@@ -142,9 +142,9 @@ export default function App() {
     }
 
   async function loadProfiles() {
-  const { data, error } = await supabase
+  const { data: mine, error } = await supabase
     .from('conversation_members')
-    .select('conversation_id, user_id')
+    .select('conversation_id')
     .eq('user_id', session.user.id);
 
   if (error) {
@@ -152,7 +152,45 @@ export default function App() {
     return;
   }
 
-  setChats(data || []);
+  if (!mine?.length) {
+    setChats([]);
+    return;
+  }
+
+  const ids = mine.map(c => c.conversation_id);
+
+  const { data: members, error: memberError } = await supabase
+    .from('conversation_members')
+    .select('conversation_id,user_id')
+    .in('conversation_id', ids)
+    .neq('user_id', session.user.id);
+
+  if (memberError) {
+    setNotice(memberError.message);
+    return;
+  }
+
+  const userIds = [...new Set((members || []).map(m => m.user_id))];
+
+  if (!userIds.length) {
+    setChats([]);
+    return;
+  }
+
+  const { data: people, error: profileError } = await supabase
+    .from('profiles')
+    .select('id,username,display_name,avatar_url')
+    .in('id', userIds);
+
+  if (profileError) {
+    setNotice(profileError.message);
+    return;
+  }
+
+  setChats((members || []).map(m => ({
+    conversation_id: m.conversation_id,
+    person: people.find(p => p.id === m.user_id)
+  })).filter(c => c.person));
   }
 
   async function openChat(person) {
