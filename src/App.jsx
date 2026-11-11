@@ -104,15 +104,17 @@ export default function App() {
 
   useEffect(() => {
     if (session) {
-      loadProfiles();
-    } else {
-      setProfiles([]);
-      setActive(null);
-      setMessages([]);
-      setUnread({});
-      setIncomingNotice(null);
-      setAccountSettingsOpen(false);
-      seenMessages.current.clear();
+  setChats([]);
+  loadProfiles();
+} else {
+  setProfiles([]);
+  setChats([]);
+  setActive(null);
+  setMessages([]);
+  setUnread({});
+  setIncomingNotice(null);
+  setAccountSettingsOpen(false);
+  seenMessages.current.clear();
     }
   }, [session]);
 
