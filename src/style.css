@@ -356,3 +356,6 @@ html[data-animations="off"] .nav-item,html[data-animations="off"] .nav-icon svg,
   .atlantic-bottom-nav { margin:8px 12px max(10px,env(safe-area-inset-bottom));padding:9px 10px; }
   .side-foot { display:none; }
 }
+
+.custom-accent { display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--ink);font-size:12px;font-weight:800; }
+.custom-accent input[type="color"] { width:42px;height:34px;padding:3px;border:2px solid var(--ink);border-radius:9px;background:#fff;box-shadow:2px 2px 0 var(--ink);cursor:pointer; }
