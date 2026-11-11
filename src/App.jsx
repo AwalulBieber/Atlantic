@@ -106,7 +106,6 @@ export default function App() {
   setChats([]);
   loadProfiles();
 } else {
-  setProfiles([]);
   setChats([]);
   setActive(null);
   setMessages([]);
