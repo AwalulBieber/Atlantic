@@ -398,16 +398,27 @@ export default function App() {
 
         <div className="section-title"><span>Pengguna</span><span className="count-tag">{filtered.length}</span></div>
         <div className="people">
-          {filtered.map(p => (
-            <button className={`person ${active?.person.id === p.id ? 'selected' : ''}`} key={p.id} onClick={() => openChat(p)}>
-              <div className="avatar">{initials(p.display_name || p.username)}</div>
-              <div className="person-info"><b>{p.display_name || p.username}</b><small>@{p.username}</small></div>
-              {unread[p.id] > 0 && <span className="unread-badge">{unread[p.id]}</span>}
-              <Plus size={17} />
-            </button>
-          ))}
-          {!filtered.length && <p className="empty">Pengguna Tidak Ditemukan</p>}
-        </div>
+  {filtered.map(c => (
+    <button
+      className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
+      key={c.conversation_id}
+      onClick={() => openChat(c.person)}
+    >
+      <div className="avatar">
+        {initials(c.person.display_name || c.person.username)}
+      </div>
+      <div className="person-info">
+        <b>{c.person.display_name || c.person.username}</b>
+        <small>Ketuk untuk membuka chat</small>
+      </div>
+      <MessageCircle size={17} />
+    </button>
+  ))}
+
+  {!filtered.length && (
+    <p className="empty">Belum ada percakapan</p>
+  )}
+</div>
         <footer className="side-foot">ATLANTIC WEB <span>•</span> V1.1</footer>
       </aside>
 
