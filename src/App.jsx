@@ -3,7 +3,8 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
-  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check
+  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
+  Paperclip, FileText, Image as ImageIcon, Video, Download
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -14,6 +15,21 @@ function time(value) {
   return new Date(value).toLocaleTimeString('id-ID', {
     hour: '2-digit', minute: '2-digit'
   });
+}
+
+
+const ATTACHMENT_PREFIX = 'ATLANTIC_FILE::';
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const ACCEPTED_FILES = 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv';
+
+function parseAttachment(body = '') {
+  if (!body.startsWith(ATTACHMENT_PREFIX)) return null;
+  try { return JSON.parse(body.slice(ATTACHMENT_PREFIX.length)); }
+  catch { return null; }
+}
+
+function safeFileName(name = 'file') {
+  return name.normalize('NFKC').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'file';
 }
 
 const DEFAULT_SETTINGS = {
@@ -46,6 +62,8 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const [mobileChat, setMobileChat] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
@@ -190,7 +208,14 @@ export default function App() {
       setNotice(error.message);
       return;
     }
-    setMessages(data || []);
+    const hydrated = await Promise.all((data || []).map(async message => {
+      const attachment = parseAttachment(message.body || '');
+      if (!attachment?.path) return message;
+      const { data: signed, error: signError } = await supabase.storage
+        .from('atlantic-attachments').createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
+      return { ...message, attachment: { ...attachment, url: signError ? null : signed?.signedUrl } };
+    }));
+    setMessages(hydrated);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -202,8 +227,15 @@ export default function App() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${active.conversation_id}`
-      }, payload => {
-        setMessages(old => old.some(m => m.id === payload.new.id) ? old : [...old, payload.new]);
+      }, async payload => {
+        const message = payload.new;
+        const attachment = parseAttachment(message.body || '');
+        if (attachment?.path) {
+          const { data: signed, error: signError } = await supabase.storage
+            .from('atlantic-attachments').createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
+          message.attachment = { ...attachment, url: signError ? null : signed?.signedUrl };
+        }
+        setMessages(old => old.some(m => m.id === message.id) ? old : [...old, message]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       })
       .subscribe();
@@ -256,6 +288,45 @@ export default function App() {
       setNotice('Pesan gagal dikirim: ' + error.message);
     }
     setSending(false);
+  }
+
+  async function sendAttachment(file) {
+    if (!file || !active || uploading) return;
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      setNotice('Ukuran file maksimal 25 MB.');
+      return;
+    }
+    const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/') ||
+      /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv)$/i.test(file.name);
+    if (!isAllowed) {
+      setNotice('Format file belum didukung. Gunakan foto, video, PDF, atau dokumen Office.');
+      return;
+    }
+    setUploading(true);
+    setNotice('');
+    try {
+      const path = `${active.conversation_id}/${session.user.id}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
+      const { error: uploadError } = await supabase.storage
+        .from('atlantic-attachments')
+        .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+      if (uploadError) throw uploadError;
+
+      const attachment = { path, name: file.name, type: file.type || 'application/octet-stream', size: file.size };
+      const { error: messageError } = await supabase.from('messages').insert({
+        conversation_id: active.conversation_id,
+        sender_id: session.user.id,
+        body: ATTACHMENT_PREFIX + JSON.stringify(attachment)
+      });
+      if (messageError) {
+        await supabase.storage.from('atlantic-attachments').remove([path]);
+        throw messageError;
+      }
+    } catch (err) {
+      setNotice('File gagal dikirim: ' + (err?.message || 'Terjadi kesalahan.'));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   }
 
   async function logout() {
@@ -382,7 +453,23 @@ export default function App() {
             <div className="messages">
               {messages.map(m => (
                 <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id}>
-                  <div className="bubble"><div>{m.body}</div><time>{time(m.created_at)}</time></div>
+                  <div className="bubble">
+                    {m.attachment ? (
+                      <div className="attachment">
+                        {m.attachment.type?.startsWith('image/') && m.attachment.url ? (
+                          <a href={m.attachment.url} target="_blank" rel="noreferrer"><img className="attachment-image" src={m.attachment.url} alt={m.attachment.name} /></a>
+                        ) : m.attachment.type?.startsWith('video/') && m.attachment.url ? (
+                          <video className="attachment-video" src={m.attachment.url} controls preload="metadata" />
+                        ) : (
+                          <a className="attachment-file" href={m.attachment.url || '#'} target="_blank" rel="noreferrer" download={m.attachment.name}>
+                            <FileText size={22} /><span><b>{m.attachment.name}</b><small>{(m.attachment.size / 1024 / 1024).toFixed(2)} MB</small></span><Download size={17} />
+                          </a>
+                        )}
+                        <small className="attachment-caption">{m.attachment.name}</small>
+                      </div>
+                    ) : <div>{m.body}</div>}
+                    <time>{time(m.created_at)}</time>
+                  </div>
                 </div>
               ))}
               {!messages.length && (
@@ -394,6 +481,10 @@ export default function App() {
               <div ref={bottomRef} />
             </div>
             <form className="composer" onSubmit={sendMessage}>
+              <input ref={fileInputRef} className="file-input-hidden" type="file" accept={ACCEPTED_FILES} onChange={e => sendAttachment(e.target.files?.[0])} />
+              <button type="button" className="attach-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="Lampirkan file" title="Kirim foto, video, atau dokumen">
+                {uploading ? <span className="button-spinner" /> : <Paperclip size={20} />}
+              </button>
               <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Tulis pesan…" autoComplete="off" />
               <button className="send" disabled={!draft.trim() || sending} aria-label="Kirim pesan">
                 {sending ? <span className="button-spinner" /> : <Send size={19} />}
