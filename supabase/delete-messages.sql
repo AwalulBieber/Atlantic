@@ -17,3 +17,8 @@ using (
 );
 
 grant delete on public.messages to authenticated;
+
+
+-- Include conversation_id in DELETE realtime payloads so the other chat
+-- participant can remove the matching message from the open conversation.
+alter table public.messages replica identity full;
