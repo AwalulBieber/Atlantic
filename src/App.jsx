@@ -142,13 +142,8 @@ export default function App() {
   }
 
   async function loadProfiles() {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id,username,display_name,avatar_url')
-      .neq('id', session.user.id)
-      .order('display_name');
-    if (error) setNotice(error.message);
-    else setProfiles(data || []);
+  setProfiles([]);
+
   }
 
   async function openChat(person) {
