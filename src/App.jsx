@@ -207,6 +207,7 @@ export default function App() {
         return next;
       });
       setIncomingNotice(null);
+      setReplyTarget(null);
       setActive({ conversation_id: conversationId, person });
       setMobileChat(true);
       await loadMessages(conversationId);
@@ -354,7 +355,9 @@ export default function App() {
       setNotice('Pesan gagal dihapus: ' + error.message);
       return;
     }
-    setMessages(old => old.filter(item => item.id !== message.id));
+    setMessages(old => old.filter(item => item.id !== message.id)
+      .map(item => item.reply_to === message.id ? { ...item, reply_to: null, replyPreview: null } : item));
+    if (replyTarget?.id === message.id) setReplyTarget(null);
     const attachment = message.attachment || parseAttachment(message.body || '');
     if (attachment?.path) {
       const { error: storageError } = await supabase.storage
