@@ -381,3 +381,22 @@ html[data-animations="off"] .nav-item,html[data-animations="off"] .nav-icon svg,
 @media (max-width:700px) { .new-chat-backdrop { padding:14px; }.new-chat-modal { max-height:80dvh; } }
 html[data-theme="dark"] .new-chat-search { background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18); }
 html[data-animations="off"] .new-chat-modal { animation:none; }
+
+
+/* Atlantic conversation history */
+.chat-list-person .person-info small {
+  max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  color:var(--muted,#737373); margin-top:5px; font-size:12px; font-weight:500;
+}
+.chat-list-meta {
+  align-self:stretch; display:flex; flex-direction:column; align-items:flex-end;
+  justify-content:center; gap:6px; color:#777; font-size:10px; white-space:nowrap;
+}
+.chat-list-meta .unread-badge { font-style:normal; }
+.chat-list-empty {
+  min-height:180px; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:9px; padding:24px; color:#777; text-align:center;
+}
+.chat-list-empty svg { opacity:.55; }
+.chat-list-empty b { color:var(--ink); font-size:14px; }
+.chat-list-empty span { font-size:12px; }
