@@ -396,7 +396,7 @@ export default function App() {
           <input placeholder="Cari Chat…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        <div className="section-title"><span>Pengguna</span><span className="count-tag">{filtered.length}</span></div>
+        <div className="section-title"><span>Chat</span><span className="count-tag">{filtered.length}</span></div>
         <div className="people">
   {filtered.map(c => (
     <button
