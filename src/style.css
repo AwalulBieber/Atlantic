@@ -294,3 +294,27 @@ html[data-theme="dark"] .font-choice small { color: #ccc; } html[data-theme="dar
 .message-delete-btn { display:inline-flex; align-items:center; justify-content:center; width:23px; height:23px; padding:0; border:0; border-radius:7px; background:transparent; color:inherit; opacity:.55; cursor:pointer; transition:opacity .18s ease, background .18s ease, transform .18s ease; }
 .message-delete-btn:hover { opacity:1; background:#ef444422; color:#dc2626; transform:scale(1.06); }
 .message-delete-btn:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+
+
+/* Atlantic message replies */
+.reply-quote {
+  display:flex; flex-direction:column; gap:3px; width:100%; max-width:100%;
+  margin:0 0 8px; padding:8px 10px; text-align:left; border:0;
+  border-left:4px solid #1685d8; border-radius:6px; background:rgba(22,133,216,.12);
+  color:inherit; cursor:pointer;
+}
+.reply-quote b { font-size:11px; color:#1685d8; }
+.reply-quote span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; opacity:.85; }
+.reply-composer-preview {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 14px; margin:0 14px 8px; border:2px solid var(--ink);
+  border-left:5px solid #1685d8; border-radius:9px; background:rgba(22,133,216,.10);
+}
+.reply-composer-preview div { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.reply-composer-preview b { color:#1685d8; font-size:11px; }
+.reply-composer-preview span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+.reply-composer-preview button { display:grid; place-items:center; width:28px; height:28px; border:0; border-radius:7px; background:transparent; color:inherit; }
+.message-reply-btn { display:inline-flex; align-items:center; justify-content:center; width:23px; height:23px; padding:0; border:0; border-radius:7px; background:transparent; color:inherit; opacity:.55; cursor:pointer; }
+.message-reply-btn:hover { opacity:1; background:#1685d822; color:#1685d8; }
+html[data-theme="dark"] .reply-quote, html[data-theme="dark"] .reply-composer-preview { background:rgba(22,133,216,.18); }
+@media (max-width:700px) { .reply-composer-preview { margin-left:10px; margin-right:10px; } }
