@@ -63,6 +63,9 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [replyTarget, setReplyTarget] = useState(null);
+  const [peerTyping, setPeerTyping] = useState(false);
+  const typingChannelRef = useRef(null);
+  const typingTimerRef = useRef(null);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -321,8 +324,41 @@ export default function App() {
     return () => supabase.removeChannel(channel);
   }, [session?.user?.id, active?.conversation_id]);
 
+  function notifyTyping(typing) {
+    if (!active || !typingChannelRef.current) return;
+    typingChannelRef.current.send({
+      type: 'broadcast', event: 'typing',
+      payload: { user_id: session.user.id, typing: Boolean(typing) }
+    });
+  }
+
+  useEffect(() => {
+    if (!active || !session) return;
+    const channel = supabase.channel('typing-' + active.conversation_id, {
+      config: { broadcast: { self: false } }
+    });
+    channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      if (payload?.user_id === session.user.id) return;
+      setPeerTyping(Boolean(payload?.typing));
+      clearTimeout(typingTimerRef.current);
+      if (payload?.typing) {
+        typingTimerRef.current = setTimeout(() => setPeerTyping(false), 1900);
+      }
+    });
+    channel.subscribe(status => {
+      if (status === 'SUBSCRIBED') typingChannelRef.current = channel;
+    });
+    return () => {
+      clearTimeout(typingTimerRef.current);
+      typingChannelRef.current = null;
+      setPeerTyping(false);
+      supabase.removeChannel(channel);
+    };
+  }, [active?.conversation_id, session?.user?.id]);
+
   async function sendMessage(e) {
     e.preventDefault();
+    notifyTyping(false);
     const body = draft.trim();
     if (!body || !active || sending) return;
     setSending(true);
@@ -527,7 +563,7 @@ export default function App() {
               {active.person.avatar_url ? <img className="avatar avatar-photo" src={active.person.avatar_url} alt="" /> : <div className="avatar">{initials(active.person.display_name || active.person.username)}</div>}
               <div className="chat-person">
                 <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b>
-                <small>@{active.person.username}</small>
+                <small className={peerTyping ? 'typing-label' : ''}>{peerTyping ? <><span className="typing-dots"><i /><i /><i /></span> sedang mengetik…</> : `@${active.person.username}`}</small>
               </div>
             </header>
             <div className="messages">
@@ -602,7 +638,7 @@ export default function App() {
               <button type="button" className="attach-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="Lampirkan file" title="Kirim foto, video, atau dokumen">
                 {uploading ? <span className="button-spinner" /> : <Paperclip size={20} />}
               </button>
-              <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Tulis pesan…" autoComplete="off" />
+              <input value={draft} onChange={e => { setDraft(e.target.value); notifyTyping(Boolean(e.target.value.trim())); }} onBlur={() => notifyTyping(false)} placeholder="Tulis pesan…" autoComplete="off" />
               <button className="send" disabled={!draft.trim() || sending} aria-label="Kirim pesan">
                 {sending ? <span className="button-spinner" /> : <Send size={19} />}
               </button>
