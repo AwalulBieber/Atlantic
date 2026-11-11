@@ -17,6 +17,7 @@ export default function AtlanticStories({ session, profiles = [], myProfile }) {
   const [storyFile, setStoryFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [viewerCount, setViewerCount] = useState(0);
   const fileRef = useRef(null);
 
   const people = useMemo(() => [
@@ -129,6 +130,18 @@ export default function AtlanticStories({ session, profiles = [], myProfile }) {
   const currentStory = storyOpen?.items?.[storyIndex];
   const currentOwner = people.find(p => p.id === currentStory?.user_id);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadViewerCount() {
+      if (!currentStory || currentStory.user_id !== session?.user?.id) { setViewerCount(0); return; }
+      const { count, error: countError } = await supabase.from('story_views')
+        .select('viewer_id', { count: 'exact', head: true }).eq('story_id', currentStory.id);
+      if (alive && !countError) setViewerCount(count || 0);
+    }
+    loadViewerCount();
+    return () => { alive = false; };
+  }, [currentStory?.id, session?.user?.id]);
+
   return (
     <section className="atl-stories">
       <div className="atl-stories-heading">
@@ -175,7 +188,7 @@ export default function AtlanticStories({ session, profiles = [], myProfile }) {
           <header><b>{currentOwner?.display_name || currentOwner?.username || 'Story'}</b><small><Clock3 size={12}/> {new Date(currentStory.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</small><button onClick={() => setStoryOpen(null)}><X size={18}/></button></header>
           {currentStory.media_type.startsWith('video/') ? <video src={currentStory.url} controls autoPlay playsInline/> : <img src={currentStory.url} alt="Story"/>}
           {currentStory.caption && <p>{currentStory.caption}</p>}
-          {currentStory.user_id === session.user.id && <small className="atl-story-views"><Eye size={14}/> { 'Lihat penonton di Supabase' }</small>}
+          {currentStory.user_id === session.user.id && <small className="atl-story-views"><Eye size={14}/> {viewerCount} penonton</small>}
           <div className="atl-story-controls"><button disabled={storyIndex === 0} onClick={() => moveStory(storyIndex - 1)}>Sebelumnya</button><button disabled={storyIndex >= storyOpen.items.length - 1} onClick={() => moveStory(storyIndex + 1)}>Berikutnya</button></div>
         </div>
       </div>}
