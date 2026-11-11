@@ -4,7 +4,7 @@ import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
-  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck
+  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck, Trash2
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -310,6 +310,30 @@ export default function App() {
     setSending(false);
   }
 
+  async function deleteMessage(message) {
+    if (!message?.id || message.sender_id !== session.user.id) return;
+    const confirmed = window.confirm('Hapus pesan ini untuk semua orang?');
+    if (!confirmed) return;
+    setNotice('');
+    const { error } = await supabase.from('messages')
+      .delete()
+      .eq('id', message.id)
+      .eq('sender_id', session.user.id);
+    if (error) {
+      setNotice('Pesan gagal dihapus: ' + error.message);
+      return;
+    }
+    setMessages(old => old.filter(item => item.id !== message.id));
+    const attachment = message.attachment || parseAttachment(message.body || '');
+    if (attachment?.path) {
+      const { error: storageError } = await supabase.storage
+        .from('atlantic-attachments').remove([attachment.path]);
+      if (storageError) {
+        setNotice('Pesan terhapus, tetapi file lampiran gagal dibersihkan: ' + storageError.message);
+      }
+    }
+  }
+
   async function sendAttachment(file) {
     if (!file || !active || uploading) return;
     if (file.size > MAX_ATTACHMENT_SIZE) {
@@ -488,7 +512,20 @@ export default function App() {
                         <small className="attachment-caption">{m.attachment.name}</small>
                       </div>
                     ) : <div>{m.body}</div>}
-                    <time>{time(m.created_at)}</time>
+                    <div className="bubble-meta">
+                      <time>{time(m.created_at)}</time>
+                      {m.sender_id === session.user.id && (
+                        <button
+                          type="button"
+                          className="message-delete-btn"
+                          onClick={() => deleteMessage(m)}
+                          title="Hapus pesan untuk semua orang"
+                          aria-label="Hapus pesan"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
