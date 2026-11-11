@@ -632,7 +632,7 @@ export default function App() {
       {accountSettingsOpen && (
         <AtlanticAccountSettings
           user={session.user}
-          onClose={() => setAccountSettingsOpen(false)}
+          onClose={() => { setAccountSettingsOpen(false); loadProfiles(); }}
         />
       )}
     </main>
