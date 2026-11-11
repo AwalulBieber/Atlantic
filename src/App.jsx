@@ -360,9 +360,10 @@ export default function App() {
     );
   }
 
-  const filtered = profiles.filter(p =>
-    (p.display_name || p.username || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = chats.filter(c =>
+  (c.person.display_name || c.person.username || '')
+    .toLowerCase().includes(search.toLowerCase())
+);
 
   return (
     <main className="app-shell">
