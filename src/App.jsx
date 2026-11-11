@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
-import AtlanticStories from './components/AtlanticStories';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
-  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, UsersRound, CircleDot, MessageSquare,
-  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck, Trash2, Reply, CheckCheck
+  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
+  Clock3, Radio, Phone, NotebookPen, ImagePlus
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -16,21 +15,6 @@ function time(value) {
   return new Date(value).toLocaleTimeString('id-ID', {
     hour: '2-digit', minute: '2-digit'
   });
-}
-
-
-const ATTACHMENT_PREFIX = 'ATLANTIC_FILE::';
-const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
-const ACCEPTED_FILES = 'image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv';
-
-function parseAttachment(body = '') {
-  if (!body.startsWith(ATTACHMENT_PREFIX)) return null;
-  try { return JSON.parse(body.slice(ATTACHMENT_PREFIX.length)); }
-  catch { return null; }
-}
-
-function safeFileName(name = 'file') {
-  return name.normalize('NFKC').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'file';
 }
 
 const DEFAULT_SETTINGS = {
@@ -57,30 +41,20 @@ export default function App() {
   const [displayName, setDisplayName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [profiles, setProfiles] = useState([]);
-  const [chatList, setChatList] = useState([]);
-  const [myProfile, setMyProfile] = useState(null);
+  const [chats, setChats] = useState([]);
   const [search, setSearch] = useState('');
-  const [activeNav, setActiveNav] = useState('chats');
-  const [newChatOpen, setNewChatOpen] = useState(false);
-  const [newChatSearch, setNewChatSearch] = useState('');
-  const searchInputRef = useRef(null);
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
-  const [replyTarget, setReplyTarget] = useState(null);
-  const [peerTyping, setPeerTyping] = useState(false);
-  const typingChannelRef = useRef(null);
-  const typingTimerRef = useRef(null);
   const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
   const [mobileChat, setMobileChat] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [unread, setUnread] = useState({});
   const [incomingNotice, setIncomingNotice] = useState(null);
+  const [activeTab, setActiveTab] = useState('chat');
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
 
   const seenMessages = useRef(new Set());
   const bottomRef = useRef(null);
@@ -110,7 +84,7 @@ export default function App() {
       yellow: '#ffd84d', blue: '#7bd5ff', pink: '#ff9ec7',
       green: '#b8f36b', purple: '#c6a5ff'
     };
-    root.style.setProperty('--accent', accents[settings.accent] || (settings.accent?.startsWith('#') ? settings.accent : accents.yellow));
+    root.style.setProperty('--accent', accents[settings.accent] || accents.yellow);
   }, [settings]);
 
   function updateSetting(key, value) {
@@ -132,19 +106,16 @@ export default function App() {
 
   useEffect(() => {
     if (session) {
-      loadProfiles();
-      loadChatList();
-    } else {
-      setProfiles([]);
-      setChatList([]);
-      setMyProfile(null);
-      setActive(null);
-      setMessages([]);
-      setReplyTarget(null);
-      setUnread({});
-      setIncomingNotice(null);
-      setAccountSettingsOpen(false);
-      seenMessages.current.clear();
+  setChats([]);
+  loadProfiles();
+} else {
+  setChats([]);
+  setActive(null);
+  setMessages([]);
+  setUnread({});
+  setIncomingNotice(null);
+  setAccountSettingsOpen(false);
+  seenMessages.current.clear();
     }
   }, [session]);
 
@@ -175,76 +146,58 @@ export default function App() {
   }
 
   async function loadProfiles() {
-    const [{ data, error }, { data: mine }] = await Promise.all([
-      supabase.from('profiles')
-        .select('id,username,display_name,avatar_url')
-        .neq('id', session.user.id)
-        .order('display_name'),
-      supabase.from('profiles')
-        .select('id,username,display_name,avatar_url')
-        .eq('id', session.user.id).maybeSingle()
-    ]);
-    if (error) {
-      setNotice(error.message);
-      return;
-    }
-    const withBadges = await Promise.all((data || []).map(async person => {
-      const { data: admin } = await supabase.rpc('is_atlantic_admin', { target_user: person.id });
-      return { ...person, is_admin: admin === true };
-    }));
-    const { data: myAdmin } = await supabase.rpc('is_atlantic_admin', { target_user: session.user.id });
-    setProfiles(withBadges);
-    setMyProfile(mine ? { ...mine, is_admin: myAdmin === true } : null);
+  const { data: mine, error } = await supabase
+    .from('conversation_members')
+    .select('conversation_id')
+    .eq('user_id', session.user.id);
+
+  if (error) {
+    setNotice(error.message);
+    return;
   }
 
-  async function loadChatList() {
-    if (!session?.user?.id) return;
-    const { data: memberships, error: memberError } = await supabase
-      .from('conversation_members').select('conversation_id,user_id')
-      .eq('user_id', session.user.id);
-    if (memberError) { setNotice(memberError.message); return; }
-    const conversationIds = [...new Set((memberships || []).map(item => item.conversation_id).filter(Boolean))];
-    if (!conversationIds.length) { setChatList([]); return; }
+  if (!mine?.length) {
+    setChats([]);
+    return;
+  }
 
-    const [{ data: allMembers, error: allMembersError }, { data: latestMessages, error: messagesError }] = await Promise.all([
-      supabase.from('conversation_members').select('conversation_id,user_id')
-        .in('conversation_id', conversationIds),
-      supabase.from('messages').select('id,conversation_id,sender_id,body,created_at')
-        .in('conversation_id', conversationIds).order('created_at', { ascending: false })
-    ]);
-    if (allMembersError || messagesError) {
-      setNotice((allMembersError || messagesError).message);
-      return;
-    }
-    const partnerIds = [...new Set((allMembers || [])
-      .filter(item => item.user_id !== session.user.id).map(item => item.user_id))];
-    if (!partnerIds.length) { setChatList([]); return; }
-    const { data: people, error: peopleError } = await supabase.from('profiles')
-      .select('id,username,display_name,avatar_url').in('id', partnerIds);
-    if (peopleError) { setNotice(peopleError.message); return; }
+  const ids = mine.map(c => c.conversation_id);
 
-    const peopleById = Object.fromEntries((people || []).map(person => [person.id, person]));
-    const partnerByConversation = {};
-    (allMembers || []).forEach(member => {
-      if (member.user_id !== session.user.id && peopleById[member.user_id]) {
-        partnerByConversation[member.conversation_id] = peopleById[member.user_id];
-      }
-    });
-    const lastByConversation = {};
-    (latestMessages || []).forEach(message => {
-      if (!lastByConversation[message.conversation_id]) lastByConversation[message.conversation_id] = message;
-    });
-    const items = conversationIds.map(id => ({
-      conversation_id: id,
-      person: partnerByConversation[id],
-      lastMessage: lastByConversation[id] || null
-    })).filter(item => item.person)
-      .sort((a, b) => new Date(b.lastMessage?.created_at || 0) - new Date(a.lastMessage?.created_at || 0));
-    setChatList(items);
+  const { data: members, error: memberError } = await supabase
+    .from('conversation_members')
+    .select('conversation_id,user_id')
+    .in('conversation_id', ids)
+    .neq('user_id', session.user.id);
+
+  if (memberError) {
+    setNotice(memberError.message);
+    return;
+  }
+
+  const userIds = [...new Set((members || []).map(m => m.user_id))];
+
+  if (!userIds.length) {
+    setChats([]);
+    return;
+  }
+
+  const { data: people, error: profileError } = await supabase
+    .from('profiles')
+    .select('id,username,display_name,avatar_url')
+    .in('id', userIds);
+
+  if (profileError) {
+    setNotice(profileError.message);
+    return;
+  }
+
+  setChats((members || []).map(m => ({
+    conversation_id: m.conversation_id,
+    person: people.find(p => p.id === m.user_id)
+  })).filter(c => c.person));
   }
 
   async function openChat(person) {
-    setNewChatOpen(false);
     setNotice('');
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -265,62 +218,26 @@ export default function App() {
         return next;
       });
       setIncomingNotice(null);
-      setReplyTarget(null);
       setActive({ conversation_id: conversationId, person });
       setMobileChat(true);
       await loadMessages(conversationId);
+      await loadProfiles();
     } catch (err) {
       setNotice('Gagal membuka chat: ' + (err?.message || 'Terjadi kesalahan.'));
     }
   }
 
-  async function markConversationRead(id) {
-    if (!session?.user?.id || !id) return;
-    const now = new Date().toISOString();
-    const { error } = await supabase.from('messages')
-      .update({ delivered_at: now, read_at: now })
-      .eq('conversation_id', id)
-      .neq('sender_id', session.user.id)
-      .is('read_at', null);
-    if (error) {
-      setNotice('Status pesan gagal diperbarui: ' + error.message);
-      return;
-    }
-    setMessages(old => old.map(message =>
-      message.sender_id !== session.user.id && message.conversation_id === id && !message.read_at
-        ? { ...message, delivered_at: message.delivered_at || now, read_at: now }
-        : message
-    ));
-  }
-
   async function loadMessages(id) {
     const { data, error } = await supabase
       .from('messages')
-      .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at')
+      .select('id,conversation_id,sender_id,body,created_at')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true });
     if (error) {
       setNotice(error.message);
       return;
     }
-    const replyIds = [...new Set((data || []).map(message => message.reply_to).filter(Boolean))];
-    let replyMap = {};
-    if (replyIds.length) {
-      const { data: originals } = await supabase.from('messages')
-        .select('id,body,sender_id').in('id', replyIds);
-      replyMap = Object.fromEntries((originals || []).map(original => [original.id, original]));
-    }
-    const hydrated = await Promise.all((data || []).map(async message => {
-      const attachment = parseAttachment(message.body || '');
-      const original = message.reply_to ? replyMap[message.reply_to] : null;
-      let result = { ...message, replyPreview: original || null };
-      if (!attachment?.path) return result;
-      const { data: signed, error: signError } = await supabase.storage
-        .from('atlantic-attachments').createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
-      return { ...result, attachment: { ...attachment, url: signError ? null : signed?.signedUrl } };
-    }));
-    setMessages(hydrated);
-    await markConversationRead(id);
+    setMessages(data || []);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -332,42 +249,9 @@ export default function App() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${active.conversation_id}`
-      }, async payload => {
-        const message = payload.new;
-        const attachment = parseAttachment(message.body || '');
-        if (attachment?.path) {
-          const { data: signed, error: signError } = await supabase.storage
-            .from('atlantic-attachments').createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
-          message.attachment = { ...attachment, url: signError ? null : signed?.signedUrl };
-        }
-        if (message.reply_to) {
-          const { data: original } = await supabase.from('messages')
-            .select('id,body,sender_id').eq('id', message.reply_to).maybeSingle();
-          message.replyPreview = original || null;
-        }
-        setMessages(old => old.some(m => m.id === message.id) ? old : [...old, message]);
+      }, payload => {
+        setMessages(old => old.some(m => m.id === payload.new.id) ? old : [...old, payload.new]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'messages',
-        filter: `conversation_id=eq.${active.conversation_id}`
-      }, payload => {
-        const updated = payload.new;
-        setMessages(old => old.map(message => message.id === updated.id
-          ? { ...message, delivered_at: updated.delivered_at, read_at: updated.read_at }
-          : message));
-      })
-      .on('postgres_changes', {
-        event: 'DELETE', schema: 'public', table: 'messages'
-      }, payload => {
-        const deleted = payload.old;
-        if (deleted?.conversation_id === active.conversation_id && deleted?.id) {
-          setMessages(old => old
-            .filter(message => message.id !== deleted.id)
-            .map(message => message.reply_to === deleted.id
-              ? { ...message, reply_to: null, replyPreview: null }
-              : message));
-        }
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
@@ -384,25 +268,12 @@ export default function App() {
         if (!message || message.sender_id === session.user.id ||
             seenMessages.current.has(message.id)) return;
         seenMessages.current.add(message.id);
+        if (active?.conversation_id === message.conversation_id) return;
 
         const { data: members, error: memberError } = await supabase
           .from('conversation_members').select('user_id')
           .eq('conversation_id', message.conversation_id);
         if (memberError || !members?.some(m => m.user_id === session.user.id)) return;
-
-        const receiptTime = new Date().toISOString();
-        const receiptUpdate = { delivered_at: receiptTime };
-        if (active?.conversation_id === message.conversation_id) receiptUpdate.read_at = receiptTime;
-        await supabase.from('messages').update(receiptUpdate)
-          .eq('id', message.id).eq('sender_id', message.sender_id);
-
-        if (active?.conversation_id === message.conversation_id) {
-          setMessages(old => old.map(item => item.id === message.id
-            ? { ...item, delivered_at: receiptTime, read_at: receiptTime }
-            : item));
-          loadChatList();
-          return;
-        }
 
         const { data: person, error: profileError } = await supabase
           .from('profiles').select('id,username,display_name,avatar_url')
@@ -410,53 +281,14 @@ export default function App() {
         if (profileError || !person) return;
 
         setUnread(old => ({ ...old, [person.id]: (old[person.id] || 0) + 1 }));
-        const incomingAttachment = parseAttachment(message.body || '');
-        const incomingLabel = incomingAttachment
-          ? incomingAttachment.type?.startsWith('image/') ? 'Mengirim foto'
-            : incomingAttachment.type?.startsWith('video/') ? 'Mengirim video' : 'Mengirim dokumen'
-          : message.body || 'Mengirim pesan';
-        setIncomingNotice({ person, body: incomingLabel });
-        loadChatList();
+        setIncomingNotice({ person, body: message.body || 'Mengirim pesan' });
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [session?.user?.id, active?.conversation_id]);
 
-  function notifyTyping(typing) {
-    if (!active || !typingChannelRef.current) return;
-    typingChannelRef.current.send({
-      type: 'broadcast', event: 'typing',
-      payload: { user_id: session.user.id, typing: Boolean(typing) }
-    });
-  }
-
-  useEffect(() => {
-    if (!active || !session) return;
-    const channel = supabase.channel('typing-' + active.conversation_id, {
-      config: { broadcast: { self: false } }
-    });
-    channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
-      if (payload?.user_id === session.user.id) return;
-      setPeerTyping(Boolean(payload?.typing));
-      clearTimeout(typingTimerRef.current);
-      if (payload?.typing) {
-        typingTimerRef.current = setTimeout(() => setPeerTyping(false), 1900);
-      }
-    });
-    channel.subscribe(status => {
-      if (status === 'SUBSCRIBED') typingChannelRef.current = channel;
-    });
-    return () => {
-      clearTimeout(typingTimerRef.current);
-      typingChannelRef.current = null;
-      setPeerTyping(false);
-      supabase.removeChannel(channel);
-    };
-  }, [active?.conversation_id, session?.user?.id]);
-
   async function sendMessage(e) {
     e.preventDefault();
-    notifyTyping(false);
     const body = draft.trim();
     if (!body || !active || sending) return;
     setSending(true);
@@ -464,85 +296,13 @@ export default function App() {
     const { error } = await supabase.from('messages').insert({
       conversation_id: active.conversation_id,
       sender_id: session.user.id,
-      body,
-      reply_to: replyTarget?.id || null
+      body
     });
     if (error) {
       setDraft(body);
       setNotice('Pesan gagal dikirim: ' + error.message);
-    } else {
-      setReplyTarget(null);
-      loadChatList();
     }
     setSending(false);
-  }
-
-  async function deleteMessage(message) {
-    if (!message?.id || message.sender_id !== session.user.id) return;
-    const confirmed = window.confirm('Hapus pesan ini untuk semua orang?');
-    if (!confirmed) return;
-    setNotice('');
-    const { error } = await supabase.from('messages')
-      .delete()
-      .eq('id', message.id)
-      .eq('sender_id', session.user.id);
-    if (error) {
-      setNotice('Pesan gagal dihapus: ' + error.message);
-      return;
-    }
-    setMessages(old => old.filter(item => item.id !== message.id)
-      .map(item => item.reply_to === message.id ? { ...item, reply_to: null, replyPreview: null } : item));
-    if (replyTarget?.id === message.id) setReplyTarget(null);
-    const attachment = message.attachment || parseAttachment(message.body || '');
-    if (attachment?.path) {
-      const { error: storageError } = await supabase.storage
-        .from('atlantic-attachments').remove([attachment.path]);
-      if (storageError) {
-        setNotice('Pesan terhapus, tetapi file lampiran gagal dibersihkan: ' + storageError.message);
-      }
-    }
-  }
-
-  async function sendAttachment(file) {
-    if (!file || !active || uploading) return;
-    if (file.size > MAX_ATTACHMENT_SIZE) {
-      setNotice('Ukuran file maksimal 25 MB.');
-      return;
-    }
-    const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/') ||
-      /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv)$/i.test(file.name);
-    if (!isAllowed) {
-      setNotice('Format file belum didukung. Gunakan foto, video, PDF, atau dokumen Office.');
-      return;
-    }
-    setUploading(true);
-    setNotice('');
-    try {
-      const path = `${active.conversation_id}/${session.user.id}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
-      const { error: uploadError } = await supabase.storage
-        .from('atlantic-attachments')
-        .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-      if (uploadError) throw uploadError;
-
-      const attachment = { path, name: file.name, type: file.type || 'application/octet-stream', size: file.size };
-      const { error: messageError } = await supabase.from('messages').insert({
-        conversation_id: active.conversation_id,
-        sender_id: session.user.id,
-        body: ATTACHMENT_PREFIX + JSON.stringify(attachment),
-        reply_to: replyTarget?.id || null
-      });
-      if (messageError) {
-        await supabase.storage.from('atlantic-attachments').remove([path]);
-        throw messageError;
-      }
-      setReplyTarget(null);
-      loadChatList();
-    } catch (err) {
-      setNotice('File gagal dikirim: ' + (err?.message || 'Terjadi kesalahan.'));
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
   }
 
   async function logout() {
@@ -605,18 +365,13 @@ export default function App() {
     );
   }
 
-  const filtered = profiles.filter(p =>
-    (p.display_name || p.username || '').toLowerCase().includes(search.toLowerCase())
-  );
-  const filteredChats = chatList.filter(item =>
-    `${item.person.display_name || ''} ${item.person.username || ''}`.toLowerCase().includes(search.toLowerCase())
-  );
-  const newChatFiltered = profiles.filter(p =>
-    `${p.display_name || ''} ${p.username || ''}`.toLowerCase().includes(newChatSearch.toLowerCase())
-  );
+  const filtered = chats.filter(c =>
+  (c.person.display_name || c.person.username || '')
+    .toLowerCase().includes(search.toLowerCase())
+);
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell tab-${activeTab}`}>
       <aside className={`sidebar ${mobileChat ? 'hide-mobile' : ''}`}>
         <header className="topbar">
           <div className="brand"><Waves /> ATLANTIC</div>
@@ -634,93 +389,41 @@ export default function App() {
         </header>
 
         <div className="me">
-          {myProfile?.avatar_url ? <img className="avatar avatar-photo" src={myProfile.avatar_url} alt="Foto profil" /> : <div className="avatar">{initials(myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email)}</div>}
+          <div className="avatar">{initials(session.user.user_metadata?.display_name || session.user.email)}</div>
           <div>
-            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b>
+            <b>{session.user.user_metadata?.display_name || session.user.email}</b>
             <small><i className="online-dot" /> Online</small>
           </div>
         </div>
 
-        <AtlanticStories session={session} profiles={profiles} myProfile={myProfile} />
-
         <div className="search">
           <Search size={17} />
-          <input ref={searchInputRef} placeholder="Cari pengguna…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Cari Chat…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        <div className="section-title"><span>{activeNav === 'friends' ? 'Friends' : 'Chat'}</span><span className="count-tag">{activeNav === 'friends' ? filtered.length : filteredChats.length}</span></div>
+        <div className="section-title"><span>Chat</span><span className="count-tag">{filtered.length}</span></div>
         <div className="people">
-          {activeNav === 'friends' ? (
-            <>
-              {filtered.map(p => (
-                <button className={`person ${active?.person.id === p.id ? 'selected' : ''}`} key={p.id} onClick={() => openChat(p)}>
-                  {p.avatar_url ? <img className="avatar avatar-photo" src={p.avatar_url} alt="" /> : <div className="avatar">{initials(p.display_name || p.username)}</div>}
-                  <div className="person-info"><b>{p.display_name || p.username}{p.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b><small>@{p.username}</small></div>
-                  <Plus size={17} />
-                </button>
-              ))}
-              {!filtered.length && <p className="empty">Pengguna tidak ditemukan.</p>}
-            </>
-          ) : (
-            <>
-              {filteredChats.map(item => {
-                const person = item.person;
-                const last = item.lastMessage;
-                const attachment = last ? parseAttachment(last.body || '') : null;
-                const preview = attachment ? (attachment.type?.startsWith('image/') ? '📷 Foto' : attachment.type?.startsWith('video/') ? '🎥 Video' : '📎 ' + attachment.name) : (last?.body || 'Belum ada pesan');
-                return (
-                  <button className={`person chat-list-person ${active?.person.id === person.id ? 'selected' : ''}`} key={item.conversation_id} onClick={() => openChat(person)}>
-                    {person.avatar_url ? <img className="avatar avatar-photo" src={person.avatar_url} alt="" /> : <div className="avatar">{initials(person.display_name || person.username)}</div>}
-                    <div className="person-info"><b>{person.display_name || person.username}{person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b><small>{last?.sender_id === session.user.id ? 'Kamu: ' : ''}{preview}</small></div>
-                    <span className="chat-list-meta">{last?.created_at ? time(last.created_at) : ''}{unread[person.id] > 0 && <i className="unread-badge">{unread[person.id]}</i>}</span>
-                  </button>
-                );
-              })}
-              {!filteredChats.length && <div className="chat-list-empty"><MessageCircle size={25} /><b>Belum ada chat</b><span>Mulai percakapan lewat tombol +.</span></div>}
-            </>
-          )}
-        </div>
-        <nav className="atlantic-bottom-nav" aria-label="Navigasi utama">
-          <button type="button" className={activeNav === 'chats' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveNav('chats')} aria-label="Chat">
-            <span className="nav-icon"><MessageSquare size={21} /></span><small>Chat</small>
-          </button>
-          <button type="button" className={activeNav === 'friends' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveNav('friends')} aria-label="Friends">
-            <span className="nav-icon"><UsersRound size={21} /></span><small>Friends</small>
-          </button>
-          <button type="button" className="nav-create" onClick={() => { setNewChatSearch(''); setNewChatOpen(true); }} aria-label="Buat chat baru" title="Buat chat baru">
-            <Plus size={27} strokeWidth={2.8} />
-          </button>
-          <button type="button" className={activeNav === 'status' ? 'nav-item active' : 'nav-item'} onClick={() => { setActiveNav('status'); setNotice('Story dan Catatan tersedia di panel kiri.'); }} aria-label="Story">
-            <span className="nav-icon"><CircleDot size={21} /></span><small>Story</small>
-          </button>
-          <button type="button" className="nav-item" onClick={() => setAccountSettingsOpen(true)} aria-label="Profile">
-            <span className="nav-icon">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : <UserRound size={21} />}</span><small>Profile</small>
-          </button>
-        </nav>
-        {newChatOpen && (
-          <div className="new-chat-backdrop" onClick={() => setNewChatOpen(false)}>
-            <section className="new-chat-modal" role="dialog" aria-modal="true" aria-label="Buat chat baru" onClick={e => e.stopPropagation()}>
-              <header className="new-chat-head">
-                <div><span className="eyebrow">ATLANTIC MESSENGER</span><h2>Chat Baru</h2></div>
-                <button type="button" className="icon-btn" onClick={() => setNewChatOpen(false)} aria-label="Tutup"><X size={19} /></button>
-              </header>
-              <label className="new-chat-search">
-                <Search size={17} />
-                <input autoFocus value={newChatSearch} onChange={e => setNewChatSearch(e.target.value)} placeholder="Cari nama atau username…" />
-              </label>
-              <div className="new-chat-list">
-                {newChatFiltered.map(person => (
-                  <button type="button" className="new-chat-person" key={person.id} onClick={() => openChat(person)}>
-                    {person.avatar_url ? <img className="avatar avatar-photo" src={person.avatar_url} alt="" /> : <div className="avatar">{initials(person.display_name || person.username)}</div>}
-                    <span><b>{person.display_name || person.username}{person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={13} /></span>}</b><small>@{person.username}</small></span>
-                    <MessageCircle size={18} />
-                  </button>
-                ))}
-                {!newChatFiltered.length && <p className="new-chat-empty">{profiles.length ? 'Pengguna tidak ditemukan.' : 'Belum ada pengguna lain di Atlantic.'}</p>}
-              </div>
-            </section>
-          </div>
-        )}
+  {filtered.map(c => (
+    <button
+      className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
+      key={c.conversation_id}
+      onClick={() => openChat(c.person)}
+    >
+      <div className="avatar">
+        {initials(c.person.display_name || c.person.username)}
+      </div>
+      <div className="person-info">
+        <b>{c.person.display_name || c.person.username}</b>
+        <small>Ketuk untuk membuka chat</small>
+      </div>
+      <MessageCircle size={17} />
+    </button>
+  ))}
+
+  {!filtered.length && (
+    <p className="empty">Belum ada percakapan</p>
+  )}
+</div>
         <footer className="side-foot">ATLANTIC WEB <span>•</span> V1.1</footer>
       </aside>
 
@@ -729,67 +432,16 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              {active.person.avatar_url ? <img className="avatar avatar-photo" src={active.person.avatar_url} alt="" /> : <div className="avatar">{initials(active.person.display_name || active.person.username)}</div>}
+              <div className="avatar">{initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
-                <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b>
-                <small className={peerTyping ? 'typing-label' : ''}>{peerTyping ? <><span className="typing-dots"><i /><i /><i /></span> sedang mengetik…</> : `@${active.person.username}`}</small>
+                <b>{active.person.display_name || active.person.username}</b>
+                <small>@{active.person.username}</small>
               </div>
             </header>
             <div className="messages">
               {messages.map(m => (
-                <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id} id={`message-${m.id}`}>
-                  <div className="bubble">
-                    {m.replyPreview && (
-                      <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-                        <b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.person.display_name || active.person.username)}</b>
-                        <span>{parseAttachment(m.replyPreview.body || '')?.name || m.replyPreview.body || 'Pesan'}</span>
-                      </button>
-                    )}
-                    {m.attachment ? (
-                      <div className="attachment">
-                        {m.attachment.type?.startsWith('image/') && m.attachment.url ? (
-                          <a href={m.attachment.url} target="_blank" rel="noreferrer"><img className="attachment-image" src={m.attachment.url} alt={m.attachment.name} /></a>
-                        ) : m.attachment.type?.startsWith('video/') && m.attachment.url ? (
-                          <video className="attachment-video" src={m.attachment.url} controls preload="metadata" />
-                        ) : (
-                          <a className="attachment-file" href={m.attachment.url || '#'} target="_blank" rel="noreferrer" download={m.attachment.name}>
-                            <FileText size={22} /><span><b>{m.attachment.name}</b><small>{(m.attachment.size / 1024 / 1024).toFixed(2)} MB</small></span><Download size={17} />
-                          </a>
-                        )}
-                        <small className="attachment-caption">{m.attachment.name}</small>
-                      </div>
-                    ) : <div>{m.body}</div>}
-                    <div className="bubble-meta">
-                      <time>{time(m.created_at)}</time>
-                      {m.sender_id === session.user.id && (
-                        <span className={`message-receipt ${m.read_at ? 'read' : ''}`}
-                          title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Diterima' : 'Terkirim'}
-                          aria-label={m.read_at ? 'Dibaca' : m.delivered_at ? 'Diterima' : 'Terkirim'}>
-                          {m.delivered_at ? <CheckCheck size={14} /> : <Check size={14} />}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        className="message-reply-btn"
-                        onClick={() => setReplyTarget(m)}
-                        title="Balas pesan"
-                        aria-label="Balas pesan"
-                      >
-                        <Reply size={13} />
-                      </button>
-                      {m.sender_id === session.user.id && (
-                        <button
-                          type="button"
-                          className="message-delete-btn"
-                          onClick={() => deleteMessage(m)}
-                          title="Hapus pesan untuk semua orang"
-                          aria-label="Hapus pesan"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id}>
+                  <div className="bubble"><div>{m.body}</div><time>{time(m.created_at)}</time></div>
                 </div>
               ))}
               {!messages.length && (
@@ -800,21 +452,8 @@ export default function App() {
               )}
               <div ref={bottomRef} />
             </div>
-            {replyTarget && (
-              <div className="reply-composer-preview">
-                <div>
-                  <b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b>
-                  <span>{parseAttachment(replyTarget.body || '')?.name || replyTarget.body || 'Pesan'}</span>
-                </div>
-                <button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17} /></button>
-              </div>
-            )}
             <form className="composer" onSubmit={sendMessage}>
-              <input ref={fileInputRef} className="file-input-hidden" type="file" accept={ACCEPTED_FILES} onChange={e => sendAttachment(e.target.files?.[0])} />
-              <button type="button" className="attach-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="Lampirkan file" title="Kirim foto, video, atau dokumen">
-                {uploading ? <span className="button-spinner" /> : <Paperclip size={20} />}
-              </button>
-              <input value={draft} onChange={e => { setDraft(e.target.value); notifyTyping(Boolean(e.target.value.trim())); }} onBlur={() => notifyTyping(false)} placeholder="Tulis pesan…" autoComplete="off" />
+              <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Tulis pesan…" autoComplete="off" />
               <button className="send" disabled={!draft.trim() || sending} aria-label="Kirim pesan">
                 {sending ? <span className="button-spinner" /> : <Send size={19} />}
               </button>
@@ -824,7 +463,7 @@ export default function App() {
           <div className="welcome">
             <div className="welcome-icon"><MessageSquarePlus size={42} /></div>
             <h2>Selamat datang di Atlantic</h2>
-            <p>Pilih pengguna di samping untuk mulai mengobrol.</p>
+            <p>Pilih chat di samping atau tekan + untuk memulai percakapan.</p>
           </div>
         )}
       </section>
@@ -872,10 +511,6 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                  <label className="custom-accent">
-                    <span>Warna sendiri</span>
-                    <input type="color" value={settings.accent?.startsWith('#') ? settings.accent : ({yellow:'#ffd84d',blue:'#7bd5ff',pink:'#ff9ec7',green:'#b8f36b',purple:'#c6a5ff'}[settings.accent] || '#ffd84d')} onChange={e => updateSetting('accent', e.target.value)} aria-label="Pilih warna aksen sendiri" />
-                  </label>
                 </div>
                 <div className="setting-group">
                   <h3>Font website</h3><p>Emoji menggunakan fallback emoji bawaan perangkat.</p>
@@ -942,10 +577,39 @@ export default function App() {
         </div>
       )}
 
+      {createMenuOpen && (
+        <div className="create-menu-backdrop" onClick={() => setCreateMenuOpen(false)}>
+          <section className="create-menu" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Buat baru">
+            <header><div><small>ATLANTIC CREATE</small><b>Buat sesuatu</b></div><button className="icon-btn" onClick={() => setCreateMenuOpen(false)} aria-label="Tutup"><X size={18}/></button></header>
+            <button onClick={() => { setActiveTab('chat'); setCreateMenuOpen(false); setNotice('Pilih pengguna dari daftar chat untuk membuka percakapan.'); }}><MessageSquarePlus/><span><b>Chat baru</b><small>Mulai percakapan</small></span></button>
+            <button onClick={() => { setActiveTab('updates'); setCreateMenuOpen(false); setNotice('Fitur Story dan Catatan sedang disiapkan.'); }}><ImagePlus/><span><b>Story</b><small>Bagikan momen singkat</small></span></button>
+            <button onClick={() => { setActiveTab('updates'); setCreateMenuOpen(false); setNotice('Fitur Catatan sedang disiapkan.'); }}><NotebookPen/><span><b>Catatan</b><small>Tulis sesuatu untuk dibagikan</small></span></button>
+          </section>
+        </div>
+      )}
+
+      {activeTab !== 'chat' && (
+        <section className="tab-placeholder" aria-live="polite">
+          <div className="tab-placeholder-icon">{activeTab === 'updates' ? <Clock3/> : activeTab === 'channels' ? <Radio/> : <Phone/>}</div>
+          <span className="eyebrow">ATLANTIC {activeTab.toUpperCase()}</span>
+          <h2>{activeTab === 'updates' ? 'Pembaruan' : activeTab === 'channels' ? 'Saluran' : 'Panggilan'}</h2>
+          <p>{activeTab === 'updates' ? 'Story dan Catatan akan hadir di sini.' : activeTab === 'channels' ? 'Saluran untuk mengikuti kabar dan komunitas akan hadir di sini.' : 'Riwayat dan fitur panggilan akan hadir di sini.'}</p>
+          <button className="primary" onClick={() => setActiveTab('chat')}>Kembali ke Chat</button>
+        </section>
+      )}
+
+      <nav className="bottom-nav" aria-label="Navigasi utama">
+        <button className={activeTab === 'chat' ? 'active' : ''} onClick={() => setActiveTab('chat')}><MessageCircle/><span>Chat</span></button>
+        <button className={activeTab === 'updates' ? 'active' : ''} onClick={() => setActiveTab('updates')}><Clock3/><span>Pembaruan</span></button>
+        <button className="nav-create" onClick={() => setCreateMenuOpen(true)} aria-label="Buat baru"><Plus/></button>
+        <button className={activeTab === 'channels' ? 'active' : ''} onClick={() => setActiveTab('channels')}><Radio/><span>Saluran</span></button>
+        <button className={activeTab === 'calls' ? 'active' : ''} onClick={() => setActiveTab('calls')}><Phone/><span>Panggilan</span></button>
+      </nav>
+
       {accountSettingsOpen && (
         <AtlanticAccountSettings
           user={session.user}
-          onClose={() => { setAccountSettingsOpen(false); loadProfiles(); }}
+          onClose={() => setAccountSettingsOpen(false)}
         />
       )}
     </main>
