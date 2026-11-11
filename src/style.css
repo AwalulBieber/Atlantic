@@ -400,3 +400,11 @@ html[data-animations="off"] .new-chat-modal { animation:none; }
 .chat-list-empty svg { opacity:.55; }
 .chat-list-empty b { color:var(--ink); font-size:14px; }
 .chat-list-empty span { font-size:12px; }
+
+
+.message-receipt {
+  display:inline-flex; align-items:center; color:#858b98; margin-left:1px;
+  vertical-align:middle; line-height:1;
+}
+.message-receipt.read { color:#168be8; }
+.message-receipt svg { stroke-width:2.6; }
