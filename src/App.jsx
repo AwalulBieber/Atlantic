@@ -60,6 +60,8 @@ export default function App() {
   const [myProfile, setMyProfile] = useState(null);
   const [search, setSearch] = useState('');
   const [activeNav, setActiveNav] = useState('chats');
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [newChatSearch, setNewChatSearch] = useState('');
   const searchInputRef = useRef(null);
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -192,6 +194,7 @@ export default function App() {
   }
 
   async function openChat(person) {
+    setNewChatOpen(false);
     setNotice('');
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -510,6 +513,9 @@ export default function App() {
   const filtered = profiles.filter(p =>
     (p.display_name || p.username || '').toLowerCase().includes(search.toLowerCase())
   );
+  const newChatFiltered = profiles.filter(p =>
+    `${p.display_name || ''} ${p.username || ''}`.toLowerCase().includes(newChatSearch.toLowerCase())
+  );
 
   return (
     <main className="app-shell">
@@ -561,7 +567,7 @@ export default function App() {
           <button type="button" className={activeNav === 'friends' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveNav('friends')} aria-label="Friends">
             <span className="nav-icon"><UsersRound size={21} /></span><small>Friends</small>
           </button>
-          <button type="button" className="nav-create" onClick={() => { setActiveNav('friends'); setSearch(''); searchInputRef.current?.focus(); }} aria-label="Buat chat baru" title="Buat chat baru">
+          <button type="button" className="nav-create" onClick={() => { setNewChatSearch(''); setNewChatOpen(true); }} aria-label="Buat chat baru" title="Buat chat baru">
             <Plus size={27} strokeWidth={2.8} />
           </button>
           <button type="button" className={activeNav === 'status' ? 'nav-item active' : 'nav-item'} onClick={() => { setActiveNav('status'); setNotice('Fitur Status sedang disiapkan.'); }} aria-label="Status">
@@ -571,6 +577,30 @@ export default function App() {
             <span className="nav-icon">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : <UserRound size={21} />}</span><small>Profile</small>
           </button>
         </nav>
+        {newChatOpen && (
+          <div className="new-chat-backdrop" onClick={() => setNewChatOpen(false)}>
+            <section className="new-chat-modal" role="dialog" aria-modal="true" aria-label="Buat chat baru" onClick={e => e.stopPropagation()}>
+              <header className="new-chat-head">
+                <div><span className="eyebrow">ATLANTIC MESSENGER</span><h2>Chat Baru</h2></div>
+                <button type="button" className="icon-btn" onClick={() => setNewChatOpen(false)} aria-label="Tutup"><X size={19} /></button>
+              </header>
+              <label className="new-chat-search">
+                <Search size={17} />
+                <input autoFocus value={newChatSearch} onChange={e => setNewChatSearch(e.target.value)} placeholder="Cari nama atau username…" />
+              </label>
+              <div className="new-chat-list">
+                {newChatFiltered.map(person => (
+                  <button type="button" className="new-chat-person" key={person.id} onClick={() => openChat(person)}>
+                    {person.avatar_url ? <img className="avatar avatar-photo" src={person.avatar_url} alt="" /> : <div className="avatar">{initials(person.display_name || person.username)}</div>}
+                    <span><b>{person.display_name || person.username}{person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={13} /></span>}</b><small>@{person.username}</small></span>
+                    <MessageCircle size={18} />
+                  </button>
+                ))}
+                {!newChatFiltered.length && <p className="new-chat-empty">{profiles.length ? 'Pengguna tidak ditemukan.' : 'Belum ada pengguna lain di Atlantic.'}</p>}
+              </div>
+            </section>
+          </div>
+        )}
         <footer className="side-foot">ATLANTIC WEB <span>•</span> V1.1</footer>
       </aside>
 
