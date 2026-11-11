@@ -399,6 +399,7 @@ export default function App() {
           setMessages(old => old.map(item => item.id === message.id
             ? { ...item, delivered_at: receiptTime, read_at: receiptTime }
             : item));
+          loadChatList();
           return;
         }
 
