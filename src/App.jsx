@@ -4,7 +4,7 @@ import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
-  Paperclip, FileText, Image as ImageIcon, Video, Download
+  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -57,6 +57,7 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [profiles, setProfiles] = useState([]);
+  const [myProfile, setMyProfile] = useState(null);
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -124,6 +125,7 @@ export default function App() {
       loadProfiles();
     } else {
       setProfiles([]);
+      setMyProfile(null);
       setActive(null);
       setMessages([]);
       setUnread({});
@@ -160,13 +162,26 @@ export default function App() {
   }
 
   async function loadProfiles() {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id,username,display_name,avatar_url')
-      .neq('id', session.user.id)
-      .order('display_name');
-    if (error) setNotice(error.message);
-    else setProfiles(data || []);
+    const [{ data, error }, { data: mine }] = await Promise.all([
+      supabase.from('profiles')
+        .select('id,username,display_name,avatar_url')
+        .neq('id', session.user.id)
+        .order('display_name'),
+      supabase.from('profiles')
+        .select('id,username,display_name,avatar_url')
+        .eq('id', session.user.id).maybeSingle()
+    ]);
+    if (error) {
+      setNotice(error.message);
+      return;
+    }
+    const withBadges = await Promise.all((data || []).map(async person => {
+      const { data: admin } = await supabase.rpc('is_atlantic_admin', { target_user: person.id });
+      return { ...person, is_admin: admin === true };
+    }));
+    const { data: myAdmin } = await supabase.rpc('is_atlantic_admin', { target_user: session.user.id });
+    setProfiles(withBadges);
+    setMyProfile(mine ? { ...mine, is_admin: myAdmin === true } : null);
   }
 
   async function openChat(person) {
@@ -417,9 +432,9 @@ export default function App() {
         </header>
 
         <div className="me">
-          <div className="avatar">{initials(session.user.user_metadata?.display_name || session.user.email)}</div>
+          {myProfile?.avatar_url ? <img className="avatar avatar-photo" src={myProfile.avatar_url} alt="Foto profil" /> : <div className="avatar">{initials(myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email)}</div>}
           <div>
-            <b>{session.user.user_metadata?.display_name || session.user.email}</b>
+            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b>
             <small><i className="online-dot" /> Online</small>
           </div>
         </div>
@@ -433,8 +448,8 @@ export default function App() {
         <div className="people">
           {filtered.map(p => (
             <button className={`person ${active?.person.id === p.id ? 'selected' : ''}`} key={p.id} onClick={() => openChat(p)}>
-              <div className="avatar">{initials(p.display_name || p.username)}</div>
-              <div className="person-info"><b>{p.display_name || p.username}</b><small>@{p.username}</small></div>
+              {p.avatar_url ? <img className="avatar avatar-photo" src={p.avatar_url} alt="" /> : <div className="avatar">{initials(p.display_name || p.username)}</div>}
+              <div className="person-info"><b>{p.display_name || p.username}{p.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b><small>@{p.username}</small></div>
               {unread[p.id] > 0 && <span className="unread-badge">{unread[p.id]}</span>}
               <Plus size={17} />
             </button>
@@ -449,9 +464,9 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              <div className="avatar">{initials(active.person.display_name || active.person.username)}</div>
+              {active.person.avatar_url ? <img className="avatar avatar-photo" src={active.person.avatar_url} alt="" /> : <div className="avatar">{initials(active.person.display_name || active.person.username)}</div>}
               <div className="chat-person">
-                <b>{active.person.display_name || active.person.username}</b>
+                <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b>
                 <small>@{active.person.username}</small>
               </div>
             </header>
