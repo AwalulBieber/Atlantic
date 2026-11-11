@@ -458,7 +458,7 @@ export default function App() {
           <div className="welcome">
             <div className="welcome-icon"><MessageSquarePlus size={42} /></div>
             <h2>Selamat datang di Atlantic</h2>
-            <p>Pilih pengguna di samping untuk mulai mengobrol.</p>
+            <p>Pilih chat di samping atau tekan + untuk memulai percakapan.</p>
           </div>
         )}
       </section>
