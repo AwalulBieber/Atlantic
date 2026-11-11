@@ -140,6 +140,7 @@ export default function App() {
     } finally {
       setAuthBusy(false);
     }
+  }
 
   async function loadProfiles() {
   const { data: mine, error } = await supabase
