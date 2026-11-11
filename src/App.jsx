@@ -40,7 +40,6 @@ export default function App() {
   const [displayName, setDisplayName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [profiles, setProfiles] = useState([]);
   const [chats, setChats] = useState([]);
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
