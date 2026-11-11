@@ -253,6 +253,13 @@ export default function App() {
         setMessages(old => old.some(m => m.id === message.id) ? old : [...old, message]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       })
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'messages',
+        filter: `conversation_id=eq.${active.conversation_id}`
+      }, payload => {
+        const deletedId = payload.old?.id;
+        if (deletedId) setMessages(old => old.filter(message => message.id !== deletedId));
+      })
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [active?.conversation_id, session?.user?.id]);
