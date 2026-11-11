@@ -266,7 +266,12 @@ export default function App() {
         if (profileError || !person) return;
 
         setUnread(old => ({ ...old, [person.id]: (old[person.id] || 0) + 1 }));
-        setIncomingNotice({ person, body: message.body || 'Mengirim pesan' });
+        const incomingAttachment = parseAttachment(message.body || '');
+        const incomingLabel = incomingAttachment
+          ? incomingAttachment.type?.startsWith('image/') ? 'Mengirim foto'
+            : incomingAttachment.type?.startsWith('video/') ? 'Mengirim video' : 'Mengirim dokumen'
+          : message.body || 'Mengirim pesan';
+        setIncomingNotice({ person, body: incomingLabel });
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
