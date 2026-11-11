@@ -3,7 +3,8 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
-  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check
+  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
+  Clock3, Radio, Phone, NotebookPen, ImagePlus
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -52,6 +53,8 @@ export default function App() {
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [unread, setUnread] = useState({});
   const [incomingNotice, setIncomingNotice] = useState(null);
+  const [activeTab, setActiveTab] = useState('chat');
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
 
   const seenMessages = useRef(new Set());
   const bottomRef = useRef(null);
@@ -368,7 +371,7 @@ export default function App() {
 );
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell tab-${activeTab}`}>
       <aside className={`sidebar ${mobileChat ? 'hide-mobile' : ''}`}>
         <header className="topbar">
           <div className="brand"><Waves /> ATLANTIC</div>
@@ -573,6 +576,35 @@ export default function App() {
           </section>
         </div>
       )}
+
+      {createMenuOpen && (
+        <div className="create-menu-backdrop" onClick={() => setCreateMenuOpen(false)}>
+          <section className="create-menu" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Buat baru">
+            <header><div><small>ATLANTIC CREATE</small><b>Buat sesuatu</b></div><button className="icon-btn" onClick={() => setCreateMenuOpen(false)} aria-label="Tutup"><X size={18}/></button></header>
+            <button onClick={() => { setActiveTab('chat'); setCreateMenuOpen(false); setNotice('Pilih pengguna dari daftar chat untuk membuka percakapan.'); }}><MessageSquarePlus/><span><b>Chat baru</b><small>Mulai percakapan</small></span></button>
+            <button onClick={() => { setActiveTab('updates'); setCreateMenuOpen(false); setNotice('Fitur Story dan Catatan sedang disiapkan.'); }}><ImagePlus/><span><b>Story</b><small>Bagikan momen singkat</small></span></button>
+            <button onClick={() => { setActiveTab('updates'); setCreateMenuOpen(false); setNotice('Fitur Catatan sedang disiapkan.'); }}><NotebookPen/><span><b>Catatan</b><small>Tulis sesuatu untuk dibagikan</small></span></button>
+          </section>
+        </div>
+      )}
+
+      {activeTab !== 'chat' && (
+        <section className="tab-placeholder" aria-live="polite">
+          <div className="tab-placeholder-icon">{activeTab === 'updates' ? <Clock3/> : activeTab === 'channels' ? <Radio/> : <Phone/>}</div>
+          <span className="eyebrow">ATLANTIC {activeTab.toUpperCase()}</span>
+          <h2>{activeTab === 'updates' ? 'Pembaruan' : activeTab === 'channels' ? 'Saluran' : 'Panggilan'}</h2>
+          <p>{activeTab === 'updates' ? 'Story dan Catatan akan hadir di sini.' : activeTab === 'channels' ? 'Saluran untuk mengikuti kabar dan komunitas akan hadir di sini.' : 'Riwayat dan fitur panggilan akan hadir di sini.'}</p>
+          <button className="primary" onClick={() => setActiveTab('chat')}>Kembali ke Chat</button>
+        </section>
+      )}
+
+      <nav className="bottom-nav" aria-label="Navigasi utama">
+        <button className={activeTab === 'chat' ? 'active' : ''} onClick={() => setActiveTab('chat')}><MessageCircle/><span>Chat</span></button>
+        <button className={activeTab === 'updates' ? 'active' : ''} onClick={() => setActiveTab('updates')}><Clock3/><span>Pembaruan</span></button>
+        <button className="nav-create" onClick={() => setCreateMenuOpen(true)} aria-label="Buat baru"><Plus/></button>
+        <button className={activeTab === 'channels' ? 'active' : ''} onClick={() => setActiveTab('channels')}><Radio/><span>Saluran</span></button>
+        <button className={activeTab === 'calls' ? 'active' : ''} onClick={() => setActiveTab('calls')}><Phone/><span>Panggilan</span></button>
+      </nav>
 
       {accountSettingsOpen && (
         <AtlanticAccountSettings
