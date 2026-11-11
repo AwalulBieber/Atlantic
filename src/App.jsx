@@ -484,7 +484,7 @@ export default function App() {
                     {[
                       ['30', 'Hemat baterai'], ['60', 'Seimbang'], ['90', 'Lebih mulus'],
                       ['120', 'Paling mulus'], ['auto', 'Otomatis']
-                   .map(([v, l]) => (
+                   ].map(([v, l]) => (
                       <button key={v} className={settings.fps === v ? 'fps-choice selected' : 'fps-choice'} onClick={() => updateSetting('fps', v)}>
                         <b>{v === 'auto' ? 'AUTO' : `${v} FPS`}</b><small>{l}</small>
                       </button>
