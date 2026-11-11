@@ -217,6 +217,7 @@ export default function App() {
       setActive({ conversation_id: conversationId, person });
       setMobileChat(true);
       await loadMessages(conversationId);
+      await loadProfiles();
     } catch (err) {
       setNotice('Gagal membuka chat: ' + (err?.message || 'Terjadi kesalahan.'));
     }
