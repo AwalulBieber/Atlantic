@@ -155,8 +155,6 @@ export default function App() {
   setChats(data || []);
   }
 
-  }
-
   async function openChat(person) {
     setNotice('');
     try {
