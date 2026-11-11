@@ -279,3 +279,10 @@ html[data-theme="dark"] .font-choice small { color: #ccc; } html[data-theme="dar
   .composer .attach-btn { width: 42px; min-width: 42px; }
   .attachment-image, .attachment-video { max-width: 100%; max-height: 300px; }
 }
+
+/* Atlantic Verified badge + profile photos */
+.avatar-photo { display:block; object-fit:cover; overflow:hidden; }
+.atl-inline-verified { display:inline-flex; vertical-align:middle; align-items:center; justify-content:center; margin-left:5px; color:#1677e8; }
+.atl-inline-verified svg { fill:#1677e8; stroke:#fff; stroke-width:2.5; }
+.person-info b { display:flex; align-items:center; gap:2px; }
+.chat-person b { display:flex; align-items:center; gap:2px; }
