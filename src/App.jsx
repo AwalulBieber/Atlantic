@@ -57,6 +57,7 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [profiles, setProfiles] = useState([]);
+  const [chatList, setChatList] = useState([]);
   const [myProfile, setMyProfile] = useState(null);
   const [search, setSearch] = useState('');
   const [activeNav, setActiveNav] = useState('chats');
@@ -131,8 +132,10 @@ export default function App() {
   useEffect(() => {
     if (session) {
       loadProfiles();
+      loadChatList();
     } else {
       setProfiles([]);
+      setChatList([]);
       setMyProfile(null);
       setActive(null);
       setMessages([]);
@@ -191,6 +194,52 @@ export default function App() {
     const { data: myAdmin } = await supabase.rpc('is_atlantic_admin', { target_user: session.user.id });
     setProfiles(withBadges);
     setMyProfile(mine ? { ...mine, is_admin: myAdmin === true } : null);
+  }
+
+  async function loadChatList() {
+    if (!session?.user?.id) return;
+    const { data: memberships, error: memberError } = await supabase
+      .from('conversation_members').select('conversation_id,user_id')
+      .eq('user_id', session.user.id);
+    if (memberError) { setNotice(memberError.message); return; }
+    const conversationIds = [...new Set((memberships || []).map(item => item.conversation_id).filter(Boolean))];
+    if (!conversationIds.length) { setChatList([]); return; }
+
+    const [{ data: allMembers, error: allMembersError }, { data: latestMessages, error: messagesError }] = await Promise.all([
+      supabase.from('conversation_members').select('conversation_id,user_id')
+        .in('conversation_id', conversationIds),
+      supabase.from('messages').select('id,conversation_id,sender_id,body,created_at')
+        .in('conversation_id', conversationIds).order('created_at', { ascending: false })
+    ]);
+    if (allMembersError || messagesError) {
+      setNotice((allMembersError || messagesError).message);
+      return;
+    }
+    const partnerIds = [...new Set((allMembers || [])
+      .filter(item => item.user_id !== session.user.id).map(item => item.user_id))];
+    if (!partnerIds.length) { setChatList([]); return; }
+    const { data: people, error: peopleError } = await supabase.from('profiles')
+      .select('id,username,display_name,avatar_url').in('id', partnerIds);
+    if (peopleError) { setNotice(peopleError.message); return; }
+
+    const peopleById = Object.fromEntries((people || []).map(person => [person.id, person]));
+    const partnerByConversation = {};
+    (allMembers || []).forEach(member => {
+      if (member.user_id !== session.user.id && peopleById[member.user_id]) {
+        partnerByConversation[member.conversation_id] = peopleById[member.user_id];
+      }
+    });
+    const lastByConversation = {};
+    (latestMessages || []).forEach(message => {
+      if (!lastByConversation[message.conversation_id]) lastByConversation[message.conversation_id] = message;
+    });
+    const items = conversationIds.map(id => ({
+      conversation_id: id,
+      person: partnerByConversation[id],
+      lastMessage: lastByConversation[id] || null
+    })).filter(item => item.person)
+      .sort((a, b) => new Date(b.lastMessage?.created_at || 0) - new Date(a.lastMessage?.created_at || 0));
+    setChatList(items);
   }
 
   async function openChat(person) {
@@ -324,6 +373,7 @@ export default function App() {
             : incomingAttachment.type?.startsWith('video/') ? 'Mengirim video' : 'Mengirim dokumen'
           : message.body || 'Mengirim pesan';
         setIncomingNotice({ person, body: incomingLabel });
+        loadChatList();
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
@@ -513,6 +563,9 @@ export default function App() {
   const filtered = profiles.filter(p =>
     (p.display_name || p.username || '').toLowerCase().includes(search.toLowerCase())
   );
+  const filteredChats = chatList.filter(item =>
+    `${item.person.display_name || ''} ${item.person.username || ''}`.toLowerCase().includes(search.toLowerCase())
+  );
   const newChatFiltered = profiles.filter(p =>
     `${p.display_name || ''} ${p.username || ''}`.toLowerCase().includes(newChatSearch.toLowerCase())
   );
@@ -548,17 +601,37 @@ export default function App() {
           <input ref={searchInputRef} placeholder="Cari pengguna…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        <div className="section-title"><span>Pengguna</span><span className="count-tag">{filtered.length}</span></div>
+        <div className="section-title"><span>{activeNav === 'friends' ? 'Friends' : 'Chat'}</span><span className="count-tag">{activeNav === 'friends' ? filtered.length : filteredChats.length}</span></div>
         <div className="people">
-          {filtered.map(p => (
-            <button className={`person ${active?.person.id === p.id ? 'selected' : ''}`} key={p.id} onClick={() => openChat(p)}>
-              {p.avatar_url ? <img className="avatar avatar-photo" src={p.avatar_url} alt="" /> : <div className="avatar">{initials(p.display_name || p.username)}</div>}
-              <div className="person-info"><b>{p.display_name || p.username}{p.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b><small>@{p.username}</small></div>
-              {unread[p.id] > 0 && <span className="unread-badge">{unread[p.id]}</span>}
-              <Plus size={17} />
-            </button>
-          ))}
-          {!filtered.length && <p className="empty">Pengguna Tidak Ditemukan</p>}
+          {activeNav === 'friends' ? (
+            <>
+              {filtered.map(p => (
+                <button className={`person ${active?.person.id === p.id ? 'selected' : ''}`} key={p.id} onClick={() => openChat(p)}>
+                  {p.avatar_url ? <img className="avatar avatar-photo" src={p.avatar_url} alt="" /> : <div className="avatar">{initials(p.display_name || p.username)}</div>}
+                  <div className="person-info"><b>{p.display_name || p.username}{p.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b><small>@{p.username}</small></div>
+                  <Plus size={17} />
+                </button>
+              ))}
+              {!filtered.length && <p className="empty">Pengguna tidak ditemukan.</p>}
+            </>
+          ) : (
+            <>
+              {filteredChats.map(item => {
+                const person = item.person;
+                const last = item.lastMessage;
+                const attachment = last ? parseAttachment(last.body || '') : null;
+                const preview = attachment ? (attachment.type?.startsWith('image/') ? '📷 Foto' : attachment.type?.startsWith('video/') ? '🎥 Video' : '📎 ' + attachment.name) : (last?.body || 'Belum ada pesan');
+                return (
+                  <button className={`person chat-list-person ${active?.person.id === person.id ? 'selected' : ''}`} key={item.conversation_id} onClick={() => openChat(person)}>
+                    {person.avatar_url ? <img className="avatar avatar-photo" src={person.avatar_url} alt="" /> : <div className="avatar">{initials(person.display_name || person.username)}</div>}
+                    <div className="person-info"><b>{person.display_name || person.username}{person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14} /></span>}</b><small>{last?.sender_id === session.user.id ? 'Kamu: ' : ''}{preview}</small></div>
+                    <span className="chat-list-meta">{last?.created_at ? time(last.created_at) : ''}{unread[person.id] > 0 && <i className="unread-badge">{unread[person.id]}</i>}</span>
+                  </button>
+                );
+              })}
+              {!filteredChats.length && <div className="chat-list-empty"><MessageCircle size={25} /><b>Belum ada chat</b><span>Mulai percakapan lewat tombol +.</span></div>}
+            </>
+          )}
         </div>
         <nav className="atlantic-bottom-nav" aria-label="Navigasi utama">
           <button type="button" className={activeNav === 'chats' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveNav('chats')} aria-label="Chat">
