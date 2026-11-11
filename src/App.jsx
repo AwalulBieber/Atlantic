@@ -4,7 +4,7 @@ import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
-  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck, Trash2
+  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck, Trash2, Reply
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -62,6 +62,7 @@ export default function App() {
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [replyTarget, setReplyTarget] = useState(null);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -128,6 +129,7 @@ export default function App() {
       setMyProfile(null);
       setActive(null);
       setMessages([]);
+      setReplyTarget(null);
       setUnread({});
       setIncomingNotice(null);
       setAccountSettingsOpen(false);
@@ -216,19 +218,28 @@ export default function App() {
   async function loadMessages(id) {
     const { data, error } = await supabase
       .from('messages')
-      .select('id,conversation_id,sender_id,body,created_at')
+      .select('id,conversation_id,sender_id,body,created_at,reply_to')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true });
     if (error) {
       setNotice(error.message);
       return;
     }
+    const replyIds = [...new Set((data || []).map(message => message.reply_to).filter(Boolean))];
+    let replyMap = {};
+    if (replyIds.length) {
+      const { data: originals } = await supabase.from('messages')
+        .select('id,body,sender_id').in('id', replyIds);
+      replyMap = Object.fromEntries((originals || []).map(original => [original.id, original]));
+    }
     const hydrated = await Promise.all((data || []).map(async message => {
       const attachment = parseAttachment(message.body || '');
-      if (!attachment?.path) return message;
+      const original = message.reply_to ? replyMap[message.reply_to] : null;
+      let result = { ...message, replyPreview: original || null };
+      if (!attachment?.path) return result;
       const { data: signed, error: signError } = await supabase.storage
         .from('atlantic-attachments').createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
-      return { ...message, attachment: { ...attachment, url: signError ? null : signed?.signedUrl } };
+      return { ...result, attachment: { ...attachment, url: signError ? null : signed?.signedUrl } };
     }));
     setMessages(hydrated);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
@@ -250,6 +261,11 @@ export default function App() {
             .from('atlantic-attachments').createSignedUrl(attachment.path, 60 * 60 * 24 * 7);
           message.attachment = { ...attachment, url: signError ? null : signed?.signedUrl };
         }
+        if (message.reply_to) {
+          const { data: original } = await supabase.from('messages')
+            .select('id,body,sender_id').eq('id', message.reply_to).maybeSingle();
+          message.replyPreview = original || null;
+        }
         setMessages(old => old.some(m => m.id === message.id) ? old : [...old, message]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       })
@@ -258,7 +274,11 @@ export default function App() {
       }, payload => {
         const deleted = payload.old;
         if (deleted?.conversation_id === active.conversation_id && deleted?.id) {
-          setMessages(old => old.filter(message => message.id !== deleted.id));
+          setMessages(old => old
+            .filter(message => message.id !== deleted.id)
+            .map(message => message.reply_to === deleted.id
+              ? { ...message, reply_to: null, replyPreview: null }
+              : message));
         }
       })
       .subscribe();
@@ -309,11 +329,14 @@ export default function App() {
     const { error } = await supabase.from('messages').insert({
       conversation_id: active.conversation_id,
       sender_id: session.user.id,
-      body
+      body,
+      reply_to: replyTarget?.id || null
     });
     if (error) {
       setDraft(body);
       setNotice('Pesan gagal dikirim: ' + error.message);
+    } else {
+      setReplyTarget(null);
     }
     setSending(false);
   }
@@ -367,12 +390,14 @@ export default function App() {
       const { error: messageError } = await supabase.from('messages').insert({
         conversation_id: active.conversation_id,
         sender_id: session.user.id,
-        body: ATTACHMENT_PREFIX + JSON.stringify(attachment)
+        body: ATTACHMENT_PREFIX + JSON.stringify(attachment),
+        reply_to: replyTarget?.id || null
       });
       if (messageError) {
         await supabase.storage.from('atlantic-attachments').remove([path]);
         throw messageError;
       }
+      setReplyTarget(null);
     } catch (err) {
       setNotice('File gagal dikirim: ' + (err?.message || 'Terjadi kesalahan.'));
     } finally {
@@ -504,8 +529,14 @@ export default function App() {
             </header>
             <div className="messages">
               {messages.map(m => (
-                <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id}>
+                <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id} id={`message-${m.id}`}>
                   <div className="bubble">
+                    {m.replyPreview && (
+                      <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+                        <b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.person.display_name || active.person.username)}</b>
+                        <span>{parseAttachment(m.replyPreview.body || '')?.name || m.replyPreview.body || 'Pesan'}</span>
+                      </button>
+                    )}
                     {m.attachment ? (
                       <div className="attachment">
                         {m.attachment.type?.startsWith('image/') && m.attachment.url ? (
@@ -522,6 +553,15 @@ export default function App() {
                     ) : <div>{m.body}</div>}
                     <div className="bubble-meta">
                       <time>{time(m.created_at)}</time>
+                      <button
+                        type="button"
+                        className="message-reply-btn"
+                        onClick={() => setReplyTarget(m)}
+                        title="Balas pesan"
+                        aria-label="Balas pesan"
+                      >
+                        <Reply size={13} />
+                      </button>
                       {m.sender_id === session.user.id && (
                         <button
                           type="button"
@@ -545,6 +585,15 @@ export default function App() {
               )}
               <div ref={bottomRef} />
             </div>
+            {replyTarget && (
+              <div className="reply-composer-preview">
+                <div>
+                  <b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b>
+                  <span>{parseAttachment(replyTarget.body || '')?.name || replyTarget.body || 'Pesan'}</span>
+                </div>
+                <button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17} /></button>
+              </div>
+            )}
             <form className="composer" onSubmit={sendMessage}>
               <input ref={fileInputRef} className="file-input-hidden" type="file" accept={ACCEPTED_FILES} onChange={e => sendAttachment(e.target.files?.[0])} />
               <button type="button" className="attach-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} aria-label="Lampirkan file" title="Kirim foto, video, atau dokumen">
