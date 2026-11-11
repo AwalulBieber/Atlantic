@@ -3,7 +3,7 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
-  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
+  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, UsersRound, CircleDot, MessageSquare,
   Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck, Trash2, Reply
 } from 'lucide-react';
 
@@ -59,6 +59,8 @@ export default function App() {
   const [profiles, setProfiles] = useState([]);
   const [myProfile, setMyProfile] = useState(null);
   const [search, setSearch] = useState('');
+  const [activeNav, setActiveNav] = useState('chats');
+  const searchInputRef = useRef(null);
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -537,7 +539,7 @@ export default function App() {
 
         <div className="search">
           <Search size={17} />
-          <input placeholder="Cari pengguna…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input ref={searchInputRef} placeholder="Cari pengguna…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
         <div className="section-title"><span>Pengguna</span><span className="count-tag">{filtered.length}</span></div>
@@ -552,6 +554,23 @@ export default function App() {
           ))}
           {!filtered.length && <p className="empty">Pengguna Tidak Ditemukan</p>}
         </div>
+        <nav className="atlantic-bottom-nav" aria-label="Navigasi utama">
+          <button type="button" className={activeNav === 'chats' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveNav('chats')} aria-label="Chat">
+            <span className="nav-icon"><MessageSquare size={21} /></span><small>Chat</small>
+          </button>
+          <button type="button" className={activeNav === 'friends' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveNav('friends')} aria-label="Friends">
+            <span className="nav-icon"><UsersRound size={21} /></span><small>Friends</small>
+          </button>
+          <button type="button" className="nav-create" onClick={() => { setActiveNav('friends'); setSearch(''); searchInputRef.current?.focus(); }} aria-label="Buat chat baru" title="Buat chat baru">
+            <Plus size={27} strokeWidth={2.8} />
+          </button>
+          <button type="button" className={activeNav === 'status' ? 'nav-item active' : 'nav-item'} onClick={() => { setActiveNav('status'); setNotice('Fitur Status sedang disiapkan.'); }} aria-label="Status">
+            <span className="nav-icon"><CircleDot size={21} /></span><small>Status</small>
+          </button>
+          <button type="button" className="nav-item" onClick={() => setAccountSettingsOpen(true)} aria-label="Profile">
+            <span className="nav-icon">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : <UserRound size={21} />}</span><small>Profile</small>
+          </button>
+        </nav>
         <footer className="side-foot">ATLANTIC WEB <span>•</span> V1.1</footer>
       </aside>
 
