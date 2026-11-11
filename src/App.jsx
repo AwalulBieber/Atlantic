@@ -429,6 +429,7 @@ export default function App() {
       setNotice('Pesan gagal dikirim: ' + error.message);
     } else {
       setReplyTarget(null);
+      loadChatList();
     }
     setSending(false);
   }
@@ -492,6 +493,7 @@ export default function App() {
         throw messageError;
       }
       setReplyTarget(null);
+      loadChatList();
     } catch (err) {
       setNotice('File gagal dikirim: ' + (err?.message || 'Terjadi kesalahan.'));
     } finally {
