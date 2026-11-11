@@ -744,4 +744,229 @@ export default function App() {
 
             <nav className="settings-tabs">
               <button
-                className={settingsTab === 'appearan
+                className={settingsTab === 'appearance' ? 'active' : ''}
+                onClick={() => setSettingsTab('appearance')}
+              >
+                Tampilan
+              </button>
+
+              <button
+                className={settingsTab === 'performance' ? 'active' : ''}
+                onClick={() => setSettingsTab('performance')}
+              >
+                Performa
+              </button>
+
+              <button
+                className={settingsTab === 'about' ? 'active' : ''}
+                onClick={() => setSettingsTab('about')}
+              >
+                Tentang
+              </button>
+            </nav>
+
+            <div className="settings-content">
+              {settingsTab === 'appearance' && (
+                <>
+                  <div className="setting-group">
+                    <h3>Tema</h3>
+                    <p>Pilih suasana tampilan Atlantic.</p>
+
+                    <div className="choice-row">
+                      {[
+                        ['light', 'Light'],
+                        ['dark', 'Dark'],
+                        ['system', 'System']
+                      ].map(([v, l]) => (
+                        <button
+                          key={v}
+                          className={
+                            settings.theme === v
+                              ? 'choice selected'
+                              : 'choice'
+                          }
+                          onClick={() => updateSetting('theme', v)}
+                        >
+                          {settings.theme === v && <Check size={15} />}
+                          {' '}{l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="setting-group">
+                    <h3>Warna aksen</h3>
+
+                    <div className="swatches">
+                      {['yellow', 'blue', 'pink', 'green', 'purple'].map(c => (
+                        <button
+                          key={c}
+                          aria-label={c}
+                          title={c}
+                          className={`swatch ${c} ${
+                            settings.accent === c ? 'chosen' : ''
+                          }`}
+                          onClick={() => updateSetting('accent', c)}
+                        >
+                          {settings.accent === c && <Check size={16} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="setting-group">
+                    <h3>Font website</h3>
+                    <p>
+                      Emoji menggunakan fallback emoji bawaan perangkat.
+                    </p>
+
+                    <div className="font-list">
+                      {FONT_OPTIONS.map(f => (
+                        <button
+                          key={f.value}
+                          className={`font-choice font-${f.value} ${
+                            settings.font === f.value ? 'selected' : ''
+                          }`}
+                          onClick={() => updateSetting('font', f.value)}
+                        >
+                          <span>
+                            <b>{f.label}</b>
+                            <small>{f.sample}</small>
+                          </span>
+
+                          {settings.font === f.value && <Check size={18} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="setting-group">
+                    <h3>Ukuran teks</h3>
+
+                    <div className="choice-row">
+                      {[
+                        ['small', 'Kecil'],
+                        ['medium', 'Sedang'],
+                        ['large', 'Besar']
+                      ].map(([v, l]) => (
+                        <button
+                          key={v}
+                          className={
+                            settings.textSize === v
+                              ? 'choice selected'
+                              : 'choice'
+                          }
+                          onClick={() => updateSetting('textSize', v)}
+                        >
+                          {settings.textSize === v && <Check size={15} />}
+                          {' '}{l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {settingsTab === 'performance' && (
+                <>
+                  <div className="setting-group">
+                    <h3>Target animasi</h3>
+                    <p>
+                      Pilih preset kelancaran animasi. FPS aktual tetap
+                      mengikuti browser, layar, dan kemampuan perangkat.
+                    </p>
+
+                    <div className="fps-grid">
+                      {[
+                        ['30', 'Hemat baterai'],
+                        ['60', 'Seimbang'],
+                        ['90', 'Lebih mulus'],
+                        ['120', 'Paling mulus'],
+                        ['auto', 'Otomatis']
+                      ].map(([v, l]) => (
+                        <button
+                          key={v}
+                          className={
+                            settings.fps === v
+                              ? 'fps-choice selected'
+                              : 'fps-choice'
+                          }
+                          onClick={() => updateSetting('fps', v)}
+                        >
+                          <b>{v === 'auto' ? 'AUTO' : `${v} FPS`}</b>
+                          <small>{l}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="setting-group setting-toggle">
+                    <div>
+                      <h3>Animasi UI</h3>
+                      <p>Efek transisi, bubble, dan Liquid Glass.</p>
+                    </div>
+
+                    <button
+                      className={`toggle ${
+                        settings.animations ? 'on' : ''
+                      }`}
+                      onClick={() =>
+                        updateSetting('animations', !settings.animations)
+                      }
+                      aria-pressed={settings.animations}
+                    >
+                      <span />
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {settingsTab === 'about' && (
+                <div className="about-card">
+                  <div className="about-logo">
+                    <Waves size={34} />
+                  </div>
+
+                  <h2>ATLANTIC</h2>
+                  <p>Ruang obrolanmu, terhubung kapan saja.</p>
+
+                  <div className="about-meta">
+                    <span>Versi</span>
+                    <b>1.2.0</b>
+                    <span>Platform</span>
+                    <b>Atlantic Web</b>
+                    <span>UI</span>
+                    <b>Neobrutalism + Liquid Glass</b>
+                  </div>
+
+                  <a
+                    href="https://github.com/AwalulBieber/Atlantic"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Lihat repository GitHub ↗
+                  </a>
+
+                  <small className="about-note">
+                    Dibuat untuk percakapan yang lebih nyaman. Pengaturan
+                    tampilan tersimpan di perangkat ini.
+                  </small>
+                </div>
+              )}
+            </div>
+
+            <footer className="settings-footer">
+              <span>Perubahan tersimpan otomatis</span>
+              <button
+                className="primary"
+                onClick={() => setSettingsOpen(false)}
+              >
+                Selesai
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+}
