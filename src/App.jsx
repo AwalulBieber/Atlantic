@@ -4,7 +4,7 @@ import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, UsersRound, CircleDot, MessageSquare,
-  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck, Trash2, Reply
+  Paperclip, FileText, Image as ImageIcon, Video, Download, ShieldCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -273,10 +273,29 @@ export default function App() {
     }
   }
 
+  async function markConversationRead(id) {
+    if (!session?.user?.id || !id) return;
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('messages')
+      .update({ delivered_at: now, read_at: now })
+      .eq('conversation_id', id)
+      .neq('sender_id', session.user.id)
+      .is('read_at', null);
+    if (error) {
+      setNotice('Status pesan gagal diperbarui: ' + error.message);
+      return;
+    }
+    setMessages(old => old.map(message =>
+      message.sender_id !== session.user.id && message.conversation_id === id && !message.read_at
+        ? { ...message, delivered_at: message.delivered_at || now, read_at: now }
+        : message
+    ));
+  }
+
   async function loadMessages(id) {
     const { data, error } = await supabase
       .from('messages')
-      .select('id,conversation_id,sender_id,body,created_at,reply_to')
+      .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true });
     if (error) {
@@ -300,6 +319,7 @@ export default function App() {
       return { ...result, attachment: { ...attachment, url: signError ? null : signed?.signedUrl } };
     }));
     setMessages(hydrated);
+    await markConversationRead(id);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -328,6 +348,15 @@ export default function App() {
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       })
       .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'messages',
+        filter: `conversation_id=eq.${active.conversation_id}`
+      }, payload => {
+        const updated = payload.new;
+        setMessages(old => old.map(message => message.id === updated.id
+          ? { ...message, delivered_at: updated.delivered_at, read_at: updated.read_at }
+          : message));
+      })
+      .on('postgres_changes', {
         event: 'DELETE', schema: 'public', table: 'messages'
       }, payload => {
         const deleted = payload.old;
@@ -354,12 +383,24 @@ export default function App() {
         if (!message || message.sender_id === session.user.id ||
             seenMessages.current.has(message.id)) return;
         seenMessages.current.add(message.id);
-        if (active?.conversation_id === message.conversation_id) return;
 
         const { data: members, error: memberError } = await supabase
           .from('conversation_members').select('user_id')
           .eq('conversation_id', message.conversation_id);
         if (memberError || !members?.some(m => m.user_id === session.user.id)) return;
+
+        const receiptTime = new Date().toISOString();
+        const receiptUpdate = { delivered_at: receiptTime };
+        if (active?.conversation_id === message.conversation_id) receiptUpdate.read_at = receiptTime;
+        await supabase.from('messages').update(receiptUpdate)
+          .eq('id', message.id).eq('sender_id', message.sender_id);
+
+        if (active?.conversation_id === message.conversation_id) {
+          setMessages(old => old.map(item => item.id === message.id
+            ? { ...item, delivered_at: receiptTime, read_at: receiptTime }
+            : item));
+          return;
+        }
 
         const { data: person, error: profileError } = await supabase
           .from('profiles').select('id,username,display_name,avatar_url')
@@ -716,6 +757,13 @@ export default function App() {
                     ) : <div>{m.body}</div>}
                     <div className="bubble-meta">
                       <time>{time(m.created_at)}</time>
+                      {m.sender_id === session.user.id && (
+                        <span className={`message-receipt ${m.read_at ? 'read' : ''}`}
+                          title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Diterima' : 'Terkirim'}
+                          aria-label={m.read_at ? 'Dibaca' : m.delivered_at ? 'Diterima' : 'Terkirim'}>
+                          {m.delivered_at ? <CheckCheck size={14} /> : <Check size={14} />}
+                        </span>
+                      )}
                       <button
                         type="button"
                         className="message-reply-btn"
