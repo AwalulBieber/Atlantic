@@ -106,7 +106,7 @@ export default function App() {
       yellow: '#ffd84d', blue: '#7bd5ff', pink: '#ff9ec7',
       green: '#b8f36b', purple: '#c6a5ff'
     };
-    root.style.setProperty('--accent', accents[settings.accent] || accents.yellow);
+    root.style.setProperty('--accent', accents[settings.accent] || (settings.accent?.startsWith('#') ? settings.accent : accents.yellow));
   }, [settings]);
 
   function updateSetting(key, value) {
@@ -715,6 +715,10 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                  <label className="custom-accent">
+                    <span>Warna sendiri</span>
+                    <input type="color" value={settings.accent?.startsWith('#') ? settings.accent : ({yellow:'#ffd84d',blue:'#7bd5ff',pink:'#ff9ec7',green:'#b8f36b',purple:'#c6a5ff'}[settings.accent] || '#ffd84d')} onChange={e => updateSetting('accent', e.target.value)} aria-label="Pilih warna aksen sendiri" />
+                  </label>
                 </div>
                 <div className="setting-group">
                   <h3>Font website</h3><p>Emoji menggunakan fallback emoji bawaan perangkat.</p>
