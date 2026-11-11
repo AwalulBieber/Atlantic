@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
+import AtlanticStories from './components/AtlanticStories';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, UsersRound, CircleDot, MessageSquare,
@@ -640,6 +641,8 @@ export default function App() {
           </div>
         </div>
 
+        <AtlanticStories session={session} profiles={profiles} myProfile={myProfile} />
+
         <div className="search">
           <Search size={17} />
           <input ref={searchInputRef} placeholder="Cari pengguna…" value={search} onChange={e => setSearch(e.target.value)} />
@@ -687,8 +690,8 @@ export default function App() {
           <button type="button" className="nav-create" onClick={() => { setNewChatSearch(''); setNewChatOpen(true); }} aria-label="Buat chat baru" title="Buat chat baru">
             <Plus size={27} strokeWidth={2.8} />
           </button>
-          <button type="button" className={activeNav === 'status' ? 'nav-item active' : 'nav-item'} onClick={() => { setActiveNav('status'); setNotice('Fitur Status sedang disiapkan.'); }} aria-label="Status">
-            <span className="nav-icon"><CircleDot size={21} /></span><small>Status</small>
+          <button type="button" className={activeNav === 'status' ? 'nav-item active' : 'nav-item'} onClick={() => { setActiveNav('status'); setNotice('Story dan Catatan tersedia di panel kiri.'); }} aria-label="Story">
+            <span className="nav-icon"><CircleDot size={21} /></span><small>Story</small>
           </button>
           <button type="button" className="nav-item" onClick={() => setAccountSettingsOpen(true)} aria-label="Profile">
             <span className="nav-icon">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : <UserRound size={21} />}</span><small>Profile</small>
