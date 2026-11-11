@@ -143,7 +143,18 @@ export default function App() {
   }
 
   async function loadProfiles() {
-  setProfiles([]);
+  const { data, error } = await supabase
+    .from('conversation_members')
+    .select('conversation_id, user_id')
+    .eq('user_id', session.user.id);
+
+  if (error) {
+    setNotice(error.message);
+    return;
+  }
+
+  setChats(data || []);
+  }
 
   }
 
