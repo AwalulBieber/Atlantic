@@ -318,3 +318,13 @@ html[data-theme="dark"] .font-choice small { color: #ccc; } html[data-theme="dar
 .message-reply-btn:hover { opacity:1; background:#1685d822; color:#1685d8; }
 html[data-theme="dark"] .reply-quote, html[data-theme="dark"] .reply-composer-preview { background:rgba(22,133,216,.18); }
 @media (max-width:700px) { .reply-composer-preview { margin-left:10px; margin-right:10px; } }
+
+
+/* Atlantic realtime typing indicator */
+.typing-label { display:flex; align-items:center; gap:6px; color:#1685d8 !important; font-weight:800; }
+.typing-dots { display:inline-flex; align-items:center; gap:3px; height:12px; }
+.typing-dots i { width:4px; height:4px; display:block; border-radius:50%; background:currentColor; animation:typing-bounce .9s ease-in-out infinite; }
+.typing-dots i:nth-child(2) { animation-delay:.14s; }
+.typing-dots i:nth-child(3) { animation-delay:.28s; }
+@keyframes typing-bounce { 0%,60%,100% { transform:translateY(0); opacity:.45; } 30% { transform:translateY(-4px); opacity:1; } }
+html[data-animations="off"] .typing-dots i { animation:none; }
