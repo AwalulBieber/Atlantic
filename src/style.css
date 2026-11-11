@@ -286,3 +286,11 @@ html[data-theme="dark"] .font-choice small { color: #ccc; } html[data-theme="dar
 .atl-inline-verified svg { fill:#1677e8; stroke:#fff; stroke-width:2.5; }
 .person-info b { display:flex; align-items:center; gap:2px; }
 .chat-person b { display:flex; align-items:center; gap:2px; }
+
+
+/* Delete own chat messages */
+.bubble-meta { display:flex; align-items:center; justify-content:flex-end; gap:7px; margin-top:5px; }
+.bubble-meta time { margin:0; }
+.message-delete-btn { display:inline-flex; align-items:center; justify-content:center; width:23px; height:23px; padding:0; border:0; border-radius:7px; background:transparent; color:inherit; opacity:.55; cursor:pointer; transition:opacity .18s ease, background .18s ease, transform .18s ease; }
+.message-delete-btn:hover { opacity:1; background:#ef444422; color:#dc2626; transform:scale(1.06); }
+.message-delete-btn:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
