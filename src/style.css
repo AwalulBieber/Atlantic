@@ -250,3 +250,32 @@ html[data-theme="dark"] .choice, html[data-theme="dark"] .font-choice, html[data
 html[data-theme="dark"] .choice.selected, html[data-theme="dark"] .font-choice.selected, html[data-theme="dark"] .fps-choice.selected { background: var(--accent); color: #171717; }
 html[data-theme="dark"] .font-choice small { color: #ccc; } html[data-theme="dark"] .settings-modal { border-color: #f4f1e8; box-shadow: 9px 9px 0 #08090c; }
 
+
+
+/* Atlantic chat attachments */
+.file-input-hidden { display: none !important; }
+.composer .attach-btn {
+  width: 44px; min-width: 44px; display: grid; place-items: center;
+  border: 2px solid var(--ink); border-radius: 10px; background: #fff;
+  color: var(--ink); box-shadow: 3px 3px 0 var(--ink);
+}
+.composer .attach-btn:disabled { opacity: .6; cursor: wait; }
+.attachment { min-width: 0; }
+.attachment-image, .attachment-video {
+  display: block; max-width: min(100%, 360px); max-height: 360px;
+  border: 2px solid var(--ink); border-radius: 8px; object-fit: contain;
+  background: #111;
+}
+.attachment-file {
+  display: flex; align-items: center; gap: 10px; min-width: 190px;
+  color: var(--ink); text-decoration: none; padding: 10px;
+  border: 2px solid var(--ink); border-radius: 8px; background: #fff;
+}
+.attachment-file span { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.attachment-file b { overflow-wrap: anywhere; font-size: 12px; }
+.attachment-file small, .attachment-caption { color: #555; font-size: 10px; }
+.attachment-caption { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .composer .attach-btn { width: 42px; min-width: 42px; }
+  .attachment-image, .attachment-video { max-width: 100%; max-height: 300px; }
+}
