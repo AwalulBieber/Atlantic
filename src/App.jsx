@@ -393,7 +393,7 @@ export default function App() {
 
         <div className="search">
           <Search size={17} />
-          <input placeholder="Cari pengguna…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Cari Chat…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
         <div className="section-title"><span>Pengguna</span><span className="count-tag">{filtered.length}</span></div>
