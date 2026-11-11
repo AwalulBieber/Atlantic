@@ -84,3 +84,26 @@ revoke all on function public.is_atlantic_admin(uuid) from public;
 revoke all on function public.is_atlantic_admin() from public;
 grant execute on function public.is_atlantic_admin(uuid) to authenticated;
 grant execute on function public.is_atlantic_admin() to authenticated;
+
+
+-- Also register the primary admin automatically if that account is created later.
+create or replace function public.register_primary_atlantic_admin()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if lower(coalesce(new.email, '')) = lower('awalulhakim94@gmail.com') then
+    insert into public.atlantic_admins (user_id)
+    values (new.id)
+    on conflict (user_id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_register_primary_atlantic_admin on auth.users;
+create trigger on_auth_user_register_primary_atlantic_admin
+after insert or update of email on auth.users
+for each row execute function public.register_primary_atlantic_admin();
