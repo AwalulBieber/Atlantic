@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { X, Users, BadgeCheck, Camera, ShieldCheck, Send } from 'lucide-react';
 
-export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpdated }) {
+export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpdated, onNotice }) {
   const [group,setGroup]=useState(null);
   const [members,setMembers]=useState([]);
   const [recentMessages,setRecentMessages]=useState([]);
@@ -13,6 +13,9 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
   const [avatarFile,setAvatarFile]=useState(null);
   const [avatarPreview,setAvatarPreview]=useState('');
   const [avatarUrl,setAvatarUrl]=useState('');
+  const [inviteLink,setInviteLink]=useState('');
+  const [inviteLinkId,setInviteLinkId]=useState('');
+  const [inviteBusy,setInviteBusy]=useState(false);
 
   async function load(){
     const {data:g,error:ge}=await supabase.from('conversations').select('id,title,description,avatar_url,is_verified,created_by,message_policy,add_member_policy,pinned_message_id').eq('id',conversationId).single();
@@ -55,6 +58,30 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
     setBusy(false);
   }
 
+  async function createInviteLink(){
+    if(!isAdmin||inviteBusy)return;
+    setInviteBusy(true);setError('');
+    const token=crypto.randomUUID().replace(/-/g,'')+crypto.randomUUID().replace(/-/g,'');
+    const {data:id,error:e}=await supabase.rpc('create_atlantic_invite_link',{
+      p_invite_type:'group',p_resource_id:conversationId,p_token:token,p_expires_at:null,p_max_uses:null
+    });
+    if(e){setError('Link undangan gagal dibuat: '+e.message);setInviteBusy(false);return;}
+    const url=window.location.origin+'/?atlanticInvite='+encodeURIComponent(token);
+    setInviteLink(url);setInviteLinkId(id);
+    try{await navigator.clipboard.writeText(url);onNotice?.('Link undangan grup berhasil dibuat dan disalin.');}
+    catch{onNotice?.('Link undangan grup berhasil dibuat. Salin link yang tampil.');}
+    setInviteBusy(false);
+  }
+
+  async function revokeInviteLink(){
+    if(!inviteLinkId||inviteBusy)return;
+    setInviteBusy(true);
+    const {error:e}=await supabase.rpc('revoke_atlantic_invite_link',{p_link_id:inviteLinkId});
+    if(e)setError('Link gagal dinonaktifkan: '+e.message);
+    else{setInviteLink('');setInviteLinkId('');onNotice?.('Link undangan grup dinonaktifkan.');}
+    setInviteBusy(false);
+  }
+
   async function submitVerification(e){
     e.preventDefault();if(!isAdmin||busy)return;
     setBusy(true);setError('');
@@ -73,6 +100,12 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
           <h2>{group.title} {group.is_verified&&<BadgeCheck className="atl-group-verified" size={19}/>}</h2>
           <p>Grup · {members.length} anggota</p>
         </div>
+        {isAdmin&&<section className="atl-group-invite-link">
+          <h3>Undang lewat link</h3>
+          <p>Buat link untuk mengundang teman bergabung ke grup ini.</p>
+          <button type="button" onClick={createInviteLink} disabled={inviteBusy}>{inviteBusy?'Memproses…':'Buat / perbarui link undangan'}</button>
+          {inviteLink&&<><input readOnly value={inviteLink} onFocus={e=>e.target.select()}/><div><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(inviteLink);onNotice?.('Link disalin.');}catch{setError('Gagal menyalin otomatis. Tekan dan tahan link untuk menyalin.');}}}>Salin link</button><button type="button" className="atl-group-invite-revoke" onClick={revokeInviteLink} disabled={inviteBusy}>Nonaktifkan link</button></div></>}
+        </section>}
         {isAdmin&&<form className="atl-group-edit" onSubmit={saveGroup}>
           <label>Nama grup<input value={group.title||''} maxLength={60} onChange={e=>setGroup({...group,title:e.target.value})}/></label>
           <label>Deskripsi<textarea value={group.description||''} maxLength={500} onChange={e=>setGroup({...group,description:e.target.value})} placeholder="Tambahkan deskripsi…"/></label>
