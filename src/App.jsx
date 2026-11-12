@@ -290,18 +290,21 @@ export default function App() {
     const { data: isAdmin, error: badgeError } = await supabase.rpc('is_atlantic_admin', { target_user: person.id });
     return { ...person, is_admin: !badgeError && isAdmin === true };
   }));
-  const chatRows = (conversations || []).map(conversation => {
+  const chatRows = await Promise.all((conversations || []).map(async conversation => {
     const conversationMembers = (members || []).filter(member => member.conversation_id === conversation.id);
     if (conversation.is_group) {
       const groupProfiles = [{ ...(myProfile || {}), id: session.user.id }, ...conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).filter(Boolean)];
       const title = conversation.title || 'Grup Atlantic';
-      return { conversation_id: conversation.id, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_url: conversation.avatar_url, pinned_message_id:conversation.pinned_message_id, message_policy:conversation.message_policy, add_member_policy:conversation.add_member_policy, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, is_group: true, is_verified: conversation.is_verified } };
+      let groupAvatarUrl=null;
+      if(conversation.avatar_url){const {data:signed}=await supabase.storage.from('atlantic-chat-media').createSignedUrl(conversation.avatar_url,3600);groupAvatarUrl=signed?.signedUrl||null;}
+      return { conversation_id: conversation.id, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_path:conversation.avatar_url, avatar_url:groupAvatarUrl, pinned_message_id:conversation.pinned_message_id, message_policy:conversation.message_policy, add_member_policy:conversation.add_member_policy, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, avatar_url:groupAvatarUrl, is_group: true, is_verified: conversation.is_verified } };
     }
     const other = conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).find(Boolean);
     return other ? { conversation_id: conversation.id, person: other, is_group: false } : null;
-  }).filter(Boolean);
-  setChats(chatRows);
-  return chatRows;
+  }));
+  const validChatRows=chatRows.filter(Boolean);
+  setChats(validChatRows);
+  return validChatRows;
   }
 
   async function loadGroupUsers() {
@@ -779,7 +782,7 @@ export default function App() {
         onClick={() => c.is_group ? openGroupChat(c) : openChat(c.person)}
       >
         <div className="avatar">
-          {c.is_group ? <Users size={19}/> : c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
+          {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : c.is_group ? <Users size={19}/> : initials(c.person.display_name || c.person.username)}
         </div>
         <div className="person-info">
           <b>{c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
@@ -803,7 +806,7 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              <div className="avatar">{active.is_group ? <Users size={20}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
+              <div className="avatar">{active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person" onClick={() => active.is_group && setGroupInfoOpen(true)} role={active.is_group ? "button" : undefined} tabIndex={active.is_group ? 0 : undefined}>
                 <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
                 <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
@@ -1012,7 +1015,7 @@ export default function App() {
       )}
 
       {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} />}
-      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
+      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
 
       {activeTab !== 'chat' && (
         <AtlanticCommunity
