@@ -784,6 +784,7 @@ export default function App() {
   }
 
   const visibleChats = chats.filter(c => archivedIds.includes(c.conversation_id) === showArchived);
+  const visibleInboxSummaries = inboxSummaries.filter(item => !archivedIds.includes(item.conversation_id));
   const filtered = visibleChats.filter(c =>
   (c.person.display_name || c.person.username || '')
     .toLowerCase().includes(search.toLowerCase())
@@ -823,9 +824,9 @@ export default function App() {
 
         <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Tersimpan</button></div>
         <AtlanticGroupInvitations user={session.user} onNotice={setNotice} onAccepted={async conversationId=>{const updated=await loadProfiles();const joined=updated?.find(item=>item.conversation_id===conversationId);if(joined)openGroupChat(joined);}} />
-        {!showSaved && !showArchived && inboxSummaries.length > 0 && <section className="atl-inbox-summary" aria-label="Pesan belum dibaca">
-          <header><b>Pesan belum dibaca</b><span>{inboxSummaries.reduce((total, item) => total + (Number(item.unread_count) || 0), 0)} total</span></header>
-          {inboxSummaries.map(item => {
+        {!showSaved && !showArchived && visibleInboxSummaries.length > 0 && <section className="atl-inbox-summary" aria-label="Pesan belum dibaca">
+          <header><b>Pesan belum dibaca</b><span>{visibleInboxSummaries.reduce((total, item) => total + (Number(item.unread_count) || 0), 0)} total</span></header>
+          {visibleInboxSummaries.map(item => {
             const chat = chats.find(entry => entry.conversation_id === item.conversation_id);
             if (!chat) return null;
             const sender = chat.is_group ? chat.members?.find(member => member.id === item.latest_sender_id) : chat.person;
