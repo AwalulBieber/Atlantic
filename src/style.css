@@ -515,3 +515,18 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-note-card>.atl-note-avatar{position:relative;display:grid;place-items:center;width:42px;min-width:42px;max-width:42px;height:42px;min-height:42px;max-height:42px;flex:0 0 42px;overflow:hidden;align-self:flex-start;}
 .atl-note-card>.atl-note-avatar>img{position:absolute;inset:0;display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:cover;border-radius:inherit;}
 .atl-note-card>div:last-child{min-width:0;flex:1 1 auto;overflow-wrap:anywhere;}
+
+
+/* Atlantic in-app minimized call overlay */
+.atl-call-header-actions{display:flex;align-items:center;gap:7px}
+.atl-call-header-actions button{display:grid;place-items:center;width:36px;height:36px;border:2px solid var(--ink);border-radius:9px;background:transparent;color:inherit}
+.atl-call-backdrop.is-minimized{display:none}
+.atl-call-mini-overlay{position:fixed;right:14px;bottom:calc(92px + env(safe-area-inset-bottom));z-index:1100;display:flex;align-items:center;gap:7px;width:min(340px,calc(100vw - 28px));padding:8px;border:2px solid #171717;border-radius:16px;background:#fffdf5;color:#171717;box-shadow:5px 5px 0 #171717;animation:atl-call-mini-in .2s ease-out}
+.atl-call-mini-main{display:flex;align-items:center;gap:10px;min-width:0;flex:1;border:0;background:transparent;color:inherit;text-align:left;padding:3px}
+.atl-call-mini-icon{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:50%;background:#9be66b}
+.atl-call-mini-copy{display:grid;gap:3px;min-width:0;flex:1}
+.atl-call-mini-copy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:950}
+.atl-call-mini-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#555}
+.atl-call-mini-end{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border:2px solid #171717;border-radius:11px;background:#ff7777;color:#171717}
+@keyframes atl-call-mini-in{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:520px){.atl-call-mini-overlay{right:10px;bottom:calc(88px + env(safe-area-inset-bottom));width:min(330px,calc(100vw - 20px))}}
