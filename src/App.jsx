@@ -8,7 +8,7 @@ import AtlanticContacts from './components/AtlanticContacts';
 import AtlanticGroupInfo from './components/AtlanticGroupInfo';
 import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
 import {
-  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users,  
+  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
@@ -193,7 +193,7 @@ export default function App() {
   async function loadMyProfile() {
     if (!session?.user?.id) return;
     const [{ data, error }, { data: isAdmin, error: badgeError }] = await Promise.all([
-      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified,read_receipts_enabled,show_online_status').eq('id', session.user.id).maybeSingle(),
+      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified,is_blocked,blocked_reason,read_receipts_enabled,show_online_status').eq('id', session.user.id).maybeSingle(),
       supabase.rpc('is_atlantic_admin', { target_user: session.user.id })
     ]);
     if (!error && data) {
@@ -733,6 +733,10 @@ export default function App() {
         </section>
       </main>
     );
+  }
+
+  if (myProfile?.is_blocked) {
+    return <main className="auth-wrap"><section className="auth-card"><div className="brand"><Waves size={28}/> ATLANTIC</div><Ban size={42}/><h1>Akun diblokir</h1><p>Akun Atlantic ini sedang diblokir oleh admin sehingga fitur chat dan komunitas tidak dapat digunakan.</p>{myProfile.blocked_reason && <p className="notice">Alasan: {myProfile.blocked_reason}</p>}<button className="primary full" onClick={logout}>Keluar dari akun</button></section></main>;
   }
 
   const visibleChats = chats.filter(c => archivedIds.includes(c.conversation_id) === showArchived);
