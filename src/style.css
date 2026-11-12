@@ -654,3 +654,7 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-story-person .atl-story-ring-inner{display:grid;place-items:center;width:100%;height:100%;overflow:hidden;border:2px solid var(--panel,#fff);border-radius:50%;background:var(--accent);color:#171717;font-size:22px;font-weight:950}
 .atl-story-person .atl-story-ring-inner img{width:100%;height:100%;object-fit:cover}
 .atl-story-person .atl-story-ring>i{position:absolute;right:-5px;bottom:-4px;display:grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border:2px solid var(--panel,#fff);border-radius:12px;background:#a855f7;color:#fff;font-size:10px;font-style:normal;font-weight:900}
+
+.atl-community-search{display:flex;align-items:center;gap:10px;margin:12px 0 18px;padding:11px 14px;border:2px solid var(--ink);border-radius:12px;background:var(--panel,#fffdf5);box-shadow:3px 3px 0 var(--ink);color:var(--muted)}
+.atl-community-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-weight:700}
+.atl-community-search input::placeholder{color:var(--muted);opacity:.8}
