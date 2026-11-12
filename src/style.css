@@ -707,3 +707,41 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 @media(prefers-reduced-motion:reduce){
   :where(button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:disabled){transition:none}
 }
+
+
+/* Atlantic motion language: soft, elastic and responsive */
+:root{
+  --atl-ease-spring:cubic-bezier(.2,.9,.25,1.18);
+  --atl-ease-smooth:cubic-bezier(.22,.75,.25,1);
+  --atl-motion-fast:160ms;
+  --atl-motion-normal:260ms;
+}
+:where(a,button,input,select,textarea,[role="button"],.person,.icon-btn,.bubble,.atl-contact-row,.atl-channel-card,.atl-admin-panel,.atl-contacts-modal,.settings-modal,.create-menu,.atl-dialog-card){
+  transition-timing-function:var(--atl-ease-smooth);
+}
+:where(a,button,input,select,textarea,[role="button"]):not(:disabled){
+  transition-duration:var(--atl-motion-fast);
+}
+:where(.person,.atl-contact-row,.atl-channel-card,.atl-admin-panel,.atl-contacts-modal,.settings-modal,.create-menu,.atl-dialog-card){
+  will-change:auto;
+}
+:where(.person,.atl-contact-row,.atl-channel-card):hover{
+  transition-duration:var(--atl-motion-normal);
+}
+:where(.settings-modal,.atl-admin-panel,.atl-contacts-modal,.create-menu,.atl-dialog-card,.atl-call-mini-overlay){
+  animation-timing-function:var(--atl-ease-spring);
+}
+:where(input,select,textarea):focus-visible{
+  transition:box-shadow var(--atl-motion-fast) var(--atl-ease-smooth),border-color var(--atl-motion-fast) var(--atl-ease-smooth);
+}
+@media(prefers-reduced-motion:reduce){
+  :where(a,button,input,select,textarea,[role="button"],.person,.icon-btn,.bubble,.atl-contact-row,.atl-channel-card,.atl-admin-panel,.atl-contacts-modal,.settings-modal,.create-menu,.atl-dialog-card,.atl-call-mini-overlay){
+    animation-duration:.01ms!important;
+    transition-duration:.01ms!important;
+    scroll-behavior:auto!important;
+  }
+}
+html[data-animations="off"] :where(a,button,input,select,textarea,[role="button"],.person,.icon-btn,.bubble,.atl-contact-row,.atl-channel-card,.atl-admin-panel,.atl-contacts-modal,.settings-modal,.create-menu,.atl-dialog-card,.atl-call-mini-overlay){
+  animation:none!important;
+  transition:none!important;
+}
