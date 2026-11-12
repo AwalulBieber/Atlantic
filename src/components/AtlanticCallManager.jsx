@@ -2,15 +2,26 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, X, Minus, Maximize2, Camera, FlipHorizontal, Settings2 } from 'lucide-react';
 
-const turnUrls = (import.meta.env.VITE_TURN_URLS || '').split(',').map(value => value.trim()).filter(Boolean);
-const rtcConfig = {
-  iceServers: [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
-    ...(turnUrls.length && import.meta.env.VITE_TURN_USERNAME && import.meta.env.VITE_TURN_CREDENTIAL
-      ? [{ urls: turnUrls, username: import.meta.env.VITE_TURN_USERNAME, credential: import.meta.env.VITE_TURN_CREDENTIAL }]
-      : [])
-  ],
-  iceCandidatePoolSize: 10
+const getRtcConfig = async () => {
+  const fallback = {
+    iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }],
+    iceCandidatePoolSize: 10
+  };
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Sesi login habis. Silakan login ulang.');
+  const response = await fetch('/api/turn-credentials', {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    cache: 'no-store'
+  });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.error || 'Kredensial TURN belum tersedia.');
+  }
+  const result = await response.json();
+  if (!Array.isArray(result.iceServers) || !result.iceServers.length) {
+    throw new Error('Konfigurasi TURN dari server tidak valid.');
+  }
+  return { iceServers: result.iceServers, iceCandidatePoolSize: 10 };
 };
 
 export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
@@ -160,8 +171,18 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     });
   }, [cleanup, handleSignal]);
 
-  const createPeer = useCallback((activeCall, stream) => {
-    const pc = new RTCPeerConnection(rtcConfig);
+  const createPeer = useCallback(async (activeCall, stream) => {
+    let config;
+    try {
+      config = await getRtcConfig();
+    } catch (turnError) {
+      config = {
+        iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }],
+        iceCandidatePoolSize: 10
+      };
+      setError('TURN belum aktif: ' + (turnError.message || 'kredensial belum tersedia') + ' Panggilan akan mencoba koneksi langsung.');
+    }
+    const pc = new RTCPeerConnection(config);
     pcRef.current = pc;
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
     pc.ontrack = event => {
@@ -178,9 +199,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       if (pc.connectionState === 'disconnected') setPhase('Jaringan terputus, mencoba menyambungkan…');
       if (pc.connectionState === 'failed') {
         setPhase('Koneksi gagal');
-        setError(turnUrls.length
-          ? 'Jalur media gagal tersambung. Coba ulangi panggilan atau ganti jaringan.'
-          : 'Jaringan tidak mengizinkan koneksi langsung. Atlantic memerlukan konfigurasi TURN agar panggilan lintas jaringan lebih stabil.');
+        setError('Jalur media gagal tersambung. Coba ulangi panggilan atau ganti jaringan. Jika tetap gagal, periksa konfigurasi TURN Atlantic.');
       }
     };
     return pc;
@@ -214,7 +233,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       setCall(activeCall);
       setPhase('Memanggil…');
       await subscribeSignals(session.id);
-      const pc = createPeer(activeCall, stream);
+      const pc = await createPeer(activeCall, stream);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await sendSignal(activeCall, 'offer', pc.localDescription.toJSON());
@@ -250,7 +269,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       setCall(activeCall);
       setIncoming(null);
       await subscribeSignals(activeCall.id);
-      const pc = createPeer(activeCall, stream);
+      const pc = await createPeer(activeCall, stream);
       let offerRow = null;
       for (let attempt = 0; attempt < 12 && !offerRow; attempt++) {
         const result = await supabase.from('atlantic_call_signals')
