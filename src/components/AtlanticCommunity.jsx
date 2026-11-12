@@ -23,6 +23,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [error,setError]=useState('');
   const [showCreate,setShowCreate]=useState(false);
   const [refreshing,setRefreshing]=useState(false);
+  const [activeStoryIndex,setActiveStoryIndex]=useState(-1);
 
   async function loadPeople(ids) {
     const unique=[...new Set((ids||[]).filter(Boolean))];
@@ -42,11 +43,11 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
       if(s.error) setError('Story: '+s.error.message);
       else {
         const signedStories=await Promise.all((s.data||[]).map(async story=>{
-          if(!story.media_url)return story;
+          if(!story.media_url)return {...story,media_path:null};
           const expiresIn=Math.max(1,Math.floor((new Date(story.expires_at).getTime()-Date.now())/1000));
           const {data:signed,error:signedError}=await supabase.storage.from('atlantic-stories').createSignedUrl(story.media_url,expiresIn);
           if(signedError){setError(v=>v||('Media Story: '+signedError.message));return {...story,media_url:null};}
-          return {...story,media_url:signed?.signedUrl||null};
+          return {...story,media_path:story.media_url,media_url:signed?.signedUrl||null};
         }));
         setStories(signedStories);
       }
@@ -122,6 +123,28 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     setBusy(false);
   }
 
+
+  async function deleteStory(story) {
+    if(story.user_id!==user.id||busy)return;
+    setBusy(true);setError('');
+    const {error:e}=await supabase.from('atlantic_stories').delete().eq('id',story.id).eq('user_id',user.id);
+    if(e)setError(e.message);
+    else {
+      if(story.media_path)await supabase.storage.from('atlantic-stories').remove([story.media_path]);
+      setStories(current=>current.filter(item=>item.id!==story.id));
+      setActiveStoryIndex(-1);
+    }
+    setBusy(false);
+  }
+
+  async function deleteNote(note) {
+    if(note.user_id!==user.id||busy)return;
+    setBusy(true);setError('');
+    const {error:e}=await supabase.from('atlantic_notes').delete().eq('id',note.id).eq('user_id',user.id);
+    if(e)setError(e.message);else setNotes(current=>current.filter(item=>item.id!==note.id));
+    setBusy(false);
+  }
+
   async function createChannel(e) {
     e.preventDefault(); if(!channelName.trim()||busy) return;
     setBusy(true);setError('');
@@ -165,12 +188,15 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     {error&&<div className="atl-community-error">{error}</div>}
     {tab==='updates'&&<>
       <div className="atl-community-section"><h2><Clock3 size={18}/> Story</h2><p>Story teks, foto, dan video tampil selama 24 jam.</p>
-        <div className="atl-story-grid">{stories.map(s=><article className="atl-story-card" key={s.id}><div className="atl-story-author"><span className="atl-story-avatar">{people[s.user_id]?.avatar_url?<img src={people[s.user_id].avatar_url} alt=""/>:(people[s.user_id]?.display_name||people[s.user_id]?.username||'A').slice(0,1).toUpperCase()}</span><span><b>{s.user_id===user.id?'Story kamu':(people[s.user_id]?.display_name||people[s.user_id]?.username||'Pengguna Atlantic')}</b><small>{dateLabel(s.created_at)}</small></span></div>{s.media_url&&( /\.(mp4|webm)(\?|$)/i.test(s.media_url)?<video className="atl-story-media" src={s.media_url} controls playsInline preload="metadata"/>:<img className="atl-story-media" src={s.media_url} alt="Media Story" loading="lazy"/>)}{s.body?.trim()&&<p>{s.body}</p>}</article>)}
-        {!stories.length&&<div className="atl-community-empty">Belum ada Story. Jadilah yang pertama berbagi.</div>}</div>
+        <div className="atl-story-strip">
+          <button type="button" className="atl-story-add" onClick={()=>setShowCreate(true)}><span className="atl-story-ring"><span>+</span></span><b>Tambah Status</b></button>
+          {stories.map((s,i)=><button type="button" className="atl-story-person" key={s.id} onClick={()=>setActiveStoryIndex(i)}><span className="atl-story-ring">{people[s.user_id]?.avatar_url?<img src={people[s.user_id].avatar_url} alt=""/>:<span>{(people[s.user_id]?.display_name||people[s.user_id]?.username||'A').slice(0,1).toUpperCase()}</span>}</span><b>{s.user_id===user.id?'Status kamu':(people[s.user_id]?.display_name||people[s.user_id]?.username||'Pengguna').split(' ')[0]}</b></button>)}
+          {!stories.length&&<p className="atl-community-empty">Belum ada pembaruan status. Ketuk "Tambah Status" untuk membuat Story pertamamu.</p>}
+        </div>
       </div>
       <div className="atl-community-section"><h2><NotebookPen size={18}/> Catatan</h2><p>Catatan singkat yang aktif selama 24 jam.</p>
-        <div className="atl-note-list">{notes.map(n=><article className="atl-note-card" key={n.id}><div className="atl-note-avatar">{people[n.user_id]?.avatar_url?<img src={people[n.user_id].avatar_url} alt=""/>:(people[n.user_id]?.display_name||people[n.user_id]?.username||'A').slice(0,1).toUpperCase()}</div><div><b>{n.user_id===user.id?'Catatan kamu':(people[n.user_id]?.display_name||people[n.user_id]?.username||'Pengguna Atlantic')}</b><p>{n.body}</p><small>{dateLabel(n.created_at)}</small></div></article>)}
-        {!notes.length&&<div className="atl-community-empty">Belum ada Catatan.</div>}</div>
+        <div className="atl-note-bubbles">{notes.map(n=><article className="atl-note-bubble" key={n.id}><div className="atl-note-avatar">{people[n.user_id]?.avatar_url?<img src={people[n.user_id].avatar_url} alt=""/>:(people[n.user_id]?.display_name||people[n.user_id]?.username||'A').slice(0,1).toUpperCase()}</div><div className="atl-note-content"><b>{n.user_id===user.id?'Catatanmu':(people[n.user_id]?.display_name||people[n.user_id]?.username||'Pengguna Atlantic')}</b><p>{n.body}</p><small>{dateLabel(n.created_at)}</small></div>{n.user_id===user.id&&<button type="button" className="atl-note-delete" onClick={()=>deleteNote(n)} aria-label="Hapus catatan">×</button>}</article>)}
+        {!notes.length&&<div className="atl-community-empty">Belum ada Catatan. Buat catatan singkat untuk teman-temanmu.</div>}</div>
       </div>
     </>}
     {tab==='channels'&&<>
@@ -184,6 +210,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     {tab==='calls'&&<div className="atl-community-section"><h2><Phone size={18}/> Riwayat panggilan</h2><p>Riwayat panggilan audio dan video langsung Atlantic.</p>
       <div className="atl-call-list">{calls.map(c=><article key={c.id}><div className="atl-call-icon"><Phone size={17}/></div><div><b>{c.caller_id===user.id?'Keluar ke':'Masuk dari'} {people[c.caller_id===user.id?c.callee_id:c.caller_id]?.display_name||people[c.caller_id===user.id?c.callee_id:c.caller_id]?.username||'Pengguna Atlantic'} · {c.call_type==='video'?'Video':'Audio'}</b><small>{dateLabel(c.started_at)} · {callStatusLabel(c.status)}</small></div></article>)}{!calls.length&&<div className="atl-community-empty">Belum ada riwayat panggilan.</div>}</div>
     </div>}
+    {activeStoryIndex>=0&&stories[activeStoryIndex]&&(()=>{const story=stories[activeStoryIndex];const isVideo=/\.(mp4|webm)(\?|$)/i.test(story.media_url||'');return <div className="atl-story-viewer" onClick={()=>setActiveStoryIndex(-1)}><button className="atl-story-viewer-close" onClick={()=>setActiveStoryIndex(-1)} aria-label="Tutup">×</button><article onClick={e=>e.stopPropagation()}><header><b>{people[story.user_id]?.display_name||people[story.user_id]?.username||'Pengguna Atlantic'}</b><small>{dateLabel(story.created_at)}</small></header>{story.media_url&&(isVideo?<video src={story.media_url} controls autoPlay playsInline/>:<img src={story.media_url} alt="Story"/>)}{story.body&&<p>{story.body}</p>}<footer>{story.user_id===user.id&&<button type="button" onClick={()=>deleteStory(story)} disabled={busy}>Hapus Story</button>}<button type="button" onClick={()=>setActiveStoryIndex(v=>v>0?v-1:-1)}>Tutup</button><button type="button" onClick={()=>setActiveStoryIndex(v=>v<stories.length-1?v+1:-1)}>Berikutnya</button></footer></article></div>;})()}
     {showCreate&&<div className="atl-community-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setShowCreate(false)}><section className="atl-community-modal"><header><b>{tab==='updates'?'Bagikan pembaruan':'Buat saluran'}</b><button onClick={()=>setShowCreate(false)}><X/></button></header>
       {tab==='updates'?<><label>{body.length>0?'Isi postingan':'Apa yang ingin kamu bagikan?' }<textarea value={body} onChange={e=>setBody(e.target.value)} rows={4} maxLength={500}/></label><div className="atl-story-upload"><input ref={storyMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" onChange={chooseStoryMedia} hidden/><button type="button" onClick={()=>storyMediaInput.current?.click()} disabled={busy}><ImagePlus size={16}/>{mediaFile?'Ganti foto/video':'Tambahkan foto/video'}</button><small>JPG, PNG, WebP, GIF, MP4, WebM · Maks. 20 MB</small>{mediaPreview&&<div className="atl-story-preview">{mediaFile?.type.startsWith('video/')?<video src={mediaPreview} controls playsInline/>:<img src={mediaPreview} alt="Pratinjau Story"/>}<button type="button" onClick={()=>{setMediaFile(null);setMediaPreview('');}}>Hapus media</button></div>}</div><div className="atl-community-modal-actions"><button onClick={()=>publish('story')} disabled={busy||(!body.trim()&&!mediaFile)}><ImagePlus size={16}/> {busy?'Mengunggah…':'Terbitkan Story'}</button><button onClick={()=>publish('note')} disabled={busy||!body.trim()||!!mediaFile}><NotebookPen size={16}/> Buat Catatan</button></div></>:<form onSubmit={createChannel}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<input value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><button className="atl-community-submit" disabled={busy||!channelName.trim()}>Buat saluran</button></form>}
     </section></div>}
