@@ -48,14 +48,14 @@ Sudah tersedia di kode:
 - Indikator "sedang mengetik" real-time.
 - Profil: nama tampilan, username, bio, foto profil, dan pengaturan privasi.
 - Badge biru Atlantic Verified untuk admin utama; pengajuan verifikasi pengguna dengan badge oranye setelah disetujui admin.
-- Story teks dan Catatan yang kedaluwarsa setelah 24 jam.
+- Story teks/foto/video dan Catatan yang kedaluwarsa setelah 24 jam.
 - Saluran publik dengan fitur gabung dan posting teks.
 - Riwayat undangan panggilan audio/video (bukan panggilan langsung).
 - Navigasi bawah Liquid Glass, tema, font, warna aksen, dan animasi UI.
 
 BATASAN YANG MASIH ADA
 ======================
-- Story belum mendukung unggah foto/video.
+- Story mendukung foto/video hingga 20 MB per file; format yang didukung JPG, PNG, WebP, GIF, MP4, dan WebM.
 - Chat belum mendukung kirim gambar atau file.
 - Grup chat belum tersedia.
 - Audio/video call langsung belum tersedia; menu Panggilan hanya menyimpan undangan dan riwayat.
