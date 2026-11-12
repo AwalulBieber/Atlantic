@@ -448,7 +448,7 @@ export default function App() {
       onClick={() => openChat(c.person)}
     >
       <div className="avatar">
-        {initials(c.person.display_name || c.person.username)}
+        {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
       </div>
       <div className="person-info">
         <b>{c.person.display_name || c.person.username}{c.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14}/></span>}</b>
@@ -470,7 +470,7 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              <div className="avatar">{initials(active.person.display_name || active.person.username)}</div>
+              <div className="avatar">{active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
                 <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={15}/></span>}</b>
                 <small>@{active.person.username}</small>
