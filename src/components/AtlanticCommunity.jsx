@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import { Clock3, Plus, Send, Radio, Phone, ImagePlus, NotebookPen, X, Users, RefreshCw } from 'lucide-react';
 
@@ -12,6 +12,9 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [posts,setPosts]=useState([]);
   const [calls,setCalls]=useState([]);
   const [body,setBody]=useState('');
+  const [mediaFile,setMediaFile]=useState(null);
+  const [mediaPreview,setMediaPreview]=useState('');
+  const storyMediaInput=useRef(null);
   const [channelName,setChannelName]=useState('');
   const [channelDescription,setChannelDescription]=useState('');
   const [busy,setBusy]=useState(false);
@@ -41,6 +44,17 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
 
   useEffect(()=>{load();},[load]);
   useEffect(()=>{if(createRequest>0)setShowCreate(true);},[createRequest]);
+  useEffect(()=>()=>{if(mediaPreview)URL.revokeObjectURL(mediaPreview);},[mediaPreview]);
+
+  function chooseStoryMedia(event){
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if(!file)return;
+    const allowed=['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm'];
+    if(!allowed.includes(file.type)){setError('Format media harus JPG, PNG, WebP, GIF, MP4, atau WebM.');return;}
+    if(file.size>20*1024*1024){setError('Ukuran media Story maksimal 20 MB.');return;}
+    setError('');setMediaFile(file);setMediaPreview(URL.createObjectURL(file));
+  }
 
   // Keep community feeds synchronized without requiring a manual refresh.
   useEffect(() => {
@@ -64,11 +78,27 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   }, [tab, user?.id, selectedChannel?.id, load]);
 
   async function publish(kind) {
-    const text=body.trim(); if(!text||busy) return;
+    const text=body.trim();
+    if(busy||(!text&&!(kind==='story'&&mediaFile))||(kind==='note'&&mediaFile)) return;
     setBusy(true); setError('');
+    let mediaUrl=null;
+    let uploadedPath=null;
+    if(kind==='story'&&mediaFile){
+      const extension=(mediaFile.name.split('.').pop()||'').toLowerCase().replace(/[^a-z0-9]/g,'')||(mediaFile.type==='video/mp4'?'mp4':mediaFile.type==='video/webm'?'webm':'jpg');
+      uploadedPath=user.id+'/'+crypto.randomUUID()+'.'+extension;
+      const {error:uploadError}=await supabase.storage.from('atlantic-stories').upload(uploadedPath,mediaFile,{cacheControl:'3600',upsert:false,contentType:mediaFile.type});
+      if(uploadError){setError('Upload Story gagal: '+uploadError.message);setBusy(false);return;}
+      mediaUrl=supabase.storage.from('atlantic-stories').getPublicUrl(uploadedPath).data.publicUrl;
+    }
     const table=kind==='story'?'atlantic_stories':'atlantic_notes';
-    const {error:e}=await supabase.from(table).insert({user_id:user.id,body:text});
-    if(e) setError(e.message); else {setBody('');setShowCreate(false);await load();}
+    const payload=kind==='story'?{user_id:user.id,body:text,media_url:mediaUrl}:{user_id:user.id,body:text};
+    const {error:e}=await supabase.from(table).insert(payload);
+    if(e){
+      if(uploadedPath)await supabase.storage.from('atlantic-stories').remove([uploadedPath]);
+      setError(e.message);
+    }else{
+      setBody('');setMediaFile(null);setMediaPreview('');setShowCreate(false);await load();
+    }
     setBusy(false);
   }
 
@@ -115,7 +145,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     {error&&<div className="atl-community-error">{error}</div>}
     {tab==='updates'&&<>
       <div className="atl-community-section"><h2><Clock3 size={18}/> Story</h2><p>Story teks tampil selama 24 jam.</p>
-        <div className="atl-story-grid">{stories.map(s=><article className="atl-story-card" key={s.id}><small>{s.user_id===user.id?'Story kamu':'Story Atlantic'} · {dateLabel(s.created_at)}</small><p>{s.body}</p></article>)}
+        <div className="atl-story-grid">{stories.map(s=><article className="atl-story-card" key={s.id}><small>{s.user_id===user.id?'Story kamu':'Story Atlantic'} · {dateLabel(s.created_at)}</small>{s.media_url&&( /\\.(mp4|webm)(\\?|$)/i.test(s.media_url)?<video className="atl-story-media" src={s.media_url} controls playsInline preload="metadata"/>:<img className="atl-story-media" src={s.media_url} alt="Media Story" loading="lazy"/>)}{s.body?.trim()&&<p>{s.body}</p>}</article>)}
         {!stories.length&&<div className="atl-community-empty">Belum ada Story. Jadilah yang pertama berbagi.</div>}</div>
       </div>
       <div className="atl-community-section"><h2><NotebookPen size={18}/> Catatan</h2><p>Catatan singkat yang aktif selama 24 jam.</p>
@@ -135,7 +165,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
       <div className="atl-call-list">{calls.map(c=><article key={c.id}><div className="atl-call-icon"><Phone size={17}/></div><div><b>{c.caller_id===user.id?'Panggilan keluar':'Panggilan masuk'} · {c.call_type==='video'?'Video':'Suara'}</b><small>{dateLabel(c.started_at)} · {c.status}</small></div></article>)}{!calls.length&&<div className="atl-community-empty">Belum ada riwayat panggilan.</div>}</div>
     </div>}
     {showCreate&&<div className="atl-community-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setShowCreate(false)}><section className="atl-community-modal"><header><b>{tab==='updates'?'Bagikan pembaruan':'Buat saluran'}</b><button onClick={()=>setShowCreate(false)}><X/></button></header>
-      {tab==='updates'?<><label>{body.length>0?'Isi postingan':'Apa yang ingin kamu bagikan?' }<textarea value={body} onChange={e=>setBody(e.target.value)} rows={5} maxLength={500}/></label><div className="atl-community-modal-actions"><button onClick={()=>publish('story')} disabled={busy||!body.trim()}><ImagePlus size={16}/> Terbitkan Story</button><button onClick={()=>publish('note')} disabled={busy||!body.trim()}><NotebookPen size={16}/> Buat Catatan</button></div></>:<form onSubmit={createChannel}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<input value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><button className="atl-community-submit" disabled={busy||!channelName.trim()}>Buat saluran</button></form>}
+      {tab==='updates'?<><label>{body.length>0?'Isi postingan':'Apa yang ingin kamu bagikan?' }<textarea value={body} onChange={e=>setBody(e.target.value)} rows={4} maxLength={500}/></label><div className="atl-story-upload"><input ref={storyMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" onChange={chooseStoryMedia} hidden/><button type="button" onClick={()=>storyMediaInput.current?.click()} disabled={busy}><ImagePlus size={16}/>{mediaFile?'Ganti foto/video':'Tambahkan foto/video'}</button><small>JPG, PNG, WebP, GIF, MP4, WebM · Maks. 20 MB</small>{mediaPreview&&<div className="atl-story-preview">{mediaFile?.type.startsWith('video/')?<video src={mediaPreview} controls playsInline/>:<img src={mediaPreview} alt="Pratinjau Story"/>}<button type="button" onClick={()=>{setMediaFile(null);setMediaPreview('');}}>Hapus media</button></div>}</div><div className="atl-community-modal-actions"><button onClick={()=>publish('story')} disabled={busy||(!body.trim()&&!mediaFile)}><ImagePlus size={16}/> {busy?'Mengunggah…':'Terbitkan Story'}</button><button onClick={()=>publish('note')} disabled={busy||!body.trim()||!!mediaFile}><NotebookPen size={16}/> Buat Catatan</button></div></>:<form onSubmit={createChannel}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<input value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><button className="atl-community-submit" disabled={busy||!channelName.trim()}>Buat saluran</button></form>}
     </section></div>}
   </section>;
 }
