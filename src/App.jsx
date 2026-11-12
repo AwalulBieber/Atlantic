@@ -3,7 +3,7 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
 import {
-  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
+  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
@@ -44,6 +44,8 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [chats, setChats] = useState([]);
+  const [archivedIds, setArchivedIds] = useState([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -186,10 +188,17 @@ export default function App() {
 
   if (!mine?.length) {
     setChats([]);
+    setArchivedIds([]);
     return;
   }
 
   const ids = mine.map(c => c.conversation_id);
+  const { data: archived, error: archiveError } = await supabase
+    .from('archived_conversations')
+    .select('conversation_id')
+    .eq('user_id', session.user.id);
+  if (archiveError) setNotice('Arsip chat: ' + archiveError.message);
+  else setArchivedIds((archived || []).map(row => row.conversation_id));
 
   // When a user reconnects, mark any previously queued messages as delivered.
   await supabase.from('messages')
@@ -234,6 +243,17 @@ export default function App() {
     conversation_id: m.conversation_id,
     person: peopleWithBadges.find(p => p.id === m.user_id)
   })).filter(c => c.person));
+  }
+
+  async function toggleArchive(conversationId) {
+    const isArchived = archivedIds.includes(conversationId);
+    const query = isArchived
+      ? supabase.from('archived_conversations').delete().eq('conversation_id', conversationId).eq('user_id', session.user.id)
+      : supabase.from('archived_conversations').upsert({ conversation_id: conversationId, user_id: session.user.id }, { onConflict: 'conversation_id,user_id' });
+    const { error } = await query;
+    if (error) { setNotice('Arsip chat gagal diperbarui: ' + error.message); return; }
+    setArchivedIds(current => isArchived ? current.filter(id => id !== conversationId) : [...current, conversationId]);
+    setNotice(isArchived ? 'Chat dipindahkan kembali ke daftar utama.' : 'Chat berhasil diarsipkan.');
   }
 
   async function openChat(person) {
@@ -495,7 +515,8 @@ export default function App() {
     );
   }
 
-  const filtered = chats.filter(c =>
+  const visibleChats = chats.filter(c => archivedIds.includes(c.conversation_id) === showArchived);
+  const filtered = visibleChats.filter(c =>
   (c.person.display_name || c.person.username || '')
     .toLowerCase().includes(search.toLowerCase())
 );
@@ -531,7 +552,8 @@ export default function App() {
           <input placeholder="Cari Chat…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        <div className="section-title"><span>Chat</span><span className="count-tag">{filtered.length}</span></div>
+        <div className="chat-list-tabs"><button className={!showArchived ? 'active' : ''} onClick={() => setShowArchived(false)}>Semua chat</button><button className={showArchived ? 'active' : ''} onClick={() => setShowArchived(true)}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button></div>
+        <div className="section-title"><span>{showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{filtered.length}</span></div>
         <div className="people">
   {filtered.map(c => (
     <button
@@ -546,12 +568,13 @@ export default function App() {
         <b>{c.person.display_name || c.person.username}{c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
         <small>Ketuk untuk membuka chat</small>
       </div>
+      <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={e => { e.stopPropagation(); toggleArchive(c.conversation_id); }}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
       <MessageCircle size={17} />
     </button>
   ))}
 
   {!filtered.length && (
-    <p className="empty">Belum ada percakapan</p>
+    <p className="empty">{showArchived ? 'Belum ada chat yang diarsipkan' : 'Belum ada percakapan'}</p>
   )}
 </div>
         <footer className="side-foot">ATLANTIC WEB <span>•</span> V1.1</footer>
