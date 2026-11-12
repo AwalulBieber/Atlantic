@@ -166,13 +166,15 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     const {data:existing,error:checkError}=await supabase.from('atlantic_channel_members').select('user_id').eq('channel_id',channel.id).eq('user_id',user.id).maybeSingle();
     if(checkError){setError(checkError.message);return;}
     if(!existing){const {error:e}=await supabase.from('atlantic_channel_members').insert({channel_id:channel.id,user_id:user.id,role:'member'});if(e){setError(e.message);return;}}
-    setSelectedChannel(channel);loadPosts(channel.id);
+    let readyChannel={...channel,avatar_path:channel.avatar_url||null};
+    if(channel.avatar_url){const {data:signed,error:signedError}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(channel.avatar_url,3600);if(signedError)setError('Foto saluran: '+signedError.message);else readyChannel.avatar_url=signed?.signedUrl||null;}
+    setSelectedChannel(readyChannel);loadPosts(channel.id);
   }
 
   async function loadPosts(id) {
     const {data,error:e}=await supabase.from('atlantic_channel_posts').select('id,channel_id,author_id,body,created_at,media_url,media_type,media_name').eq('channel_id',id).order('created_at',{ascending:true}).limit(100);
     if(e) setError(e.message); else {
-      const hydrated=await Promise.all((data||[]).map(async post=>{if(!post.media_url)return post;const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(post.media_url,3600);return {...post,media_url:signed?.signedUrl||null};}));
+      const hydrated=await Promise.all((data||[]).map(async post=>{if(!post.media_url)return post;const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(post.media_url,3600);return {...post,media_path:post.media_url,media_url:signed?.signedUrl||null};}));
       setPosts(hydrated);await loadPeople((data||[]).map(post=>post.author_id));
     }
   }
@@ -181,7 +183,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     e.preventDefault();
     if(!selectedChannel||selectedChannel.owner_id!==user.id||busy)return;
     setBusy(true);setError('');
-    let avatarPath=selectedChannel.avatar_url||null;
+    let avatarPath=selectedChannel.avatar_path||null;
     if(channelAvatarFile){
       const ext=(channelAvatarFile.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
       avatarPath=selectedChannel.id+'/'+user.id+'/'+crypto.randomUUID()+'.'+ext;
@@ -191,8 +193,9 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     const {error:e1}=await supabase.from('atlantic_channels').update({name:channelName.trim(),description:channelDescription.trim(),avatar_url:avatarPath}).eq('id',selectedChannel.id).eq('owner_id',user.id);
     if(e1){if(channelAvatarFile&&avatarPath)await supabase.storage.from('atlantic-channel-media').remove([avatarPath]);setError(e1.message);}
     else{
-      if(selectedChannel.avatar_url&&avatarPath!==selectedChannel.avatar_url)await supabase.storage.from('atlantic-channel-media').remove([selectedChannel.avatar_url]);
-      const next={...selectedChannel,name:channelName.trim(),description:channelDescription.trim(),avatar_url:avatarPath};
+      if(selectedChannel.avatar_path&&avatarPath!==selectedChannel.avatar_path)await supabase.storage.from('atlantic-channel-media').remove([selectedChannel.avatar_path]);
+      let avatarSigned=null;if(avatarPath){const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(avatarPath,3600);avatarSigned=signed?.signedUrl||null;}
+      const next={...selectedChannel,name:channelName.trim(),description:channelDescription.trim(),avatar_path:avatarPath,avatar_url:avatarSigned};
       setSelectedChannel(next);setChannels(items=>items.map(item=>item.id===next.id?next:item));
       setChannelAvatarFile(null);setChannelAvatarPreview('');setChannelSettingsOpen(false);
       onNotice?.('Info saluran berhasil diperbarui.');
