@@ -55,7 +55,7 @@ Sudah tersedia di kode:
 
 BATASAN YANG MASIH ADA
 ======================
-- Story mendukung foto/video hingga 20 MB per file; format yang didukung JPG, PNG, WebP, GIF, MP4, dan WebM.
+- Story mendukung foto/video hingga 20 MB per file (JPG, PNG, WebP, GIF, MP4, WebM); media disimpan privat dan URL akses berakhir mengikuti masa aktif Story.
 - Chat belum mendukung kirim gambar atau file.
 - Grup chat belum tersedia.
 - Audio/video call langsung belum tersedia; menu Panggilan hanya menyimpan undangan dan riwayat.
