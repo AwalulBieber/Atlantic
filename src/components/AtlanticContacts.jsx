@@ -5,6 +5,7 @@ import { UserPlus, Check, X, Search, Users, Clock3, Trash2 } from 'lucide-react'
 export default function AtlanticContacts({ user, onClose, onOpenChat }) {
   const [query,setQuery]=useState('');
   const [profiles,setProfiles]=useState([]);
+  const [searchProfiles,setSearchProfiles]=useState([]);
   const [rows,setRows]=useState([]);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
@@ -29,6 +30,24 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
 
   useEffect(()=>{load();},[load]);
   useEffect(()=>{
+    let cancelled=false;
+    const run=async()=>{
+      const term=query.trim();
+      if(!term){setSearchProfiles([]);return;}
+      const safe=term.replace(/[,%()]/g,' ').trim();
+      if(!safe){setSearchProfiles([]);return;}
+      const {data,error:e}=await supabase.from('profiles')
+        .select('id,username,display_name,avatar_url,is_verified')
+        .or('username.ilike.%'+safe+'%,display_name.ilike.%'+safe+'%')
+        .neq('id',user.id).limit(30);
+      if(!cancelled&&!e)setSearchProfiles(data||[]);
+      if(!cancelled&&e)setError(e.message);
+    };
+    const timer=setTimeout(run,220);
+    return()=>{cancelled=true;clearTimeout(timer);};
+  },[query,user?.id]);
+
+  useEffect(()=>{
     if(!user?.id)return;
     const channel=supabase.channel('atlantic-contacts-'+user.id)
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_contacts'},load)
@@ -40,9 +59,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
   const incoming=rows.filter(r=>r.status==='pending'&&r.addressee_id===user.id);
   const outgoing=rows.filter(r=>r.status==='pending'&&r.requester_id===user.id);
   const contacts=rows.filter(r=>r.status==='accepted');
-  const filtered=profiles.filter(p=>!rows.some(r=>[r.requester_id,r.addressee_id].includes(p.id))&&
-    (p.display_name||'').toLowerCase().includes(query.toLowerCase())||
-    (!rows.some(r=>[r.requester_id,r.addressee_id].includes(p.id))&&(p.username||'').toLowerCase().includes(query.toLowerCase())));
+  const filtered=searchProfiles.filter(p=>!rows.some(r=>[r.requester_id,r.addressee_id].includes(p.id)));
 
   async function sendRequest(person){
     setBusy(true);setError('');setNotice('');
@@ -79,7 +96,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
       {outgoing.length>0&&<section className="atl-contacts-section"><h3>Menunggu persetujuan</h3>{outgoing.map(r=><article className="atl-contact-row" key={r.id}>{personRow(r.addressee_id)}<small>Menunggu</small></article>)}</section>}
       <section className="atl-contacts-section"><h3><UserPlus size={16}/> Temukan pengguna</h3>
         {filtered.map(p=><article className="atl-contact-row" key={p.id}>{personRow(p.id)}<button className="atl-contact-add" disabled={busy} onClick={()=>sendRequest(p)}><UserPlus size={15}/> Tambah</button></article>)}
-        {!filtered.length&&<p className="atl-contacts-empty">{query?'Tidak ada pengguna yang cocok.':'Semua hasil sudah punya permintaan atau menjadi kontak.'}</p>}
+        {!filtered.length&&<p className="atl-contacts-empty">{query?'Tidak ada pengguna yang cocok.':'Cari nama atau username untuk menemukan pengguna.'}</p>}
       </section>
       <footer>Story dan Catatan hanya terlihat setelah permintaan kontak diterima oleh kedua pihak.</footer>
     </section>
