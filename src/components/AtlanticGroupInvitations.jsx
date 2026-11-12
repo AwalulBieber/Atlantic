@@ -10,18 +10,13 @@ export default function AtlanticGroupInvitations({user,onAccepted,onNotice}){
 
   const load=useCallback(async()=>{
     if(!user?.id)return;
-    const {data,error:e}=await supabase.from('atlantic_group_invitations').select('id,conversation_id,inviter_id,created_at').eq('invitee_id',user.id).eq('status','pending').order('created_at',{ascending:false});
+    const {data,error:e}=await supabase.from('atlantic_group_invitations').select('id,conversation_id,inviter_id,group_title,created_at').eq('invitee_id',user.id).eq('status','pending').order('created_at',{ascending:false});
     if(e){setError(e.message);return;}
     const rows=data||[];
-    const conversationIds=[...new Set(rows.map(row=>row.conversation_id))];
     const inviterIds=[...new Set(rows.map(row=>row.inviter_id))];
-    const [{data:groups},{data:profiles}]=await Promise.all([
-      conversationIds.length?supabase.from('conversations').select('id,title,avatar_url').in('id',conversationIds):Promise.resolve({data:[]}),
-      inviterIds.length?supabase.from('profiles').select('id,display_name,username,avatar_url').in('id',inviterIds):Promise.resolve({data:[]})
-    ]);
-    const groupMap=Object.fromEntries((groups||[]).map(group=>[group.id,group]));
+    const {data:profiles}=inviterIds.length?await supabase.from('profiles').select('id,display_name,username,avatar_url').in('id',inviterIds):{data:[]};
     const profileMap=Object.fromEntries((profiles||[]).map(profile=>[profile.id,profile]));
-    setItems(rows.map(row=>({...row,group:groupMap[row.conversation_id]||{},inviter:profileMap[row.inviter_id]||{}})));
+    setItems(rows.map(row=>({...row,group:{title:row.group_title||'Grup Atlantic'},inviter:profileMap[row.inviter_id]||{}})));
   },[user?.id]);
 
   useEffect(()=>{load();},[load]);
