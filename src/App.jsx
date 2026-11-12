@@ -294,7 +294,7 @@ export default function App() {
       conversation_id: conversationId,
       is_group: true,
       title: groupTitle.trim(),
-      members: [myProfile, ...selectedProfiles].filter(Boolean),
+      members: [{ id: session.user.id, display_name: myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email }, ...selectedProfiles],
       person: { id: conversationId, display_name: groupTitle.trim(), username: groupTitle.trim(), is_group: true }
     };
     setChats(current => [group, ...current]);
@@ -679,7 +679,8 @@ export default function App() {
   {showSaved ? (savedBusy ? <p className="empty">Memuat pesan tersimpan…</p> : savedMessages.map(item => {
     const message = item.message;
     const chat = chats.find(entry => entry.conversation_id === message.conversation_id);
-    const author = message.sender_id === session.user.id ? 'Kamu' : (chat?.person?.display_name || chat?.person?.username || 'Pengguna');
+    const savedSender = chat?.is_group ? chat.members?.find(person => person.id === message.sender_id) : chat?.person;
+    const author = message.sender_id === session.user.id ? 'Kamu' : (savedSender?.display_name || savedSender?.username || 'Pengguna');
     return <div className="saved-message-row" key={item.id}><button type="button" className="saved-message-open" onClick={() => openSavedMessage(item)}><b>{author}</b><span>{message.body || 'Pesan'}</span><small>{time(message.created_at)} · Buka percakapan</small></button><button type="button" className="saved-message-remove" onClick={() => toggleSavedMessage(message)} aria-label="Hapus dari pesan tersimpan"><X size={15}/></button></div>;
   })) : filtered.map(c => (
     <div className="person-row" key={c.conversation_id}>
