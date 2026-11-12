@@ -607,3 +607,5 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-group-verification-queue{margin:20px 0;padding:14px;border:2px solid var(--ink);border-radius:12px;background:var(--paper)}
 .atl-group-verification-queue h4{margin:0 0 10px;font-size:14px;font-weight:950}.atl-group-verification-queue article{display:grid;gap:6px;padding:10px 0;border-top:1px solid #8885}.atl-group-verification-queue article>b{font-size:13px}.atl-group-verification-queue article>small{color:#888;font-size:10px}.atl-group-verification-queue article>p{margin:0;font-size:12px}.atl-group-verification-queue article>div{display:flex;gap:8px}.atl-group-verification-queue article button{padding:7px 10px;border:2px solid var(--ink);border-radius:8px;background:#a7efbd;font-weight:900}.atl-group-verification-queue article button.atl-secondary{background:#eee}
 @media(max-width:560px){.atl-group-info-backdrop{padding:0}.atl-group-info{width:100%;height:100dvh;max-height:100dvh;border-width:0;box-shadow:none}.atl-group-edit,.atl-group-verification,.atl-group-members{margin:10px 14px}}
+
+.chat-person[role="button"]{cursor:pointer}
