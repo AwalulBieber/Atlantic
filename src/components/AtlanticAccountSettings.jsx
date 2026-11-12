@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import "./AtlanticAccountSettings.css";
+import AtlanticImageCropper from "./AtlanticImageCropper";
 
 const DEFAULTS = {
   bio: "", is_private: false, show_online_status: true,
@@ -15,6 +16,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [avatarCropFile, setAvatarCropFile] = useState(null);
   const [message, setMessage] = useState("");
   const [verificationRequests, setVerificationRequests] = useState([]);
   const [verificationNote, setVerificationNote] = useState("");
@@ -126,24 +128,29 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     }
   }
 
-  async function uploadAvatar(event) {
+  function uploadAvatar(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !user?.id) return;
-    if (!file.type.startsWith("image/")) {
-      setMessage("Pilih file gambar (JPG, PNG, atau WebP).");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setMessage("Pilih foto JPG, PNG, atau WebP.");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
       setMessage("Ukuran foto maksimal 5 MB.");
       return;
     }
+    setMessage("");
+    setAvatarCropFile(file);
+  }
+
+  async function saveCroppedAvatar(file) {
+    if (!file || !user?.id) return;
     setUploading(true);
     setMessage("");
-    const extension = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-    const path = user.id + "/" + Date.now() + "." + extension;
+    const path = user.id + "/" + Date.now() + ".jpg";
     const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, {
-      cacheControl: "3600", upsert: false, contentType: file.type
+      cacheControl: "3600", upsert: false, contentType: "image/jpeg"
     });
     if (uploadError) {
       setMessage("Upload gagal: " + uploadError.message + ". Pastikan bucket avatars dan izin upload sudah dibuat di Supabase.");
@@ -152,7 +159,8 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       if (pendingAvatarPath) await supabase.storage.from("avatars").remove([pendingAvatarPath]);
       setPendingAvatarPath(path);
       update("avatar_url", data.publicUrl);
-      setMessage("Foto berhasil diunggah. Tekan Simpan perubahan untuk menerapkannya.");
+      setMessage("Foto berhasil disesuaikan dan diunggah. Tekan Simpan perubahan untuk menerapkannya.");
+      setAvatarCropFile(null);
     }
     setUploading(false);
   }
@@ -297,6 +305,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           {tab !== "admin" && <footer><button type="button" className="atl-secondary" onClick={onClose}>Tutup</button>{(tab === "profile" || tab === "privacy") && <button type="submit" disabled={busy || uploading}>{busy ? "Menyimpan…" : "Simpan perubahan"}</button>}</footer>}
         </form>
       </section>
+      <AtlanticImageCropper file={avatarCropFile} title="Sesuaikan foto profil" busy={uploading} onCancel={() => setAvatarCropFile(null)} onApply={saveCroppedAvatar} />
     </div>
   );
 }
