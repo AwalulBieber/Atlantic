@@ -73,3 +73,10 @@ ATLANTIC COMMUNITY MIGRATION
 Jalankan SQL secara utuh dari file supabase/migrations/202611120001_community_features.sql melalui Supabase Dashboard > SQL Editor sebelum memakai Story, Catatan, Saluran, dan riwayat undangan panggilan. Migrasi ini hanya menambah tabel baru dan policy RLS; tidak menghapus atau mengubah tabel chat lama.
 
 Catatan: menu Panggilan pada versi ini menyimpan riwayat/undangan. Audio/video real-time belum aktif dan tidak ditampilkan sebagai fitur yang sudah tersedia.
+
+
+ATLANTIC SAVED MESSAGES
+=======================
+- Pengguna dapat menyimpan dan menghapus pesan dari daftar Pesan Tersimpan.
+- Pesan tersimpan bersifat pribadi per akun dan dapat dibuka kembali langsung ke percakapan asal.
+- Tabel saved_messages dilindungi RLS; hanya pemilik yang dapat membaca, menyimpan, atau menghapus bookmark untuk pesan di percakapan yang diikutinya.
