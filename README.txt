@@ -80,3 +80,13 @@ ATLANTIC SAVED MESSAGES
 - Pengguna dapat menyimpan dan menghapus pesan dari daftar Pesan Tersimpan.
 - Pesan tersimpan bersifat pribadi per akun dan dapat dibuka kembali langsung ke percakapan asal.
 - Tabel saved_messages dilindungi RLS; hanya pemilik yang dapat membaca, menyimpan, atau menghapus bookmark untuk pesan di percakapan yang diikutinya.
+
+
+ATLANTIC GROUP CHAT
+===================
+- Pengguna dapat membuat grup dengan nama 2–60 karakter dan memilih minimal dua anggota lain.
+- Grup mendukung percakapan teks realtime, balasan pesan, status pesan, dan Pesan Tersimpan.
+- Nama pengirim ditampilkan pada setiap pesan grup.
+- Batas anggota grup saat ini 100 akun termasuk pembuat grup.
+- Pembuatan grup memakai RPC terautentikasi; fungsi tidak dapat dijalankan oleh role anon. Penambahan anggota langsung dibatasi kepada pembuat percakapan.
+- Panggilan audio/video grup langsung belum tersedia.
