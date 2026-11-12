@@ -180,31 +180,56 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   async function createChannel(e) {
     e.preventDefault(); if(!channelName.trim()||busy) return;
     setBusy(true);setError('');
+    const {data,error:e1}=await supabase.from('atlantic_channels')
+      .insert({owner_id:user.id,name:channelName.trim(),description:channelDescription.trim()})
+      .select('id,owner_id,name,description,is_public,avatar_url,created_at').single();
+    if(e1){
+      setError(e1.message);
+      setBusy(false);
+      return;
+    }
+
+    const {error:e2}=await supabase.from('atlantic_channel_members')
+      .insert({channel_id:data.id,user_id:user.id,role:'owner'});
+    if(e2){
+      await supabase.from('atlantic_channels').delete().eq('id',data.id).eq('owner_id',user.id);
+      setError('Gagal menyiapkan keanggotaan saluran: '+e2.message);
+      setBusy(false);
+      return;
+    }
+
     let avatarPath=null;
     if(channelAvatarFile){
       const ext=(channelAvatarFile.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
-      avatarPath=user.id+'/'+crypto.randomUUID()+'.'+ext;
-      const {error:uploadError}=await supabase.storage.from('atlantic-channel-media').upload(avatarPath,channelAvatarFile,{upsert:false,contentType:channelAvatarFile.type});
-      if(uploadError){setError('Foto saluran gagal diunggah: '+uploadError.message);setBusy(false);return;}
-    }
-    const {data,error:e1}=await supabase.from('atlantic_channels').insert({owner_id:user.id,name:channelName.trim(),description:channelDescription.trim(),avatar_url:avatarPath}).select('id,owner_id,name,description,is_public,avatar_url,created_at').single();
-    if(e1) {
-      if(avatarPath)await supabase.storage.from('atlantic-channel-media').remove([avatarPath]);
-      setError(e1.message);
-    } else {
-      const {error:e2}=await supabase.from('atlantic_channel_members').insert({channel_id:data.id,user_id:user.id,role:'owner'});
-      if(e2){
+      avatarPath=data.id+'/'+user.id+'/'+crypto.randomUUID()+'.'+ext;
+      const {error:uploadError}=await supabase.storage.from('atlantic-channel-media')
+        .upload(avatarPath,channelAvatarFile,{upsert:false,contentType:channelAvatarFile.type});
+      if(uploadError){
         await supabase.from('atlantic_channels').delete().eq('id',data.id).eq('owner_id',user.id);
-        if(avatarPath)await supabase.storage.from('atlantic-channel-media').remove([avatarPath]);
-        setError('Gagal menyiapkan keanggotaan saluran: '+e2.message);
-      } else {
-        let avatarSigned=null;
-        if(avatarPath){const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(avatarPath,3600);avatarSigned=signed?.signedUrl||null;}
-        const ready={...data,avatar_path:avatarPath,avatar_url:avatarSigned,member_count:1};
-        setChannelName('');setChannelDescription('');setChannelAvatarFile(null);setChannelAvatarPreview('');
-        setShowCreate(false);setChannels(v=>[ready,...v]);setSelectedChannel(ready);
+        setError('Foto saluran gagal diunggah: '+uploadError.message);
+        setBusy(false);
+        return;
+      }
+      const {error:updateError}=await supabase.from('atlantic_channels')
+        .update({avatar_url:avatarPath}).eq('id',data.id).eq('owner_id',user.id);
+      if(updateError){
+        await supabase.storage.from('atlantic-channel-media').remove([avatarPath]);
+        await supabase.from('atlantic_channels').delete().eq('id',data.id).eq('owner_id',user.id);
+        setError('Foto saluran gagal disimpan: '+updateError.message);
+        setBusy(false);
+        return;
       }
     }
+
+    let avatarSigned=null;
+    if(avatarPath){
+      const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(avatarPath,3600);
+      avatarSigned=signed?.signedUrl||null;
+    }
+    const ready={...data,avatar_url:avatarPath?avatarPath:null,avatar_path:avatarPath,member_count:1};
+    if(avatarPath)ready.avatar_url=avatarSigned;
+    setChannelName('');setChannelDescription('');setChannelAvatarFile(null);setChannelAvatarPreview('');
+    setShowCreate(false);setChannels(v=>[ready,...v]);setSelectedChannel(ready);
     setBusy(false);
   }
 
