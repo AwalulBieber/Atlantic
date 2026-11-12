@@ -745,3 +745,57 @@ html[data-animations="off"] :where(a,button,input,select,textarea,[role="button"
   animation:none!important;
   transition:none!important;
 }
+
+/* Atlantic unread message indicators */
+.person-row { gap: 7px; }
+.atl-unread-badge {
+  flex: 0 0 auto;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent, #ffd84d);
+  color: #171717;
+  border: 1.5px solid var(--ink, #171717);
+  box-shadow: 1px 2px 0 var(--ink, #171717);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+  animation: atl-unread-pop 260ms var(--atl-ease-spring, cubic-bezier(.2,.9,.25,1.18));
+}
+.incoming-message-toast {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  animation: atl-toast-enter 300ms var(--atl-ease-spring, cubic-bezier(.2,.9,.25,1.18));
+}
+.incoming-message-toast small { font-size: 11px; opacity: .75; }
+.incoming-toast-body {
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.incoming-toast-close { position: absolute; top: 7px; right: 10px; opacity: .65; }
+@keyframes atl-unread-pop {
+  from { transform: scale(.65); opacity: .35; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes atl-toast-enter {
+  from { opacity: 0; transform: translate(-50%, 12px) scale(.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atl-unread-badge, .incoming-message-toast { animation: none; }
+}
+
