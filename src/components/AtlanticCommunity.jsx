@@ -11,6 +11,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [selectedChannel,setSelectedChannel]=useState(null);
   const [posts,setPosts]=useState([]);
   const [calls,setCalls]=useState([]);
+  const [people,setPeople]=useState({});
   const [body,setBody]=useState('');
   const [mediaFile,setMediaFile]=useState(null);
   const [mediaPreview,setMediaPreview]=useState('');
@@ -21,6 +22,13 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [error,setError]=useState('');
   const [showCreate,setShowCreate]=useState(false);
   const [refreshing,setRefreshing]=useState(false);
+
+  async function loadPeople(ids) {
+    const unique=[...new Set((ids||[]).filter(Boolean))];
+    if(!unique.length)return;
+    const {data,error:e}=await supabase.from('profiles').select('id,display_name,username,avatar_url,is_verified').in('id',unique);
+    if(!e&&data?.length)setPeople(current=>({...current,...Object.fromEntries(data.map(person=>[person.id,person]))}));
+  }
 
   const load = useCallback(async () => {
     if(!user?.id) return;
@@ -40,14 +48,15 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
           return {...story,media_url:signed?.signedUrl||null};
         }));
         setStories(signedStories);
+        await loadPeople([...(s.data||[]).map(story=>story.user_id),...(n.data||[]).map(note=>note.user_id)]);
       }
       if(n.error) setError(v=>v||('Catatan: '+n.error.message)); else setNotes(n.data||[]);
     } else if(tab==='channels') {
       const {data,error:e}=await supabase.from('atlantic_channels').select('id,owner_id,name,description,is_public,created_at').eq('is_public',true).order('created_at',{ascending:false}).limit(60);
-      if(e) setError(e.message); else setChannels(data||[]);
+      if(e) setError(e.message); else {setChannels(data||[]);await loadPeople((data||[]).map(channel=>channel.owner_id));}
     } else if(tab==='calls') {
       const {data,error:e}=await supabase.from('atlantic_call_sessions').select('id,caller_id,callee_id,call_type,status,started_at,ended_at').or('caller_id.eq.'+user.id+',callee_id.eq.'+user.id).order('started_at',{ascending:false}).limit(40);
-      if(e) setError(e.message); else setCalls(data||[]);
+      if(e) setError(e.message); else {setCalls(data||[]);await loadPeople((data||[]).flatMap(call=>[call.caller_id,call.callee_id]));}
     }
     setRefreshing(false);
   },[tab,user?.id]);
@@ -133,7 +142,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
 
   async function loadPosts(id) {
     const {data,error:e}=await supabase.from('atlantic_channel_posts').select('id,channel_id,author_id,body,created_at').eq('channel_id',id).order('created_at',{ascending:true}).limit(100);
-    if(e) setError(e.message); else setPosts(data||[]);
+    if(e) setError(e.message); else {setPosts(data||[]);await loadPeople((data||[]).map(post=>post.author_id));}
   }
 
   async function publishPost(e) {
@@ -155,11 +164,11 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     {error&&<div className="atl-community-error">{error}</div>}
     {tab==='updates'&&<>
       <div className="atl-community-section"><h2><Clock3 size={18}/> Story</h2><p>Story teks, foto, dan video tampil selama 24 jam.</p>
-        <div className="atl-story-grid">{stories.map(s=><article className="atl-story-card" key={s.id}><small>{s.user_id===user.id?'Story kamu':'Story Atlantic'} · {dateLabel(s.created_at)}</small>{s.media_url&&( /\.(mp4|webm)(\?|$)/i.test(s.media_url)?<video className="atl-story-media" src={s.media_url} controls playsInline preload="metadata"/>:<img className="atl-story-media" src={s.media_url} alt="Media Story" loading="lazy"/>)}{s.body?.trim()&&<p>{s.body}</p>}</article>)}
+        <div className="atl-story-grid">{stories.map(s=><article className="atl-story-card" key={s.id}><small>{s.user_id===user.id?'Story kamu':(people[s.user_id]?.display_name||people[s.user_id]?.username||'Pengguna Atlantic')} · {dateLabel(s.created_at)}</small>{s.media_url&&( /\.(mp4|webm)(\?|$)/i.test(s.media_url)?<video className="atl-story-media" src={s.media_url} controls playsInline preload="metadata"/>:<img className="atl-story-media" src={s.media_url} alt="Media Story" loading="lazy"/>)}{s.body?.trim()&&<p>{s.body}</p>}</article>)}
         {!stories.length&&<div className="atl-community-empty">Belum ada Story. Jadilah yang pertama berbagi.</div>}</div>
       </div>
       <div className="atl-community-section"><h2><NotebookPen size={18}/> Catatan</h2><p>Catatan singkat yang aktif selama 24 jam.</p>
-        <div className="atl-note-list">{notes.map(n=><article className="atl-note-card" key={n.id}><div className="atl-note-avatar">{(n.user_id===user.id?(profile?.display_name||'K'):'A').slice(0,1).toUpperCase()}</div><div><b>{n.user_id===user.id?'Catatan kamu':'Catatan pengguna'}</b><p>{n.body}</p><small>{dateLabel(n.created_at)}</small></div></article>)}
+        <div className="atl-note-list">{notes.map(n=><article className="atl-note-card" key={n.id}><div className="atl-note-avatar">{people[n.user_id]?.avatar_url?<img src={people[n.user_id].avatar_url} alt=""/>:(people[n.user_id]?.display_name||people[n.user_id]?.username||'A').slice(0,1).toUpperCase()}</div><div><b>{n.user_id===user.id?'Catatan kamu':(people[n.user_id]?.display_name||people[n.user_id]?.username||'Pengguna Atlantic')}</b><p>{n.body}</p><small>{dateLabel(n.created_at)}</small></div></article>)}
         {!notes.length&&<div className="atl-community-empty">Belum ada Catatan.</div>}</div>
       </div>
     </>}
@@ -167,12 +176,12 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
       {selectedChannel?<div className="atl-channel-view">
         <button className="atl-channel-back" onClick={()=>{setSelectedChannel(null);setPosts([]);}}>← Semua saluran</button>
         <h2>{selectedChannel.name}</h2><p>{selectedChannel.description||'Saluran komunitas Atlantic'}</p>
-        <div className="atl-channel-posts">{posts.map(p=><article key={p.id}><p>{p.body}</p><small>{dateLabel(p.created_at)}</small></article>)}{!posts.length&&<div className="atl-community-empty">Belum ada postingan di saluran ini.</div>}</div>
+        <div className="atl-channel-posts">{posts.map(p=><article key={p.id}><b>{people[p.author_id]?.display_name||people[p.author_id]?.username||'Pengguna Atlantic'}</b><p>{p.body}</p><small>{dateLabel(p.created_at)}</small></article>)}{!posts.length&&<div className="atl-community-empty">Belum ada postingan di saluran ini.</div>}</div>
         <form className="atl-community-compose" onSubmit={publishPost}><input value={body} onChange={e=>setBody(e.target.value)} placeholder="Tulis postingan…" maxLength={2000}/><button disabled={busy||!body.trim()}><Send size={18}/></button></form>
-      </div>:<div className="atl-channel-grid">{channels.map(c=><article className="atl-channel-card" key={c.id}><div className="atl-channel-mark"><Radio/></div><h3>{c.name}</h3><p>{c.description||'Saluran komunitas Atlantic'}</p><small>Dibuat {dateLabel(c.created_at)}</small><button onClick={()=>joinChannel(c)}><Users size={15}/> Gabung & buka</button></article>)}{!channels.length&&<div className="atl-community-empty">Belum ada saluran publik. Buat saluran pertama.</div>}</div>}
+      </div>:<div className="atl-channel-grid">{channels.map(c=><article className="atl-channel-card" key={c.id}><div className="atl-channel-mark"><Radio/></div><h3>{c.name}</h3><p>{c.description||'Saluran komunitas Atlantic'}</p><small>Oleh {people[c.owner_id]?.display_name||people[c.owner_id]?.username||'Pengguna Atlantic'} · {dateLabel(c.created_at)}</small><button onClick={()=>joinChannel(c)}><Users size={15}/> Gabung & buka</button></article>)}{!channels.length&&<div className="atl-community-empty">Belum ada saluran publik. Buat saluran pertama.</div>}</div>}
     </>}
     {tab==='calls'&&<div className="atl-community-section"><h2><Phone size={18}/> Riwayat panggilan</h2><p>Riwayat undangan suara dan video tersimpan di sini. Panggilan langsung belum tersedia pada versi ini.</p>
-      <div className="atl-call-list">{calls.map(c=><article key={c.id}><div className="atl-call-icon"><Phone size={17}/></div><div><b>{c.caller_id===user.id?'Panggilan keluar':'Panggilan masuk'} · {c.call_type==='video'?'Video':'Suara'}</b><small>{dateLabel(c.started_at)} · {c.status}</small></div></article>)}{!calls.length&&<div className="atl-community-empty">Belum ada riwayat panggilan.</div>}</div>
+      <div className="atl-call-list">{calls.map(c=><article key={c.id}><div className="atl-call-icon"><Phone size={17}/></div><div><b>{c.caller_id===user.id?'Keluar ke':'Masuk dari'} {people[c.caller_id===user.id?c.callee_id:c.caller_id]?.display_name||people[c.caller_id===user.id?c.callee_id:c.caller_id]?.username||'Pengguna Atlantic'} · {c.call_type==='video'?'Video':'Suara'}</b><small>{dateLabel(c.started_at)} · {c.status}</small></div></article>)}{!calls.length&&<div className="atl-community-empty">Belum ada riwayat panggilan.</div>}</div>
     </div>}
     {showCreate&&<div className="atl-community-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setShowCreate(false)}><section className="atl-community-modal"><header><b>{tab==='updates'?'Bagikan pembaruan':'Buat saluran'}</b><button onClick={()=>setShowCreate(false)}><X/></button></header>
       {tab==='updates'?<><label>{body.length>0?'Isi postingan':'Apa yang ingin kamu bagikan?' }<textarea value={body} onChange={e=>setBody(e.target.value)} rows={4} maxLength={500}/></label><div className="atl-story-upload"><input ref={storyMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" onChange={chooseStoryMedia} hidden/><button type="button" onClick={()=>storyMediaInput.current?.click()} disabled={busy}><ImagePlus size={16}/>{mediaFile?'Ganti foto/video':'Tambahkan foto/video'}</button><small>JPG, PNG, WebP, GIF, MP4, WebM · Maks. 20 MB</small>{mediaPreview&&<div className="atl-story-preview">{mediaFile?.type.startsWith('video/')?<video src={mediaPreview} controls playsInline/>:<img src={mediaPreview} alt="Pratinjau Story"/>}<button type="button" onClick={()=>{setMediaFile(null);setMediaPreview('');}}>Hapus media</button></div>}</div><div className="atl-community-modal-actions"><button onClick={()=>publish('story')} disabled={busy||(!body.trim()&&!mediaFile)}><ImagePlus size={16}/> {busy?'Mengunggah…':'Terbitkan Story'}</button><button onClick={()=>publish('note')} disabled={busy||!body.trim()||!!mediaFile}><NotebookPen size={16}/> Buat Catatan</button></div></>:<form onSubmit={createChannel}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<input value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><button className="atl-community-submit" disabled={busy||!channelName.trim()}>Buat saluran</button></form>}
