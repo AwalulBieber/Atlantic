@@ -24,6 +24,9 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [channelCropFile,setChannelCropFile]=useState(null);
   const [channelAvatarPreview,setChannelAvatarPreview]=useState('');
   const [channelSettingsOpen,setChannelSettingsOpen]=useState(false);
+  const [channelInviteLink,setChannelInviteLink]=useState('');
+  const [channelInviteLinkId,setChannelInviteLinkId]=useState('');
+  const [channelInviteBusy,setChannelInviteBusy]=useState(false);
   const [channelMediaFile,setChannelMediaFile]=useState(null);
   const channelMediaInput=useRef(null);
   const [busy,setBusy]=useState(false);
@@ -277,6 +280,30 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     setBusy(false);
   }
 
+  async function createChannelInviteLink(){
+    if(!selectedChannel||selectedChannel.owner_id!==user.id||channelInviteBusy)return;
+    setChannelInviteBusy(true);setError('');
+    const token=crypto.randomUUID().replace(/-/g,'')+crypto.randomUUID().replace(/-/g,'');
+    const {data:id,error:e}=await supabase.rpc('create_atlantic_invite_link',{
+      p_invite_type:'channel',p_resource_id:selectedChannel.id,p_token:token,p_expires_at:null,p_max_uses:null
+    });
+    if(e){setError('Link undangan saluran gagal dibuat: '+e.message);setChannelInviteBusy(false);return;}
+    const url=window.location.origin+'/?atlanticInvite='+encodeURIComponent(token);
+    setChannelInviteLink(url);setChannelInviteLinkId(id);
+    try{await navigator.clipboard.writeText(url);onNotice?.('Link saluran berhasil dibuat dan disalin.');}
+    catch{onNotice?.('Link saluran berhasil dibuat. Salin link yang tampil.');}
+    setChannelInviteBusy(false);
+  }
+
+  async function revokeChannelInviteLink(){
+    if(!channelInviteLinkId||channelInviteBusy)return;
+    setChannelInviteBusy(true);
+    const {error:e}=await supabase.rpc('revoke_atlantic_invite_link',{p_link_id:channelInviteLinkId});
+    if(e)setError('Link saluran gagal dinonaktifkan: '+e.message);
+    else{setChannelInviteLink('');setChannelInviteLinkId('');onNotice?.('Link undangan saluran dinonaktifkan.');}
+    setChannelInviteBusy(false);
+  }
+
   async function deleteChannelPost(post) {
     if(!selectedChannel||busy)return;
     const canDelete=post.author_id===user.id||selectedChannel.owner_id===user.id;
@@ -331,8 +358,9 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
         <div className="atl-channel-profile-head">
           <div className="atl-channel-profile-avatar">{selectedChannel.avatar_url?<img src={selectedChannel.avatar_url} alt="Foto saluran"/>:<Radio size={28}/>}</div>
           <div><h2>{selectedChannel.name}</h2><p>{selectedChannel.description||'Saluran komunitas Atlantic'}</p><small>{posts.length} postingan · {selectedChannel.owner_id===user.id?'Saluran milikmu':'Saluran komunitas'}</small></div>
-          {selectedChannel.owner_id===user.id&&<button type="button" className="atl-channel-settings-btn" onClick={()=>{setChannelName(selectedChannel.name);setChannelDescription(selectedChannel.description||'');setChannelAvatarPreview('');setChannelSettingsOpen(true);}}>Pengaturan</button>}
+          {selectedChannel.owner_id===user.id&&<div className="atl-channel-owner-actions"><button type="button" className="atl-channel-settings-btn" onClick={()=>{setChannelName(selectedChannel.name);setChannelDescription(selectedChannel.description||'');setChannelAvatarPreview('');setChannelSettingsOpen(true);}}>Pengaturan</button><button type="button" className="atl-channel-settings-btn" onClick={createChannelInviteLink} disabled={channelInviteBusy}>{channelInviteBusy?'Memproses…':'Undang teman'}</button></div>}
         </div>
+        {channelInviteLink&&<div className="atl-channel-invite-link"><input readOnly value={channelInviteLink} onFocus={e=>e.target.select()}/><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(channelInviteLink);onNotice?.('Link saluran disalin.');}catch{setError('Gagal menyalin otomatis. Tekan dan tahan link untuk menyalin.');}}}>Salin</button><button type="button" onClick={revokeChannelInviteLink} disabled={channelInviteBusy}>Nonaktifkan</button></div>}
         <div className="atl-channel-posts">{posts.map(p=><article key={p.id}><div className="atl-channel-post-author"><span>{people[p.author_id]?.avatar_url?<img src={people[p.author_id].avatar_url} alt=""/>:(people[p.author_id]?.display_name||people[p.author_id]?.username||'A').slice(0,1).toUpperCase()}</span><b>{people[p.author_id]?.display_name||people[p.author_id]?.username||'Pengguna Atlantic'} {people[p.author_id]?.is_verified&&<BadgeCheck size={13}/>}</b></div>{p.media_url&&(p.media_type?.startsWith('image/')?<img className="atl-channel-media" src={p.media_url} alt={p.media_name||'Media saluran'}/>:p.media_type?.startsWith('video/')?<video className="atl-channel-media" src={p.media_url} controls playsInline/>:<a href={p.media_url} target="_blank" rel="noreferrer">📎 {p.media_name||'Lampiran'}</a>)}{p.body&&<p>{p.body}</p>}<small>{dateLabel(p.created_at)}</small>{(p.author_id===user.id||selectedChannel.owner_id===user.id)&&<button type="button" className="atl-channel-delete-post" onClick={()=>deleteChannelPost(p)} disabled={busy}>Hapus postingan</button>}</article>)}{!posts.length&&<div className="atl-community-empty">Belum ada postingan di saluran ini.</div>}</div>
         <form className="atl-community-compose" onSubmit={publishPost}><input ref={channelMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" hidden onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(file.size>50*1024*1024){setError('Ukuran media maksimal 50 MB.');return;}setChannelMediaFile(file);}}/><button type="button" onClick={()=>channelMediaInput.current?.click()} aria-label="Lampirkan media"><ImagePlus size={18}/></button><input value={body} onChange={e=>setBody(e.target.value)} placeholder="Tulis postingan…" maxLength={2000}/><button disabled={busy||(!body.trim()&&!channelMediaFile)}><Send size={18}/></button></form>{channelMediaFile&&<small className="atl-channel-attachment">Lampiran: {channelMediaFile.name} <button type="button" onClick={()=>setChannelMediaFile(null)}>Hapus</button></small>}
         {channelSettingsOpen&&<div className="atl-community-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setChannelSettingsOpen(false)}><section className="atl-community-modal atl-channel-settings-modal"><header><b>Pengaturan Saluran</b><button type="button" onClick={()=>setChannelSettingsOpen(false)}><X/></button></header><form onSubmit={saveChannelSettings}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<textarea value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><input type="file" accept="image/jpeg,image/png,image/webp" hidden id="atl-channel-avatar-input" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(file.size>5*1024*1024){setError('Foto saluran maksimal 5 MB.');return;}setChannelCropFile(file);}}/><label className="atl-channel-avatar-picker" htmlFor="atl-channel-avatar-input"><ImagePlus size={16}/> Ganti foto saluran</label>{channelAvatarPreview&&<img className="atl-channel-avatar-preview" src={channelAvatarPreview} alt="Pratinjau foto saluran"/>}<button className="atl-community-submit" disabled={busy||channelName.trim().length<2}>Simpan perubahan</button></form></section></div>}
