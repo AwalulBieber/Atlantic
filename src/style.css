@@ -409,3 +409,5 @@ html[data-theme="dark"] .neo-delete-actions button{border-color:#fff;box-shadow:
 .bottom-nav .nav-create{transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s ease}
 .bottom-nav .nav-create:active{transform:scale(.9) rotate(-8deg);box-shadow:1px 2px 0 #171717}
 @media(prefers-reduced-motion:reduce){.bubble-row,.atl-community,.bottom-nav,.bottom-nav .nav-create{animation:none!important;transition:none!important}}
+
+html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply-indicator,html[data-animations="off"] .atl-community,html[data-animations="off"] .bottom-nav,html[data-animations="off"] .bottom-nav .nav-create,html[data-animations="off"] .typing-indicator i{animation:none!important;transition:none!important}
