@@ -19,6 +19,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [verificationRequests, setVerificationRequests] = useState([]);
   const [verificationNote, setVerificationNote] = useState("");
   const [dashboard, setDashboard] = useState(null);
+  const [groupVerificationRequests, setGroupVerificationRequests] = useState([]);
   const [dashboardBusy, setDashboardBusy] = useState(false);
   const [dashboardError, setDashboardError] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -59,17 +60,29 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     if (!isAdmin || dashboardBusy) return;
     setDashboardBusy(true);
     setDashboardError("");
-    const [users, groups, privateChats, calls, pending, recent] = await Promise.all([
+    const [users, groups, privateChats, calls, pending, recent, groupPending] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
       supabase.from("conversations").select("id", { count: "exact", head: true }).eq("is_group", true),
       supabase.from("conversations").select("id", { count: "exact", head: true }).eq("is_group", false),
       supabase.from("atlantic_call_sessions").select("id", { count: "exact", head: true }),
       supabase.from("atlantic_verification_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
-      supabase.from("profiles").select("id,username,display_name,avatar_url,is_verified,created_at").order("created_at", { ascending: false }).limit(30)
+      supabase.from("profiles").select("id,username,display_name,avatar_url,is_verified,created_at").order("created_at", { ascending: false }).limit(30),
+      supabase.from("atlantic_group_verification_requests").select("id,conversation_id,requester_id,status,note,created_at").eq("status","pending").order("created_at",{ascending:false})
     ]);
-    const failed = [users, groups, privateChats, calls, pending, recent].find(result => result.error);
+    const failed = [users, groups, privateChats, calls, pending, recent, groupPending].find(result => result.error);
     if (failed) setDashboardError(failed.error.message || "Data dashboard gagal dimuat.");
-    else setDashboard({
+    else {
+      const requests = groupPending.data || [];
+      const conversationIds = [...new Set(requests.map(item => item.conversation_id))];
+      const requesterIds = [...new Set(requests.map(item => item.requester_id))];
+      const [{data: groupRows}, {data: requesterRows}] = await Promise.all([
+        conversationIds.length ? supabase.from("conversations").select("id,title,is_verified").in("id",conversationIds) : Promise.resolve({data:[]}),
+        requesterIds.length ? supabase.from("profiles").select("id,username,display_name,avatar_url").in("id",requesterIds) : Promise.resolve({data:[]})
+      ]);
+      const groupMap = Object.fromEntries((groupRows||[]).map(item=>[item.id,item]));
+      const requesterMap = Object.fromEntries((requesterRows||[]).map(item=>[item.id,item]));
+      setGroupVerificationRequests(requests.map(item=>({...item,group:groupMap[item.conversation_id]||{},requester:requesterMap[item.requester_id]||{}})));
+      setDashboard({
       users: users.count || 0,
       groups: groups.count || 0,
       privateChats: privateChats.count || 0,
@@ -77,12 +90,25 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       pending: pending.count || 0,
       recentUsers: recent.data || []
     });
+    }
     setDashboardBusy(false);
   }
 
   useEffect(() => {
     if (tab === "admin" && isAdmin) loadDashboard();
   }, [tab, isAdmin]);
+
+  async function reviewGroupVerification(request, approve) {
+    const {error} = await supabase.rpc("review_atlantic_group_verification_request", {
+      request_id: request.id, approve,
+      admin_note: approve ? "Disetujui oleh admin Atlantic." : "Belum memenuhi kriteria verifikasi grup."
+    });
+    if(error)setDashboardError("Gagal memproses verifikasi grup: "+error.message);
+    else {
+      setGroupVerificationRequests(current=>current.filter(item=>item.id!==request.id));
+      setMessage(approve ? "Grup berhasil diverifikasi." : "Pengajuan verifikasi grup ditolak.");
+    }
+  }
 
   function update(key, value) {
     setProfile(current => ({ ...current, [key]: value }));
@@ -248,6 +274,16 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
                 </article>)}
                 {dashboard.recentUsers.filter(person => ((person.display_name || "") + " " + (person.username || "")).toLowerCase().includes(userSearch.toLowerCase())).length === 0 && <p className="atl-muted">Pengguna tidak ditemukan.</p>}
               </div>
+              <section className="atl-group-verification-queue">
+                <h4>Pengajuan verifikasi grup ({groupVerificationRequests.length})</h4>
+                {groupVerificationRequests.length===0&&<p className="atl-muted">Belum ada pengajuan verifikasi grup.</p>}
+                {groupVerificationRequests.map(request=><article key={request.id}>
+                  <b>{request.group?.title||"Grup Atlantic"}</b>
+                  <small>Diajukan oleh {request.requester?.display_name||request.requester?.username||"Admin grup"} · {new Date(request.created_at).toLocaleString("id-ID")}</small>
+                  <p>{request.note||"Tidak ada keterangan tambahan."}</p>
+                  <div><button type="button" onClick={()=>reviewGroupVerification(request,true)}>Setujui centang</button><button type="button" className="atl-secondary" onClick={()=>reviewGroupVerification(request,false)}>Tolak</button></div>
+                </article>)}
+              </section>
               <button type="button" className="atl-admin-open-verification" onClick={() => setTab("verification")}>Kelola pengajuan verifikasi →</button>
             </>}
           </section>}
