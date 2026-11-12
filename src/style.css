@@ -475,3 +475,27 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .group-create-modal>footer button.primary{background:var(--accent,#ffd84d);color:var(--ink,#171717)}
 .group-create-modal>footer button:disabled{opacity:.45;cursor:not-allowed}
 .group-sender-name{display:block;margin-bottom:4px;font-size:11px;font-weight:950;color:var(--accent-ink,var(--text,#171717))}
+
+
+/* Atlantic live audio/video calls */
+.atl-call-backdrop{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:18px;background:#080b13b8;backdrop-filter:blur(7px)}
+.atl-call-modal{width:min(100%,460px);max-height:92dvh;overflow:auto;padding:20px;border:3px solid var(--ink);border-radius:18px;background:var(--panel,#fffdf5);color:var(--ink);box-shadow:8px 8px 0 var(--ink);text-align:center}
+.atl-call-modal>header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;text-align:left}
+.atl-call-modal>header b{font-size:17px;font-weight:950}
+.atl-call-modal>header button{display:grid;place-items:center;width:36px;height:36px;border:2px solid var(--ink);border-radius:9px;background:transparent;color:inherit}
+.atl-call-incoming-icon,.atl-call-audio-art{width:88px;height:88px;margin:24px auto 16px;display:grid;place-items:center;border:3px solid var(--ink);border-radius:50%;background:var(--accent);box-shadow:4px 4px 0 var(--ink)}
+.atl-call-modal h2{margin:8px 0;font-size:23px;font-weight:950}
+.atl-call-modal p{margin:6px 0 18px;color:var(--muted,#777);font-size:13px}
+.atl-call-peer{font-size:19px;font-weight:950}
+.atl-call-peer small{display:block;margin-top:5px;color:var(--muted,#777);font-size:12px;font-weight:700}
+.atl-call-video-grid{position:relative;display:grid;place-items:center;overflow:hidden;min-height:230px;margin:18px 0;border:2px solid var(--ink);border-radius:14px;background:#171717}
+.atl-call-remote-video{width:100%;max-height:55dvh;aspect-ratio:4/3;object-fit:cover}
+.atl-call-local-video{position:absolute;right:10px;bottom:10px;width:27%;max-height:145px;aspect-ratio:3/4;object-fit:cover;border:2px solid white;border-radius:10px;background:#333}
+.atl-call-audio-art{width:110px;height:110px;margin:26px auto;background:var(--blue)}
+.atl-call-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:22px}
+.atl-call-actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:43px;padding:10px 15px;border:2px solid var(--ink);border-radius:11px;background:var(--accent);color:var(--ink);font-weight:900;box-shadow:3px 3px 0 var(--ink)}
+.atl-call-actions button.decline{background:#ff7777}
+.atl-call-actions button.accept{background:#9be66b}
+.atl-call-actions button.muted{background:#d6d6d6}
+.atl-call-error{padding:10px;border:2px solid #c33;border-radius:9px;color:#b22!important;background:#ffe6e6}
+@media(max-width:520px){.atl-call-backdrop{padding:10px}.atl-call-modal{padding:16px}.atl-call-video-grid{min-height:190px}.atl-call-remote-video{max-height:48dvh}}
