@@ -251,36 +251,38 @@ export default function App() {
   }
 
   const ids = mine.map(c => c.conversation_id);
-  const { data: archived, error: archiveError } = await supabase
-    .from('archived_conversations')
-    .select('conversation_id')
-    .eq('user_id', session.user.id);
+
+  // Fetch independent sidebar datasets together so the chat list does not wait
+  // for several avoidable network round trips in sequence.
+  const [archiveResult, memberResult, conversationResult] = await Promise.all([
+    supabase.from('archived_conversations')
+      .select('conversation_id')
+      .eq('user_id', session.user.id),
+    supabase.from('conversation_members')
+      .select('conversation_id,user_id')
+      .in('conversation_id', ids)
+      .neq('user_id', session.user.id),
+    supabase.from('conversations')
+      .select('id,title,is_group,created_by,description,avatar_url,is_verified,pinned_message_id,message_policy,add_member_policy')
+      .in('id', ids)
+  ]);
+
+  const { data: archived, error: archiveError } = archiveResult;
   if (archiveError) setNotice('Arsip chat: ' + archiveError.message);
   else setArchivedIds((archived || []).map(row => row.conversation_id));
 
-  // When a user reconnects, mark any previously queued messages as delivered.
-  await supabase.from('messages')
+  const { data: members, error: memberError } = memberResult;
+  if (memberError) { setNotice(memberError.message); return; }
+
+  const { data: conversations, error: conversationError } = conversationResult;
+  if (conversationError) { setNotice('Daftar percakapan: ' + conversationError.message); return; }
+
+  // Delivery receipts are useful but should not block rendering the sidebar.
+  void supabase.from('messages')
     .update({ delivered_at: new Date().toISOString() })
     .in('conversation_id', ids)
     .neq('sender_id', session.user.id)
     .is('delivered_at', null);
-
-  const { data: members, error: memberError } = await supabase
-    .from('conversation_members')
-    .select('conversation_id,user_id')
-    .in('conversation_id', ids)
-    .neq('user_id', session.user.id);
-
-  if (memberError) {
-    setNotice(memberError.message);
-    return;
-  }
-
-  const { data: conversations, error: conversationError } = await supabase
-    .from('conversations')
-    .select('id,title,is_group,created_by,description,avatar_url,is_verified,pinned_message_id,message_policy,add_member_policy')
-    .in('id', ids);
-  if (conversationError) { setNotice('Daftar percakapan: ' + conversationError.message); return; }
 
   const userIds = [...new Set((members || []).map(m => m.user_id))];
   const { data: people, error: profileError } = userIds.length ? await supabase
@@ -297,16 +299,23 @@ export default function App() {
     const { data: isAdmin, error: badgeError } = await supabase.rpc('is_atlantic_admin', { target_user: person.id });
     return { ...person, is_admin: !badgeError && isAdmin === true };
   }));
+  const membersByConversation = new Map();
+  (members || []).forEach(member => {
+    const list = membersByConversation.get(member.conversation_id) || [];
+    list.push(member);
+    membersByConversation.set(member.conversation_id, list);
+  });
+  const peopleById = new Map(peopleWithBadges.map(person => [person.id, person]));
   const chatRows = await Promise.all((conversations || []).map(async conversation => {
-    const conversationMembers = (members || []).filter(member => member.conversation_id === conversation.id);
+    const conversationMembers = membersByConversation.get(conversation.id) || [];
     if (conversation.is_group) {
-      const groupProfiles = [{ ...(myProfile || {}), id: session.user.id }, ...conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).filter(Boolean)];
+      const groupProfiles = [{ ...(myProfile || {}), id: session.user.id }, ...conversationMembers.map(member => peopleById.get(member.user_id)).filter(Boolean)];
       const title = conversation.title || 'Grup Atlantic';
       let groupAvatarUrl=null;
       if(conversation.avatar_url){const {data:signed}=await supabase.storage.from('atlantic-chat-media').createSignedUrl(conversation.avatar_url,3600);groupAvatarUrl=signed?.signedUrl||null;}
       return { conversation_id: conversation.id, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_path:conversation.avatar_url, avatar_url:groupAvatarUrl, pinned_message_id:conversation.pinned_message_id, message_policy:conversation.message_policy, add_member_policy:conversation.add_member_policy, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, avatar_url:groupAvatarUrl, is_group: true, is_verified: conversation.is_verified } };
     }
-    const other = conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).find(Boolean);
+    const other = conversationMembers.map(member => peopleById.get(member.user_id)).find(Boolean);
     return other ? { conversation_id: conversation.id, person: other, is_group: false } : null;
   }));
   const validChatRows=chatRows.filter(Boolean);
