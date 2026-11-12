@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, X } from 'lucide-react';
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, X, Minus, Maximize2 } from 'lucide-react';
 
 const rtcConfig = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -16,6 +16,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
   const [phase, setPhase] = useState('');
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
+  const [minimized, setMinimized] = useState(false);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -55,6 +56,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     setCameraOff(false);
     pendingIceRef.current = [];
     setElapsed(0);
+    setMinimized(false);
   }, []);
 
   useEffect(() => {
@@ -358,9 +360,19 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
   }, [user?.id]);
 
   if (!incoming && !call && !error) return null;
-  return <div className="atl-call-backdrop">
+  const callClock = Math.floor(elapsed / 60).toString().padStart(2,'0') + ':' + (elapsed % 60).toString().padStart(2,'0');
+  return <>
+  {call && minimized && <div className="atl-call-mini-overlay" role="status" aria-label="Panggilan diminimalkan">
+    <button className="atl-call-mini-main" type="button" onClick={() => setMinimized(false)} aria-label="Buka kembali panggilan">
+      <span className="atl-call-mini-icon">{call.call_type === 'video' ? <Video size={18}/> : <Phone size={18}/>}</span>
+      <span className="atl-call-mini-copy"><b>{call.peerName || 'Panggilan Atlantic'}</b><small>{phase || 'Menghubungkan…'}{phase === 'Terhubung' ? ' · ' + callClock : ''}</small></span>
+      <Maximize2 size={17}/>
+    </button>
+    <button className="atl-call-mini-end" type="button" onClick={endCall} aria-label="Akhiri panggilan"><PhoneOff size={17}/></button>
+  </div>}
+  <div className={'atl-call-backdrop' + (minimized && call ? ' is-minimized' : '')}>
     <section className={'atl-call-modal ' + (call?.call_type === 'video' ? 'is-video' : '')}>
-      <header><b>{incoming ? 'Panggilan masuk' : call?.direction === 'outgoing' ? 'Panggilan keluar' : 'Panggilan berlangsung'}</b><button type="button" onClick={call ? endCall : incoming ? rejectIncoming : () => { setIncoming(null); setError(''); }} aria-label="Tutup"><X size={19}/></button></header>
+      <header><b>{incoming ? 'Panggilan masuk' : call?.direction === 'outgoing' ? 'Panggilan keluar' : 'Panggilan berlangsung'}</b><div className="atl-call-header-actions">{call && <button type="button" onClick={() => setMinimized(true)} aria-label="Minimalkan panggilan"><Minus size={19}/></button>}<button type="button" onClick={call ? endCall : incoming ? rejectIncoming : () => { setIncoming(null); setError(''); }} aria-label="Tutup"><X size={19}/></button></div></header>
       {incoming ? <>
         <div className="atl-call-incoming-icon">{incoming.call_type === 'video' ? <Video size={32}/> : <Phone size={32}/>}</div>
         <h2>{incoming.peerName || 'Pengguna Atlantic'}</h2>
