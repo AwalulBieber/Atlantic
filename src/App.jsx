@@ -48,6 +48,11 @@ export default function App() {
   const [displayName, setDisplayName] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [atlanticDialog, setAtlanticDialog] = useState(null);
+  const [atlanticDialogValue, setAtlanticDialogValue] = useState('');
+  const atlanticDialogResolver = useRef(null);
+  function openAtlanticDialog(options) { setAtlanticDialogValue(options.defaultValue || ''); setAtlanticDialog(options); return new Promise(resolve => { atlanticDialogResolver.current = resolve; }); }
+  function closeAtlanticDialog(result) { setAtlanticDialog(null); const resolve = atlanticDialogResolver.current; atlanticDialogResolver.current = null; resolve?.(result); }
   const [chats, setChats] = useState([]);
   const [archivedIds, setArchivedIds] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -891,6 +896,7 @@ export default function App() {
       </section>
 
       {notice && <button className="toast" onClick={() => setNotice('')}>{notice}　×</button>}
+      {atlanticDialog && <div className="atl-dialog-backdrop" onMouseDown={event => { if(event.target===event.currentTarget) closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false); }}><section className="atl-dialog-card" role="dialog" aria-modal="true" aria-labelledby="atl-dialog-title"><span className="atl-dialog-eyebrow">ATLANTIC / CONFIRMATION</span><h2 id="atl-dialog-title">{atlanticDialog.title || 'Konfirmasi'}</h2><p>{atlanticDialog.message}</p>{atlanticDialog.type==='prompt' && <textarea autoFocus value={atlanticDialogValue} onChange={event=>setAtlanticDialogValue(event.target.value)} placeholder={atlanticDialog.placeholder || 'Tulis di sini…'} maxLength={atlanticDialog.maxLength || 1000}/>}<footer><button type="button" className="atl-dialog-cancel" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false)}>{atlanticDialog.cancelLabel || 'Batal'}</button><button type="button" className="atl-dialog-confirm" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?atlanticDialogValue:true)}>{atlanticDialog.confirmLabel || 'Lanjutkan'}</button></footer></section></div>}
       {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={() => confirmDeleteMessage('me')}>UNTUK SAYA</button>{deleteTarget.sender_id === session.user.id && <button type="button" onClick={() => confirmDeleteMessage('everyone')}>UNTUK SEMUA</button>}</div></section></div>}
       {incomingNotice && (
         <button className="toast" onClick={() => { const person = incomingNotice.person; setIncomingNotice(null); openChat(person); }}>
@@ -1026,8 +1032,8 @@ export default function App() {
         </div>
       )}
 
-      {adminDashboardOpen && <AtlanticAdminDashboard user={session.user} onClose={() => setAdminDashboardOpen(false)} onNotice={setNotice} />}
-      {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} />}
+      {adminDashboardOpen && <AtlanticAdminDashboard user={session.user} onClose={() => setAdminDashboardOpen(false)} onNotice={setNotice} onDialog={openAtlanticDialog} />}
+      {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} onDialog={openAtlanticDialog} />}
       {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
 
       {activeTab !== 'chat' && (
@@ -1038,6 +1044,7 @@ export default function App() {
           createRequest={communityCreateRequest}
           onProfileRefresh={loadMyProfile}
           onNotice={setNotice}
+          onDialog={openAtlanticDialog}
         />
       )}
 
