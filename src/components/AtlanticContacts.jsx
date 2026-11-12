@@ -7,6 +7,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
   const [profiles,setProfiles]=useState([]);
   const [searchProfiles,setSearchProfiles]=useState([]);
   const [rows,setRows]=useState([]);
+  const [blockedRows,setBlockedRows]=useState([]);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -14,13 +15,15 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
   const load = useCallback(async () => {
     if(!user?.id)return;
     setBusy(true);setError('');
+    const {data:myBlocks,error:blockError}=await supabase.from('atlantic_user_blocks').select('id,blocked_user_id,created_at').eq('blocker_id',user.id).order('created_at',{ascending:false});
+    if(!blockError)setBlockedRows(myBlocks||[]);
     const {data,error:e}=await supabase.from('atlantic_contacts')
       .select('id,requester_id,addressee_id,status,created_at')
       .or('requester_id.eq.'+user.id+',addressee_id.eq.'+user.id)
       .order('created_at',{ascending:false}).limit(200);
     if(e){setError(e.message);setBusy(false);return;}
     const list=data||[];setRows(list);
-    const ids=[...new Set(list.flatMap(r=>[r.requester_id,r.addressee_id]).filter(id=>id!==user.id))];
+    const ids=[...new Set([...list.flatMap(r=>[r.requester_id,r.addressee_id]),...(myBlocks||[]).map(item=>item.blocked_user_id)].filter(id=>id!==user.id))];
     if(ids.length){
       const {data:people,error:pe}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified').in('id',ids);
       if(!pe)setProfiles(people||[]);
@@ -61,6 +64,30 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
   const contacts=rows.filter(r=>r.status==='accepted');
   const filtered=searchProfiles.filter(p=>!rows.some(r=>['pending','accepted'].includes(r.status)&&[r.requester_id,r.addressee_id].includes(p.id)));
 
+  async function blockPerson(person){
+    if(!person?.id)return;
+    if(!window.confirm('Blokir @'+(person.username||'pengguna')+'? Pengguna ini tidak bisa mengirim pesan langsung kepadamu.'))return;
+    setBusy(true);setError('');setNotice('');
+    const {error:e}=await supabase.rpc('set_atlantic_user_block',{target_user:person.id,should_block:true});
+    if(e)setError(e.message);else setNotice('@'+(person.username||'Pengguna')+' berhasil diblokir.');
+    await load();setBusy(false);
+  }
+  async function unblockPerson(id){
+    setBusy(true);setError('');setNotice('');
+    const {error:e}=await supabase.rpc('set_atlantic_user_block',{target_user:id,should_block:false});
+    if(e)setError(e.message);else setNotice('Blokir berhasil dibuka.');
+    await load();setBusy(false);
+  }
+  async function reportPerson(person){
+    if(!person?.id)return;
+    const reason=window.prompt('Jelaskan alasan melaporkan @'+(person.username||'pengguna')+' (minimal 3 karakter):','');
+    if(reason===null)return;
+    if(reason.trim().length<3){setError('Alasan laporan minimal 3 karakter.');return;}
+    setBusy(true);setError('');setNotice('');
+    const {error:e}=await supabase.from('atlantic_account_reports').insert({reporter_id:user.id,reported_user_id:person.id,reason:reason.trim().slice(0,1000)});
+    if(e)setError(e.message);else setNotice('Laporan akun berhasil dikirim ke admin Atlantic.');
+    setBusy(false);
+  }
   async function sendRequest(person){
     setBusy(true);setError('');setNotice('');
     const {error:e}=await supabase.from('atlantic_contacts').insert({requester_id:user.id,addressee_id:person.id,status:'pending'});
@@ -92,10 +119,11 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
       {error&&<p className="atl-contacts-message error">{error}</p>}
       {notice&&<p className="atl-contacts-message">{notice}</p>}
       {incoming.length>0&&<section className="atl-contacts-section"><h3><Clock3 size={16}/> Permintaan masuk ({incoming.length})</h3>{incoming.map(r=><article className="atl-contact-row" key={r.id}>{personRow(r.requester_id)}<div className="atl-contact-actions"><button disabled={busy} onClick={()=>respond(r,'accepted')} aria-label="Terima"><Check/></button><button disabled={busy} onClick={()=>respond(r,'rejected')} aria-label="Tolak"><X/></button></div></article>)}</section>}
-      {contacts.length>0&&<section className="atl-contacts-section"><h3><Users size={16}/> Kontak saya ({contacts.length})</h3>{contacts.map(r=>{const id=r.requester_id===user.id?r.addressee_id:r.requester_id;return <article className="atl-contact-row" key={r.id}>{personRow(id)}<div className="atl-contact-actions"><button disabled={busy} onClick={()=>onOpenChat?.(personById[id])} aria-label="Chat"><span>Chat</span></button><button disabled={busy} onClick={()=>remove(r)} aria-label="Hapus kontak"><Trash2/></button></div></article>})}</section>}
+      {contacts.length>0&&<section className="atl-contacts-section"><h3><Users size={16}/> Kontak saya ({contacts.length})</h3>{contacts.map(r=>{const id=r.requester_id===user.id?r.addressee_id:r.requester_id;return <article className="atl-contact-row" key={r.id}>{personRow(id)}<div className="atl-contact-actions"><button disabled={busy} onClick={()=>onOpenChat?.(personById[id])} aria-label="Chat"><span>Chat</span></button><button disabled={busy} onClick={()=>reportPerson(personById[id])} aria-label="Laporkan akun">Report</button><button disabled={busy} onClick={()=>blockPerson(personById[id])} aria-label="Blokir akun">Blokir</button><button disabled={busy} onClick={()=>remove(r)} aria-label="Hapus kontak"><Trash2/></button></div></article>})}</section>}
+      {blockedRows.length>0&&<section className="atl-contacts-section"><h3>Pengguna diblokir ({blockedRows.length})</h3>{blockedRows.map(row=><article className="atl-contact-row" key={row.id}>{personRow(row.blocked_user_id)}<button className="atl-contact-add" disabled={busy} onClick={()=>unblockPerson(row.blocked_user_id)}>Buka blokir</button></article>)}</section>}
       {outgoing.length>0&&<section className="atl-contacts-section"><h3>Menunggu persetujuan</h3>{outgoing.map(r=><article className="atl-contact-row" key={r.id}>{personRow(r.addressee_id)}<small>Menunggu</small></article>)}</section>}
       <section className="atl-contacts-section"><h3><UserPlus size={16}/> Temukan pengguna</h3>
-        {filtered.map(p=><article className="atl-contact-row" key={p.id}>{personRow(p.id)}<button className="atl-contact-add" disabled={busy} onClick={()=>sendRequest(p)}><UserPlus size={15}/> Tambah</button></article>)}
+        {filtered.map(p=><article className="atl-contact-row" key={p.id}>{personRow(p.id)}<div className="atl-contact-actions"><button className="atl-contact-add" disabled={busy} onClick={()=>sendRequest(p)}><UserPlus size={15}/> Tambah</button><button disabled={busy} onClick={()=>reportPerson(p)}>Report</button><button disabled={busy} onClick={()=>blockPerson(p)}>Blokir</button></div></article>)}
         {!filtered.length&&<p className="atl-contacts-empty">{query?'Tidak ada pengguna yang cocok.':'Cari nama atau username untuk menemukan pengguna.'}</p>}
       </section>
       <footer>Story dan Catatan hanya terlihat setelah permintaan kontak diterima oleh kedua pihak.</footer>
