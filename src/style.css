@@ -508,3 +508,10 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 
 
 .atl-online-dot{display:inline-block;width:7px;height:7px;margin:0 5px 1px 0;border-radius:50%;background:#22c55e;box-shadow:0 0 0 2px var(--paper)}
+
+
+/* Fix mobile Notes avatar overflow: keep profile photos inside the compact note identity slot. */
+.atl-note-card{min-width:0;overflow:hidden;}
+.atl-note-card>.atl-note-avatar{position:relative;display:grid;place-items:center;width:42px;min-width:42px;max-width:42px;height:42px;min-height:42px;max-height:42px;flex:0 0 42px;overflow:hidden;align-self:flex-start;}
+.atl-note-card>.atl-note-avatar>img{position:absolute;inset:0;display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:cover;border-radius:inherit;}
+.atl-note-card>div:last-child{min-width:0;flex:1 1 auto;overflow-wrap:anywhere;}
