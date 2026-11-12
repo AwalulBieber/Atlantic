@@ -1144,7 +1144,7 @@ export default function App() {
 
       {adminDashboardOpen && <AtlanticAdminDashboard user={session.user} onClose={() => setAdminDashboardOpen(false)} onNotice={setNotice} onDialog={openAtlanticDialog} />}
       {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} onDialog={openAtlanticDialog} />}
-      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
+      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onNotice={setNotice} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
 
       {activeTab !== 'chat' && (
         <AtlanticCommunity
