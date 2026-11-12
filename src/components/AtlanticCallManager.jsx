@@ -396,5 +396,5 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
         </div>
       </> : <><h2>Panggilan gagal</h2><p className="atl-call-error">{error}</p><div className="atl-call-actions"><button type="button" onClick={() => setError('')}>Tutup</button></div></>}
     </section>
-  </div>;
+  </div></>;
 }
