@@ -30,6 +30,13 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [refreshing,setRefreshing]=useState(false);
   const [activeStoryIndex,setActiveStoryIndex]=useState(-1);
 
+  const storyGroups = [...stories.reduce((groups, story, index) => {
+    const existing = groups.get(story.user_id);
+    if (existing) existing.items.push({ story, index });
+    else groups.set(story.user_id, { userId: story.user_id, firstIndex: index, items: [{ story, index }] });
+    return groups;
+  }, new Map()).values()];
+
   async function loadPeople(ids) {
     const unique=[...new Set((ids||[]).filter(Boolean))];
     if(!unique.length)return;
@@ -241,7 +248,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
       <div className="atl-community-section"><h2><Clock3 size={18}/> Story</h2><p>Story teks, foto, dan video tampil selama 24 jam.</p>
         <div className="atl-story-strip">
           <button type="button" className="atl-story-add" onClick={()=>setShowCreate(true)}><span className="atl-story-ring"><span>+</span></span><b>Tambah Status</b></button>
-          {stories.map((s,i)=><button type="button" className="atl-story-person" key={s.id} onClick={()=>setActiveStoryIndex(i)}><span className="atl-story-ring">{people[s.user_id]?.avatar_url?<img src={people[s.user_id].avatar_url} alt=""/>:<span>{(people[s.user_id]?.display_name||people[s.user_id]?.username||'A').slice(0,1).toUpperCase()}</span>}</span><b>{s.user_id===user.id?'Status kamu':(people[s.user_id]?.display_name||people[s.user_id]?.username||'Pengguna').split(' ')[0]}</b></button>)}
+          {storyGroups.map(group=>{const s=group.items[0].story;const person=people[group.userId]||{};return <button type="button" className="atl-story-person" key={group.userId} onClick={()=>setActiveStoryIndex(group.firstIndex)}><span className="atl-story-ring"><span className="atl-story-ring-inner">{person.avatar_url?<img src={person.avatar_url} alt=""/>:(person.display_name||person.username||'A').slice(0,1).toUpperCase()}</span>{group.items.length>1&&<i>{group.items.length}</i>}</span><b>{group.userId===user.id?'Status kamu':(person.display_name||person.username||'Pengguna').split(' ')[0]}</b></button>;})}
           {!stories.length&&<p className="atl-community-empty">Belum ada pembaruan status. Ketuk "Tambah Status" untuk membuat Story pertamamu.</p>}
         </div>
       </div>
