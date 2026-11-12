@@ -658,3 +658,23 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-community-search{display:flex;align-items:center;gap:10px;margin:12px 0 18px;padding:11px 14px;border:2px solid var(--ink);border-radius:12px;background:var(--panel,#fffdf5);box-shadow:3px 3px 0 var(--ink);color:var(--muted)}
 .atl-community-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-weight:700}
 .atl-community-search input::placeholder{color:var(--muted);opacity:.8}
+
+/* Channel discovery and publisher identity */
+.atl-channel-card{display:flex;flex-direction:column;gap:9px;min-width:0}
+.atl-channel-card-head{display:flex;align-items:center;gap:11px}
+.atl-channel-card .atl-channel-mark{width:58px;height:58px;flex-basis:58px;overflow:hidden;border-radius:16px}
+.atl-channel-card .atl-channel-mark img{width:100%;height:100%;object-fit:cover}
+.atl-channel-card-meta{display:grid;gap:3px;min-width:0}
+.atl-channel-card-meta>b,.atl-channel-card-meta b{font-size:16px;font-weight:950;overflow-wrap:anywhere}
+.atl-channel-card-meta small{font-size:10px;color:var(--muted,#777)}
+.atl-channel-card p{min-height:0;margin:0;line-height:1.45;overflow-wrap:anywhere}
+.atl-channel-card .atl-channel-owner{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.atl-channel-owner svg,.atl-channel-post-author svg{color:#2789e8;fill:#2789e8;vertical-align:middle}
+.atl-channel-post-author{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.atl-channel-post-author>span{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;overflow:hidden;border:2px solid var(--ink);border-radius:50%;background:var(--accent);font-weight:950}
+.atl-channel-post-author>span img{width:100%;height:100%;object-fit:cover}
+.atl-channel-post-author>b{display:flex;align-items:center;gap:5px;font-size:12px}
+.atl-channel-profile-avatar{overflow:hidden}
+.atl-channel-profile-avatar img{width:100%;height:100%;object-fit:cover}
+.atl-group-avatar{overflow:hidden}
+.atl-group-avatar img{width:100%;height:100%;object-fit:cover}
