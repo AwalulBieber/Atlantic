@@ -556,21 +556,22 @@ export default function App() {
         <div className="section-title"><span>{showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{filtered.length}</span></div>
         <div className="people">
   {filtered.map(c => (
-    <button
-      className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
-      key={c.conversation_id}
-      onClick={() => openChat(c.person)}
-    >
-      <div className="avatar">
-        {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
-      </div>
-      <div className="person-info">
-        <b>{c.person.display_name || c.person.username}{c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
-        <small>Ketuk untuk membuka chat</small>
-      </div>
-      <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={e => { e.stopPropagation(); toggleArchive(c.conversation_id); }}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
-      <MessageCircle size={17} />
-    </button>
+    <div className="person-row" key={c.conversation_id}>
+      <button
+        className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
+        onClick={() => openChat(c.person)}
+      >
+        <div className="avatar">
+          {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
+        </div>
+        <div className="person-info">
+          <b>{c.person.display_name || c.person.username}{c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
+          <small>Ketuk untuk membuka chat</small>
+        </div>
+        <MessageCircle size={17} />
+      </button>
+      <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
+    </div>
   ))}
 
   {!filtered.length && (
