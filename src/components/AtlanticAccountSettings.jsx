@@ -10,6 +10,7 @@ const DEFAULTS = {
 export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [tab, setTab] = useState("profile");
   const [profile, setProfile] = useState(null);
+  const [savedAvatarUrl, setSavedAvatarUrl] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -33,7 +34,10 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
         ]);
       if (!alive) return;
       if (profileError) setMessage(profileError.message);
-      else setProfile({ ...DEFAULTS, ...(p || {}) });
+      else {
+        setProfile({ ...DEFAULTS, ...(p || {}) });
+        setSavedAvatarUrl(p?.avatar_url || "");
+      }
       const adminMode = (!adminError && admin === true) || user.email?.toLowerCase() === 'awalulhakim94@gmail.com';
       setIsAdmin(adminMode);
       const { data: requests, error: requestError } = await supabase.from("atlantic_verification_requests").select("id,user_id,note,status,requested_at,review_note").order("requested_at", { ascending: false }).limit(adminMode ? 100 : 10);
@@ -74,6 +78,18 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
 
   function update(key, value) {
     setProfile(current => ({ ...current, [key]: value }));
+  }
+
+  function avatarObjectPath(url) {
+    if (!url) return null;
+    try {
+      const baseUrl = new URL(supabase.storage.from("avatars").getPublicUrl("").data.publicUrl);
+      const candidate = new URL(url);
+      if (candidate.origin !== baseUrl.origin || !candidate.pathname.startsWith(baseUrl.pathname)) return null;
+      return decodeURIComponent(candidate.pathname.slice(baseUrl.pathname.length));
+    } catch {
+      return null;
+    }
   }
 
   async function uploadAvatar(event) {
@@ -120,7 +136,17 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     const { error } = await supabase.from("profiles").update(payload).eq("id", user.id);
     setBusy(false);
     if (error) setMessage("Gagal menyimpan: " + error.message);
-    else { setMessage("Perubahan berhasil disimpan."); onSaved?.(profile); }
+    else {
+      const oldAvatarPath = avatarObjectPath(savedAvatarUrl);
+      const nextAvatarPath = avatarObjectPath(profile.avatar_url);
+      if (oldAvatarPath && oldAvatarPath !== nextAvatarPath) {
+        const { error: cleanupError } = await supabase.storage.from("avatars").remove([oldAvatarPath]);
+        if (cleanupError) setMessage("Perubahan tersimpan, tetapi foto lama gagal dibersihkan: " + cleanupError.message);
+        else setMessage("Perubahan berhasil disimpan.");
+      } else setMessage("Perubahan berhasil disimpan.");
+      setSavedAvatarUrl(profile.avatar_url || "");
+      onSaved?.(profile);
+    }
   }
 
   if (!profile) {
@@ -154,7 +180,10 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
                 <b>Foto profil</b>
                 <small>Pilih foto langsung dari galeri. Maksimal 5 MB.</small>
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={uploadAvatar} hidden />
-                <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? "Mengunggah…" : "Pilih dari galeri"}</button>
+                <div className="atl-avatar-buttons">
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? "Mengunggah…" : profile.avatar_url ? "Ganti foto" : "Pilih dari galeri"}</button>
+                  {profile.avatar_url && <button type="button" className="atl-avatar-remove" onClick={() => update("avatar_url", null)} disabled={uploading}>Hapus foto</button>}
+                </div>
               </div>
             </div>
             <label>Nama tampilan<input value={profile.display_name || ""} onChange={e => update("display_name", e.target.value)} maxLength={60}/></label>
