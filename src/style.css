@@ -499,3 +499,9 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-call-actions button.muted{background:#d6d6d6}
 .atl-call-error{padding:10px;border:2px solid #c33;border-radius:9px;color:#b22!important;background:#ffe6e6}
 @media(max-width:520px){.atl-call-backdrop{padding:10px}.atl-call-modal{padding:16px}.atl-call-video-grid{min-height:190px}.atl-call-remote-video{max-height:48dvh}}
+
+
+/* Three-way delete confirmation fits compact screens without breaking the neo layout. */
+.neo-delete-actions{flex-wrap:wrap}
+.neo-delete-actions button{min-width:0;padding:0 7px;font-size:11px;letter-spacing:.1px}
+@media(max-width:390px){.neo-delete-modal{padding:18px}.neo-delete-actions{gap:7px}.neo-delete-actions button{font-size:10px}}
