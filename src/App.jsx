@@ -3,7 +3,7 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
 import {
-  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, 
+  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
@@ -49,6 +49,12 @@ export default function App() {
   const [showSaved, setShowSaved] = useState(false);
   const [savedMessages, setSavedMessages] = useState([]);
   const [savedBusy, setSavedBusy] = useState(false);
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false);
+  const [groupUsers, setGroupUsers] = useState([]);
+  const [groupSelected, setGroupSelected] = useState([]);
+  const [groupTitle, setGroupTitle] = useState('');
+  const [groupSearch, setGroupSearch] = useState('');
+  const [groupBusy, setGroupBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -222,17 +228,17 @@ export default function App() {
     return;
   }
 
+  const { data: conversations, error: conversationError } = await supabase
+    .from('conversations')
+    .select('id,title,is_group,created_by')
+    .in('id', ids);
+  if (conversationError) { setNotice('Daftar percakapan: ' + conversationError.message); return; }
+
   const userIds = [...new Set((members || []).map(m => m.user_id))];
-
-  if (!userIds.length) {
-    setChats([]);
-    return;
-  }
-
-  const { data: people, error: profileError } = await supabase
+  const { data: people, error: profileError } = userIds.length ? await supabase
     .from('profiles')
     .select('id,username,display_name,avatar_url,is_verified')
-    .in('id', userIds);
+    .in('id', userIds) : { data: [], error: null };
 
   if (profileError) {
     setNotice(profileError.message);
@@ -243,10 +249,69 @@ export default function App() {
     const { data: isAdmin, error: badgeError } = await supabase.rpc('is_atlantic_admin', { target_user: person.id });
     return { ...person, is_admin: !badgeError && isAdmin === true };
   }));
-  setChats((members || []).map(m => ({
-    conversation_id: m.conversation_id,
-    person: peopleWithBadges.find(p => p.id === m.user_id)
-  })).filter(c => c.person));
+  const chatRows = (conversations || []).map(conversation => {
+    const conversationMembers = (members || []).filter(member => member.conversation_id === conversation.id);
+    if (conversation.is_group) {
+      const groupProfiles = conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).filter(Boolean);
+      const title = conversation.title || 'Grup Atlantic';
+      return { conversation_id: conversation.id, is_group: true, title, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, is_group: true } };
+    }
+    const other = conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).find(Boolean);
+    return other ? { conversation_id: conversation.id, person: other, is_group: false } : null;
+  }).filter(Boolean);
+  setChats(chatRows);
+  }
+
+  async function loadGroupUsers() {
+    const { data, error } = await supabase.from('profiles')
+      .select('id,username,display_name,avatar_url,is_verified')
+      .neq('id', session.user.id)
+      .order('display_name', { ascending: true })
+      .limit(300);
+    if (error) { setNotice('Daftar anggota grup gagal dimuat: ' + error.message); return; }
+    setGroupUsers(data || []);
+    setGroupSelected([]);
+    setGroupTitle('');
+    setGroupSearch('');
+    setGroupCreateOpen(true);
+  }
+
+  async function createGroup() {
+    if (groupBusy || groupSelected.length < 2 || groupTitle.trim().length < 2) return;
+    setGroupBusy(true);
+    const { data: conversationId, error } = await supabase.rpc('create_group_conversation', {
+      group_title: groupTitle.trim(), member_ids: groupSelected
+    });
+    if (error || !conversationId) {
+      setNotice('Grup gagal dibuat: ' + (error?.message || 'ID grup tidak ditemukan.'));
+      setGroupBusy(false);
+      return;
+    }
+    const selectedProfiles = groupUsers.filter(person => groupSelected.includes(person.id));
+    const group = {
+      conversation_id: conversationId,
+      is_group: true,
+      title: groupTitle.trim(),
+      members: [myProfile, ...selectedProfiles].filter(Boolean),
+      person: { id: conversationId, display_name: groupTitle.trim(), username: groupTitle.trim(), is_group: true }
+    };
+    setChats(current => [group, ...current]);
+    setActive({ conversation_id: conversationId, person: group.person, is_group: true, title: group.title, members: group.members });
+    setMessages([]);
+    setMobileChat(true);
+    setGroupCreateOpen(false);
+    setCreateMenuOpen(false);
+    setNotice('Grup berhasil dibuat. Mulai percakapan sekarang!');
+    await loadMessages(conversationId);
+    setGroupBusy(false);
+  }
+
+  async function openGroupChat(group) {
+    setNotice('');
+    setActive({ conversation_id: group.conversation_id, person: group.person, is_group: true, title: group.title, members: group.members || [] });
+    setReplyTarget(null);
+    setMobileChat(true);
+    await loadMessages(group.conversation_id);
   }
 
   async function loadSavedMessages() {
@@ -281,7 +346,7 @@ export default function App() {
     const message = item.message;
     const chat = chats.find(entry => entry.conversation_id === message.conversation_id);
     if (!chat?.person) { setNotice('Percakapan asal pesan tidak ditemukan.'); return; }
-    setActive({ conversation_id: message.conversation_id, person: chat.person });
+    setActive({ conversation_id: message.conversation_id, person: chat.person, is_group: Boolean(chat.is_group), title: chat.title, members: chat.members || [] });
     setMobileChat(true);
     setShowSaved(false);
     await loadMessages(message.conversation_id);
@@ -340,6 +405,9 @@ export default function App() {
       setNotice(error.message);
       return;
     }
+    const senderIds = [...new Set((data || []).map(message => message.sender_id).filter(Boolean))];
+    const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', senderIds) : { data: [] };
+    const senderMap = Object.fromEntries((senderProfiles || []).map(profile => [profile.id, profile]));
     const replyIds = [...new Set((data || []).map(m => m.reply_to).filter(Boolean))];
     let replyMap = {};
     if (replyIds.length) {
@@ -353,7 +421,7 @@ export default function App() {
       if (myProfile?.read_receipts_enabled !== false) receipt.read_at = now;
       await supabase.from('messages').update(receipt).in('id', incomingIds);
     }
-    setMessages((data || []).map(m => ({ ...m, replyPreview: replyMap[m.reply_to] || null })));
+    setMessages((data || []).map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -370,6 +438,14 @@ export default function App() {
         if (incoming.reply_to) {
           const { data: original } = await supabase.from('messages').select('id,body,sender_id').eq('id', incoming.reply_to).maybeSingle();
           incoming.replyPreview = original || null;
+        }
+        if (active.is_group) {
+          const { data: senderProfile } = await supabase.from('profiles').select('id,username,display_name,avatar_url').eq('id', incoming.sender_id).maybeSingle();
+          incoming.senderProfile = senderProfile || null;
+          if (incoming.replyPreview) {
+            const { data: replyProfile } = await supabase.from('profiles').select('id,username,display_name').eq('id', incoming.replyPreview.sender_id).maybeSingle();
+            incoming.replyPreview.senderProfile = replyProfile || null;
+          }
         }
         if (incoming.sender_id !== session.user.id) {
           const now = new Date().toISOString();
@@ -607,10 +683,10 @@ export default function App() {
     <div className="person-row" key={c.conversation_id}>
       <button
         className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
-        onClick={() => openChat(c.person)}
+        onClick={() => c.is_group ? openGroupChat(c) : openChat(c.person)}
       >
         <div className="avatar">
-          {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
+          {c.is_group ? <Users size={19}/> : c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
         </div>
         <div className="person-info">
           <b>{c.person.display_name || c.person.username}{c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
@@ -634,15 +710,15 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              <div className="avatar">{active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
+              <div className="avatar">{active.is_group ? <Users size={20}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
                 <b>{active.person.display_name || active.person.username}{active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
-                <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : `@${active.person.username}`}</small>
+                <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : `@${active.person.username}`}</small>
               </div>
-              <div className="chat-head-actions">
+              {!active.is_group && <div className="chat-head-actions">
                 <button type="button" className="icon-btn" onClick={() => requestCall('audio')} title="Undang panggilan suara" aria-label="Undang panggilan suara"><Phone size={18}/></button>
                 <button type="button" className="icon-btn" onClick={() => requestCall('video')} title="Undang panggilan video" aria-label="Undang panggilan video"><Video size={18}/></button>
-              </div>
+              </div>}
             </header>
             <div className="messages">
               {messages.map(m => (
@@ -671,7 +747,8 @@ export default function App() {
                 >
                   <div className={`swipe-reply-indicator ${swipeState.id === m.id && swipeState.offset > 12 ? 'visible' : ''}`} style={swipeState.id === m.id ? { opacity: Math.min(swipeState.offset / 65, 1) } : undefined}><Reply size={15}/></div>
                   <div className="bubble">
-                    {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.person.display_name || active.person.username)}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
+                    {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.is_group ? (m.replyPreview.senderProfile?.display_name || m.replyPreview.senderProfile?.username || 'Anggota grup') : (active.person.display_name || active.person.username))}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
+                    {active.is_group && <b className="group-sender-name">{m.senderProfile?.display_name || m.senderProfile?.username || (m.sender_id === session.user.id ? 'Kamu' : 'Anggota grup')}</b>}
                     <div>{m.body}</div>
                     <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button>{m.sender_id === session.user.id && <button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button>}</div>
                   </div>
@@ -680,14 +757,14 @@ export default function App() {
               {!messages.length && (
                 <div className="empty-chat">
                   <MessageCircle size={34} /><b>Mulai percakapan</b>
-                  <span>Kirim pesan pertama ke {active.person.display_name || active.person.username}.</span>
+                  <span>{active.is_group ? `Kirim pesan pertama ke ${active.title}.` : `Kirim pesan pertama ke ${active.person.display_name || active.person.username}.`}</span>
                 </div>
               )}
               <div ref={bottomRef} />
             </div>
             {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
             <form className="composer" onSubmit={sendMessage}>
-              <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder="Tulis pesan…" autoComplete="off" />
+              <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder={active.is_group ? `Pesan ke ${active.title}…` : 'Tulis pesan…'} autoComplete="off" />
               <button className="send" disabled={!draft.trim() || sending} aria-label="Kirim pesan">
                 {sending ? <span className="button-spinner" /> : <Send size={19} />}
               </button>
@@ -812,11 +889,25 @@ export default function App() {
         </div>
       )}
 
+      {groupCreateOpen && (
+        <div className="group-create-backdrop" onClick={() => setGroupCreateOpen(false)}>
+          <section className="group-create-modal" role="dialog" aria-modal="true" aria-label="Buat grup Atlantic" onClick={e => e.stopPropagation()}>
+            <header><div><small>ATLANTIC GROUP</small><h2>Buat grup baru</h2></div><button type="button" className="icon-btn" onClick={() => setGroupCreateOpen(false)} aria-label="Tutup"><X size={18}/></button></header>
+            <label>Nama grup<input value={groupTitle} onChange={e => setGroupTitle(e.target.value)} maxLength={60} placeholder="Contoh: Teman Kelas" /></label>
+            <label>Cari anggota<input value={groupSearch} onChange={e => setGroupSearch(e.target.value)} placeholder="Cari nama atau username…" /></label>
+            <div className="group-selected-count">{groupSelected.length} anggota dipilih · minimal 2 orang selain kamu</div>
+            <div className="group-user-list">{groupUsers.filter(person => `${person.display_name || ''} ${person.username || ''}`.toLowerCase().includes(groupSearch.toLowerCase())).map(person => <label className="group-user-option" key={person.id}><input type="checkbox" checked={groupSelected.includes(person.id)} onChange={e => setGroupSelected(current => e.target.checked ? [...current, person.id] : current.filter(id => id !== person.id))}/><span className="group-user-avatar">{person.avatar_url ? <img src={person.avatar_url} alt=""/> : initials(person.display_name || person.username)}</span><span><b>{person.display_name || person.username}</b><small>@{person.username}</small></span></label>)}</div>
+            <footer><button type="button" onClick={() => setGroupCreateOpen(false)}>Batal</button><button type="button" className="primary" disabled={groupBusy || groupTitle.trim().length < 2 || groupSelected.length < 2} onClick={createGroup}>{groupBusy ? 'Membuat…' : `Buat Grup (${groupSelected.length + 1})`}</button></footer>
+          </section>
+        </div>
+      )}
+
       {createMenuOpen && (
         <div className="create-menu-backdrop" onClick={() => setCreateMenuOpen(false)}>
           <section className="create-menu" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Buat baru">
             <header><div><small>ATLANTIC CREATE</small><b>Buat sesuatu</b></div><button className="icon-btn" onClick={() => setCreateMenuOpen(false)} aria-label="Tutup"><X size={18}/></button></header>
             <button onClick={() => { setActiveTab('chat'); setCreateMenuOpen(false); setNotice('Pilih pengguna dari daftar chat untuk membuka percakapan.'); }}><MessageSquarePlus/><span><b>Chat baru</b><small>Mulai percakapan</small></span></button>
+            <button onClick={loadGroupUsers}><Users/><span><b>Grup baru</b><small>Buat grup dan pilih anggota</small></span></button>
             <button onClick={() => { setActiveTab('updates'); setCommunityCreateRequest(v => v + 1); setCreateMenuOpen(false); setNotice(''); }}><ImagePlus/><span><b>Story</b><small>Bagikan momen singkat</small></span></button>
             <button onClick={() => { setActiveTab('updates'); setCommunityCreateRequest(v => v + 1); setCreateMenuOpen(false); setNotice(''); }}><NotebookPen/><span><b>Catatan</b><small>Tulis sesuatu untuk dibagikan</small></span></button>
           </section>
