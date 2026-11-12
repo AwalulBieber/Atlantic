@@ -14,7 +14,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
   const [avatarUrl,setAvatarUrl]=useState('');
 
   async function load(){
-    const {data:g,error:ge}=await supabase.from('conversations').select('id,title,description,avatar_url,is_verified,created_by').eq('id',conversationId).single();
+    const {data:g,error:ge}=await supabase.from('conversations').select('id,title,description,avatar_url,is_verified,created_by,message_policy,add_member_policy,pinned_message_id').eq('id',conversationId).single();
     if(ge){setError(ge.message);return;}
     setGroup(g);
     if(g.avatar_url){const {data:signed}=await supabase.storage.from('atlantic-chat-media').createSignedUrl(g.avatar_url,3600);setAvatarUrl(signed?.signedUrl||'');}
@@ -42,12 +42,12 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
       if(uploadError){setError(uploadError.message);setBusy(false);return;}
       avatarPath=next;
     }
-    const {error:updateError}=await supabase.from('conversations').update({title:group.title.trim(),description:group.description.trim(),avatar_url:avatarPath}).eq('id',conversationId);
+    const {error:updateError}=await supabase.from('conversations').update({title:group.title.trim(),description:group.description.trim(),avatar_url:avatarPath,message_policy:group.message_policy,add_member_policy:group.add_member_policy}).eq('id',conversationId);
     if(updateError){if(avatarFile&&avatarPath)await supabase.storage.from('atlantic-chat-media').remove([avatarPath]);setError(updateError.message);}
     else{
       if(group.avatar_url&&avatarPath!==group.avatar_url)await supabase.storage.from('atlantic-chat-media').remove([group.avatar_url]);
       const {data:signed}=avatarPath?await supabase.storage.from('atlantic-chat-media').createSignedUrl(avatarPath,3600):{data:null};
-      setAvatarUrl(signed?.signedUrl||'');setAvatarFile(null);setAvatarPreview('');onUpdated?.(group);
+      setAvatarUrl(signed?.signedUrl||'');setAvatarFile(null);setAvatarPreview('');const saved={...group,avatar_url:avatarPath};setGroup(saved);onUpdated?.(saved);
     }
     setBusy(false);
   }
@@ -76,6 +76,12 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
           <label className="atl-group-photo-pick"><Camera size={16}/> Ubah foto grup<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{const file=e.target.files?.[0];if(file&&file.size<=5*1024*1024){setAvatarFile(file);setAvatarPreview(URL.createObjectURL(file));setAvatarUrl(URL.createObjectURL(file));}else if(file)setError('Foto grup maksimal 5 MB.');}} hidden/></label>
           <button disabled={busy||group.title.trim().length<2}>Simpan perubahan</button>
         </form>}
+        {isAdmin&&<section className="atl-group-permissions">
+          <h3>⚙️ Pengaturan grup</h3>
+          <label><span><b>Kirim pesan</b><small>Siapa yang boleh mengirim pesan di grup ini</small></span><select value={group.message_policy||'all'} onChange={e=>setGroup({...group,message_policy:e.target.value})}><option value="all">Semua anggota</option><option value="admins">Hanya admin</option></select></label>
+          <label><span><b>Tambah anggota</b><small>Siapa yang boleh menambahkan anggota baru</small></span><select value={group.add_member_policy||'admins'} onChange={e=>setGroup({...group,add_member_policy:e.target.value})}><option value="admins">Hanya admin</option><option value="all">Semua anggota</option></select></label>
+          <p>Pengaturan berlaku langsung setelah menekan Simpan perubahan di atas.</p>
+        </section>}
         <section className="atl-group-verification">
           <h3><ShieldCheck size={17}/> Atlantic Verified</h3>
           {group.is_verified?<p>Grup ini sudah terverifikasi Atlantic.</p>:request?.status==='pending'?<p>Permintaan verifikasi sedang diperiksa admin Atlantic.</p>:isAdmin?<><form onSubmit={submitVerification}><textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={500} placeholder="Jelaskan identitas dan tujuan grup…"/><button disabled={busy}><Send size={15}/> Ajukan verifikasi</button></form>{request?.status==='rejected'&&<p>Pengajuan terakhir ditolak: {request.admin_note||'Tidak ada catatan'}. Kamu bisa mengajukan ulang.</p>}</>:<p>Hanya admin grup yang dapat mengajukan verifikasi.</p>}
