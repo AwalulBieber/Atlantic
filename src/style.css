@@ -688,3 +688,22 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 
 /* Atlantic-native confirmation and prompt overlay */
 .atl-dialog-backdrop{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:20px;background:rgba(8,12,20,.58);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);animation:atlDialogFade .16s ease-out}.atl-dialog-card{width:min(100%,430px);padding:24px;border:2px solid #171717;border-radius:22px;background:var(--panel,#fff);color:var(--text,#171717);box-shadow:8px 8px 0 rgba(0,0,0,.22);animation:atlDialogPop .18s ease-out}.atl-dialog-eyebrow{font-size:10px;font-weight:900;letter-spacing:.16em;opacity:.62}.atl-dialog-card h2{margin:10px 0 8px;font-size:22px;font-weight:900}.atl-dialog-card p{margin:0 0 18px;line-height:1.55;opacity:.78}.atl-dialog-card textarea{display:block;width:100%;min-height:104px;resize:vertical;padding:12px;border:1.5px solid var(--border,#aaa);border-radius:12px;background:var(--surface,#f7f7f7);color:inherit;font:inherit;outline:none}.atl-dialog-card textarea:focus{border-color:var(--accent,#ffd84d);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent,#ffd84d) 25%,transparent)}.atl-dialog-card footer{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}.atl-dialog-card footer button{min-height:42px;padding:0 17px;border:1.5px solid #171717;border-radius:12px;font-weight:850;cursor:pointer}.atl-dialog-cancel{background:transparent;color:inherit}.atl-dialog-confirm{background:var(--accent,#ffd84d);color:#171717;box-shadow:3px 3px 0 #171717}@keyframes atlDialogFade{from{opacity:0}to{opacity:1}}@keyframes atlDialogPop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}@media(prefers-reduced-motion:reduce){.atl-dialog-backdrop,.atl-dialog-card{animation:none}}
+
+
+/* Global tactile 3D push interaction for every Atlantic button */
+:where(button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:disabled){
+  transform-style:preserve-3d;
+  transition:transform 130ms cubic-bezier(.2,.8,.2,1),filter 130ms ease,box-shadow 130ms ease;
+  -webkit-tap-highlight-color:transparent;
+}
+:where(button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:disabled):active{
+  transform:perspective(600px) translate3d(2px,3px,0) scale(.975);
+  filter:brightness(.94);
+}
+:where(button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):focus-visible{
+  outline:2px solid var(--accent,#ffd84d);
+  outline-offset:3px;
+}
+@media(prefers-reduced-motion:reduce){
+  :where(button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(:disabled){transition:none}
+}
