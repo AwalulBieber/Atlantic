@@ -24,7 +24,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       if (!user?.id) return;
       const [{ data: p, error: profileError }, { data: admin, error: adminError }] =
         await Promise.all([
-          supabase.from("profiles").select("id,username,display_name,avatar_url,bio,is_private,show_online_status,read_receipts_enabled,group_invite_policy").eq("id", user.id).maybeSingle(),
+          supabase.from("profiles").select("id,username,display_name,avatar_url,bio,is_private,show_online_status,read_receipts_enabled,group_invite_policy,is_verified").eq("id", user.id).maybeSingle(),
           supabase.rpc("is_atlantic_admin")
         ]);
       if (!alive) return;
