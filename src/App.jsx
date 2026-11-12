@@ -5,6 +5,7 @@ import AtlanticCommunity from './components/AtlanticCommunity';
 import AtlanticCallManager from './components/AtlanticCallManager';
 import AtlanticContacts from './components/AtlanticContacts';
 import AtlanticGroupInfo from './components/AtlanticGroupInfo';
+import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
@@ -300,11 +301,12 @@ export default function App() {
     return other ? { conversation_id: conversation.id, person: other, is_group: false } : null;
   }).filter(Boolean);
   setChats(chatRows);
+  return chatRows;
   }
 
   async function loadGroupUsers() {
     const { data, error } = await supabase.from('profiles')
-      .select('id,username,display_name,avatar_url,is_verified,is_private')
+      .select('id,username,display_name,avatar_url,is_verified,is_private,group_invite_policy')
       .neq('id', session.user.id)
       .order('display_name', { ascending: true })
       .limit(300);
@@ -330,7 +332,7 @@ export default function App() {
       setGroupBusy(false);
       return;
     }
-    const selectedProfiles = groupUsers.filter(person => groupSelected.includes(person.id));
+    const selectedProfiles = groupUsers.filter(person => groupSelected.includes(person.id) && person.group_invite_policy !== 'approval');
     const group = {
       conversation_id: conversationId,
       is_group: true,
@@ -344,8 +346,10 @@ export default function App() {
     setMobileChat(true);
     setGroupCreateOpen(false);
     setCreateMenuOpen(false);
-    setNotice('Grup berhasil dibuat. Mulai percakapan sekarang!');
+    const {count:pendingInvites}=await supabase.from('atlantic_group_invitations').select('id',{count:'exact',head:true}).eq('conversation_id',conversationId).eq('status','pending');
+    setNotice(pendingInvites ? `Grup dibuat. ${pendingInvites} undangan menunggu persetujuan.` : 'Grup berhasil dibuat. Mulai percakapan sekarang!');
     await loadMessages(conversationId);
+    await loadProfiles();
     setGroupBusy(false);
   }
 
@@ -759,6 +763,7 @@ export default function App() {
         </div>
 
         <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Tersimpan</button></div>
+        <AtlanticGroupInvitations user={session.user} onNotice={setNotice} onAccepted={async conversationId=>{const updated=await loadProfiles();const joined=updated?.find(item=>item.conversation_id===conversationId);if(joined)openGroupChat(joined);}} />
         <div className="section-title"><span>{showSaved ? 'Pesan Tersimpan' : showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{showSaved ? savedMessages.length : filtered.length}</span></div>
         <div className="people">
   {showSaved ? (savedBusy ? <p className="empty">Memuat pesan tersimpan…</p> : savedMessages.map(item => {
