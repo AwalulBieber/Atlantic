@@ -4,6 +4,7 @@ import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
 import AtlanticCallManager from './components/AtlanticCallManager';
 import AtlanticContacts from './components/AtlanticContacts';
+import AtlanticGroupInfo from './components/AtlanticGroupInfo';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
@@ -70,6 +71,7 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState('appearance');
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [unread, setUnread] = useState({});
   const [incomingNotice, setIncomingNotice] = useState(null);
   const [callIntent, setCallIntent] = useState(null);
@@ -268,7 +270,7 @@ export default function App() {
 
   const { data: conversations, error: conversationError } = await supabase
     .from('conversations')
-    .select('id,title,is_group,created_by')
+    .select('id,title,is_group,created_by,description,avatar_url,is_verified')
     .in('id', ids);
   if (conversationError) { setNotice('Daftar percakapan: ' + conversationError.message); return; }
 
@@ -292,7 +294,7 @@ export default function App() {
     if (conversation.is_group) {
       const groupProfiles = [{ ...(myProfile || {}), id: session.user.id }, ...conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).filter(Boolean)];
       const title = conversation.title || 'Grup Atlantic';
-      return { conversation_id: conversation.id, is_group: true, title, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, is_group: true } };
+      return { conversation_id: conversation.id, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_url: conversation.avatar_url, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, is_group: true, is_verified: conversation.is_verified } };
     }
     const other = conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).find(Boolean);
     return other ? { conversation_id: conversation.id, person: other, is_group: false } : null;
@@ -797,8 +799,8 @@ export default function App() {
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
               <div className="avatar">{active.is_group ? <Users size={20}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
-              <div className="chat-person">
-                <b>{active.person.display_name || active.person.username}{active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
+              <div className="chat-person" onClick={() => active.is_group && setGroupInfoOpen(true)} role={active.is_group ? "button" : undefined} tabIndex={active.is_group ? 0 : undefined}>
+                <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
                 <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
               </div>
               {!active.is_group && <div className="chat-head-actions">
@@ -1004,6 +1006,7 @@ export default function App() {
       )}
 
       {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} />}
+      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,person:{...current.person,display_name:updated.title,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
 
       {activeTab !== 'chat' && (
         <AtlanticCommunity
