@@ -478,6 +478,14 @@ export default function App() {
         const deleted = payload.old;
         if (deleted?.id) setMessages(old => old.filter(m => m.id !== deleted.id).map(m => m.reply_to === deleted.id ? { ...m, reply_to: null, replyPreview: null } : m));
       })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'message_user_states',
+        filter: 'user_id=eq.' + session.user.id
+      }, payload => {
+        if (payload.new?.is_deleted) {
+          setMessages(old => old.filter(m => m.id !== payload.new.message_id));
+        }
+      })
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [active?.conversation_id, session?.user?.id, myProfile?.read_receipts_enabled]);
