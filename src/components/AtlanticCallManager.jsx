@@ -116,7 +116,15 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
         event: 'UPDATE', schema: 'public', table: 'atlantic_call_sessions',
         filter: 'id=eq.' + callId
       }, payload => {
-        if (['declined','cancelled','ended','missed'].includes(payload.new.status) && callRef.current?.id === callId) {
+        if (callRef.current?.id !== callId) return;
+        if (payload.new.status === 'accepted') {
+          callRef.current.status = 'accepted';
+          setCall({ ...callRef.current });
+          setPhase('Menghubungkan…');
+          return;
+        }
+        if (['declined','cancelled','ended','missed'].includes(payload.new.status)) {
+          if (payload.new.status === 'missed') setError('Panggilan tidak dijawab.');
           setPhase(payload.new.status === 'declined' ? 'Panggilan ditolak' : 'Panggilan berakhir');
           cleanup();
         }
@@ -292,6 +300,24 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [call?.id, call?.started_at]);
+
+  // End unanswered outgoing calls so both sides leave the ringing state.
+  useEffect(() => {
+    if (!call || call.direction !== 'outgoing' || call.status !== 'requested') return;
+    const callId = call.id;
+    const timer = setTimeout(async () => {
+      if (callRef.current?.id !== callId || callRef.current.status !== 'requested') return;
+      await supabase.from('atlantic_call_sessions').update({
+        status: 'missed',
+        ended_at: new Date().toISOString()
+      }).eq('id', callId);
+      if (callRef.current?.id === callId) {
+        setError('Panggilan tidak dijawab.');
+        await cleanup();
+      }
+    }, 45000);
+    return () => clearTimeout(timer);
+  }, [call?.id, call?.direction, call?.status, cleanup]);
 
   useEffect(() => () => {
     if (signalChannelRef.current) supabase.removeChannel(signalChannelRef.current);
