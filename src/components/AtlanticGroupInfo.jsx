@@ -45,7 +45,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
       if(uploadError){setError(uploadError.message);setBusy(false);return;}
       avatarPath=next;
     }
-    const {error:updateError}=await supabase.from('conversations').update({title:group.title.trim(),description:group.description.trim(),avatar_url:avatarPath,message_policy:group.message_policy,add_member_policy:group.add_member_policy,pinned_message_id:group.pinned_message_id||null}).eq('id',conversationId);
+    const {error:updateError}=await supabase.from('conversations').update({title:String(group.title||'').trim(),description:String(group.description||'').trim(),avatar_url:avatarPath,message_policy:group.message_policy,add_member_policy:group.add_member_policy,pinned_message_id:group.pinned_message_id||null}).eq('id',conversationId);
     if(updateError){if(avatarFile&&avatarPath)await supabase.storage.from('atlantic-chat-media').remove([avatarPath]);setError(updateError.message);}
     else{
       if(group.avatar_url&&avatarPath!==group.avatar_url)await supabase.storage.from('atlantic-chat-media').remove([group.avatar_url]);
