@@ -266,12 +266,13 @@ export default function App() {
 
   async function loadGroupUsers() {
     const { data, error } = await supabase.from('profiles')
-      .select('id,username,display_name,avatar_url,is_verified')
+      .select('id,username,display_name,avatar_url,is_verified,is_private')
       .neq('id', session.user.id)
       .order('display_name', { ascending: true })
       .limit(300);
     if (error) { setNotice('Daftar anggota grup gagal dimuat: ' + error.message); return; }
-    setGroupUsers(data || []);
+    // Private profiles are not discoverable through the new-group member picker.
+    setGroupUsers((data || []).filter(person => person.is_private !== true));
     setGroupSelected([]);
     setGroupTitle('');
     setGroupSearch('');
