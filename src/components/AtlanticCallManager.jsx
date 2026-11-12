@@ -442,7 +442,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
           <button className="decline" type="button" onClick={endCall}><PhoneOff size={18}/> Akhiri</button>
         </div>
         {call.call_type === 'video' && cameraSettingsOpen && <div className="atl-call-video-settings">
-          <button type="button" onClick={switchCamera} disabled={cameraOff}><Camera size={17}/> Kamera {cameraFacing === 'user' ? 'depan' : 'belakang'}</button>
+          <button type="button" onClick={switchCamera} disabled={cameraOff}><Camera size={17}/> Ganti ke kamera {cameraFacing === 'user' ? 'belakang' : 'depan'}</button>
           <button type="button" onClick={() => setMirrorSelf(value => !value)}><FlipHorizontal size={17}/> Mirror {mirrorSelf ? 'aktif' : 'nonaktif'}</button>
           <small>Mirror hanya mengubah tampilan kamera sendiri.</small>
         </div>}
