@@ -5,7 +5,7 @@ import './AtlanticAdminDashboard.css';
 
 const dateLabel = value => value ? new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
-export default function AtlanticAdminDashboard({ user, onClose, onNotice }) {
+export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDialog }) {
   const [authorized, setAuthorized] = useState(false);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -108,7 +108,7 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice }) {
   const pendingReports = reports.filter(item => item.status === 'pending').length;
 
   const toggleVerification = async profile => {
-    if (!window.confirm(profile.is_verified ? `Cabut centang verifikasi @${profile.username}?` : `Berikan centang verifikasi ke @${profile.username}?`)) return;
+    const confirmed=await onDialog?.({type:'confirm',title:profile.is_verified?'Cabut verifikasi?':'Verifikasi pengguna?',message:profile.is_verified?`Cabut centang verifikasi @${profile.username}?`:`Berikan centang verifikasi ke @${profile.username}?`,confirmLabel:profile.is_verified?'Cabut centang':'Verifikasi'}); if(!confirmed)return;
     setBusyId('verify:' + profile.id);
     const { error } = await supabase.rpc('admin_set_user_verified', { target_user: profile.id, should_verify: !profile.is_verified });
     if (error) onNotice?.('Gagal mengubah verifikasi: ' + error.message);
@@ -118,9 +118,8 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice }) {
 
   const toggleAdminBlock = async profile => {
     const shouldBlock = !profile.is_blocked;
-    const reason = shouldBlock ? (window.prompt('Alasan blokir akun (opsional):', 'Pelanggaran aturan Atlantic') || '') : '';
-    if (shouldBlock && !window.confirm(`Blokir akun @${profile.username}?`)) return;
-    if (!shouldBlock && !window.confirm(`Buka blokir akun @${profile.username}?`)) return;
+    const reason = shouldBlock ? ((await onDialog?.({type:'prompt',title:'Alasan blokir akun',message:`Masukkan alasan memblokir @${profile.username} (opsional).`,defaultValue:'Pelanggaran aturan Atlantic',placeholder:'Alasan blokir…',confirmLabel:'Lanjutkan',maxLength:500})) || '') : '';
+    const confirmed=await onDialog?.({type:'confirm',title:shouldBlock?'Blokir akun?':'Buka blokir akun?',message:shouldBlock?`Blokir akun @${profile.username}?`:`Buka blokir akun @${profile.username}?`,confirmLabel:shouldBlock?'Blokir':'Buka blokir'}); if(!confirmed)return;
     setBusyId('block:' + profile.id);
     const { error } = await supabase.rpc('admin_set_user_blocked', { target_user: profile.id, should_block: shouldBlock, reason });
     if (error) onNotice?.('Gagal mengubah status blokir: ' + error.message);
@@ -129,7 +128,7 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice }) {
   };
 
   const reviewReport = async (report, decision) => {
-    const note = window.prompt('Catatan admin (opsional):', '') || '';
+    const note = (await onDialog?.({type:'prompt',title:'Catatan admin',message:'Tambahkan catatan peninjauan (opsional).',placeholder:'Catatan untuk laporan…',confirmLabel:'Simpan catatan',maxLength:500})) || '';
     setBusyId('report:' + report.id);
     const { error } = await supabase.rpc('admin_review_account_report', { report_id: report.id, decision, admin_note: note.slice(0,500) });
     if (error) onNotice?.('Gagal memproses laporan: ' + error.message);
