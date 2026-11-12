@@ -13,9 +13,11 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   const [showCreate,setShowCreate]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [canModerate,setCanModerate]=useState(false);
 
   const load=useCallback(async()=>{
     if(!targetId)return;
+    if(targetType==='group'&&user?.id){const {data:membership}=await supabase.from('conversation_members').select('role').eq('conversation_id',targetId).eq('user_id',user.id).maybeSingle();setCanModerate(membership?.role==='admin');}else setCanModerate(Boolean(canCreate));
     const {data:rows,error:pollError}=await supabase.from('atlantic_polls').select('id,target_type,target_id,question,created_by,created_at,expires_at,closed_at').eq('target_type',targetType).eq('target_id',targetId).order('created_at',{ascending:false}).limit(30);
     if(pollError){setError(pollError.message);return;}
     const pollIds=(rows||[]).map(p=>p.id);
@@ -32,7 +34,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const {data:people}=await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids);
       setProfiles(Object.fromEntries((people||[]).map(p=>[p.id,p])));
     }else setProfiles({});
-  },[targetId,targetType]);
+  },[targetId,targetType,user?.id,canCreate]);
 
   useEffect(()=>{
     load();
@@ -94,7 +96,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const ownVote=pollVotes.find(v=>v.user_id===user?.id);
       const expired=poll.expires_at&&new Date(poll.expires_at).getTime()<=Date.now();
       const closed=Boolean(poll.closed_at||expired);
-      const canClose=poll.created_by===user?.id;
+      const canClose=poll.created_by===user?.id||canModerate;
       return <article className="atl-poll-card" key={poll.id}>
         <header><div><span className="atl-poll-tag"><BarChart3 size={12}/> {targetType==='group'?'POLLING GRUP':'POLLING SALURAN'}</span><h3>{poll.question}</h3><small>{new Date(poll.created_at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · {formatExpiry(poll.expires_at)}</small></div>{canClose&&!closed&&<button type="button" className="atl-poll-close" onClick={()=>closePoll(poll)} disabled={busy}>Tutup</button>}</header>
         <div className="atl-poll-options">{opts.map(option=>{
