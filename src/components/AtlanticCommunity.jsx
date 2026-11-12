@@ -5,7 +5,7 @@ import { Clock3, Plus, Send, Radio, Phone, ImagePlus, NotebookPen, X, Users, Ref
 const dateLabel = value => new Date(value).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 const callStatusLabel = status => ({ requested:'Memanggil', accepted:'Diterima', declined:'Ditolak', missed:'Tak terjawab', ended:'Selesai', cancelled:'Dibatalkan' }[status] || status);
 
-export default function AtlanticCommunity({ tab, user, profile, createRequest = 0, onNotice }) {
+export default function AtlanticCommunity({ tab, user, profile, createRequest = 0, onNotice, onDialog }) {
   const [stories,setStories]=useState([]);
   const [notes,setNotes]=useState([]);
   const [channels,setChannels]=useState([]);
@@ -234,7 +234,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     if(!selectedChannel||busy)return;
     const canDelete=post.author_id===user.id||selectedChannel.owner_id===user.id;
     if(!canDelete)return;
-    if(!window.confirm('Hapus postingan ini?'))return;
+    const confirmed=await onDialog?.({type:'confirm',title:'Hapus postingan?',message:'Postingan ini akan dihapus dari saluran.',confirmLabel:'Hapus'}); if(!confirmed)return;
     setBusy(true);setError('');
     const {error:e}=await supabase.from('atlantic_channel_posts').delete().eq('id',post.id);
     if(e)setError('Postingan gagal dihapus: '+e.message);
