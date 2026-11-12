@@ -33,7 +33,7 @@ const FONT_OPTIONS = [
 ];
 
 export default function App() {
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState(null);\n  const [myProfile, setMyProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
@@ -427,7 +427,7 @@ export default function App() {
         </header>
 
         <div className="me">
-          <div className="avatar">{initials(session.user.user_metadata?.display_name || session.user.email)}</div>
+          <div className="avatar">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : initials(session.user.user_metadata?.display_name || session.user.email)}</div>
           <div>
             <b>{session.user.user_metadata?.display_name || session.user.email}</b>
             <small><i className="online-dot" /> Online</small>
