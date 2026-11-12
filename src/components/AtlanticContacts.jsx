@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
 import { UserPlus, Check, X, Search, Users, Clock3, Trash2 } from 'lucide-react';
 
-export default function AtlanticContacts({ user, onClose, onOpenChat }) {
+export default function AtlanticContacts({ user, onClose, onOpenChat, onDialog }) {
   const [query,setQuery]=useState('');
   const [profiles,setProfiles]=useState([]);
   const [searchProfiles,setSearchProfiles]=useState([]);
@@ -66,7 +66,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
 
   async function blockPerson(person){
     if(!person?.id)return;
-    if(!window.confirm('Blokir @'+(person.username||'pengguna')+'? Pengguna ini tidak bisa mengirim pesan langsung kepadamu.'))return;
+    const confirmed=await onDialog?.({type:'confirm',title:'Blokir pengguna?',message:'Blokir @'+(person.username||'pengguna')+'? Pengguna ini tidak bisa mengirim pesan langsung kepadamu.',confirmLabel:'Blokir'}); if(!confirmed)return;
     setBusy(true);setError('');setNotice('');
     const {error:e}=await supabase.rpc('set_atlantic_user_block',{target_user:person.id,should_block:true});
     if(e)setError(e.message);else setNotice('@'+(person.username||'Pengguna')+' berhasil diblokir.');
@@ -80,8 +80,8 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
   }
   async function reportPerson(person){
     if(!person?.id)return;
-    const reason=window.prompt('Jelaskan alasan melaporkan @'+(person.username||'pengguna')+' (minimal 3 karakter):','');
-    if(reason===null)return;
+    const reason=await onDialog?.({type:'prompt',title:'Laporkan akun',message:'Jelaskan alasan melaporkan @'+(person.username||'pengguna')+' (minimal 3 karakter).',placeholder:'Tulis alasan laporan…',confirmLabel:'Kirim laporan',maxLength:1000});
+    if(reason===null||reason===undefined)return;
     if(reason.trim().length<3){setError('Alasan laporan minimal 3 karakter.');return;}
     setBusy(true);setError('');setNotice('');
     const {error:e}=await supabase.from('atlantic_account_reports').insert({reporter_id:user.id,reported_user_id:person.id,reason:reason.trim().slice(0,1000)});
@@ -102,7 +102,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
     await load();setBusy(false);
   }
   async function remove(row){
-    if(!window.confirm('Hapus kontak ini? Story dan Catatan kalian tidak akan saling terlihat lagi.'))return;
+    const confirmed=await onDialog?.({type:'confirm',title:'Hapus kontak?',message:'Story dan Catatan kalian tidak akan saling terlihat lagi.',confirmLabel:'Hapus'}); if(!confirmed)return;
     setBusy(true);const {error:e}=await supabase.from('atlantic_contacts').delete().eq('id',row.id);
     if(e)setError(e.message);else setNotice('Kontak dihapus.');
     await load();setBusy(false);
