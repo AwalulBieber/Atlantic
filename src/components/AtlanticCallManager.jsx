@@ -210,6 +210,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     setPhase('Menyiapkan panggilan…');
     endedRef.current = false;
     try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('Browser ini tidak mendukung akses mikrofon/kamera. Buka Atlantic melalui HTTPS dan browser terbaru.');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: incoming.call_type === 'video'
