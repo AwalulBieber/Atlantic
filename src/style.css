@@ -559,3 +559,22 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-contacts-empty{padding:14px;border:1px dashed #999;border-radius:9px;color:#888;text-align:center;font-size:12px}
 .atl-contacts-modal>footer{padding-top:12px;border-top:1px solid #8884;color:#888;font-size:11px;line-height:1.5}
 @media(max-width:560px){.atl-contacts-backdrop{padding:8px}.atl-contacts-modal{padding:14px;max-height:94dvh}.atl-contact-row{gap:7px}.atl-contact-actions button{padding:5px 7px}}
+
+.atl-story-strip{display:flex;align-items:flex-start;gap:15px;overflow-x:auto;padding:16px 4px 22px;scrollbar-width:none}.atl-story-strip::-webkit-scrollbar{display:none}
+.atl-story-add,.atl-story-person{display:flex;flex:0 0 92px;flex-direction:column;align-items:center;gap:7px;border:0;background:transparent;color:var(--ink);padding:0;cursor:pointer}
+.atl-story-add{align-items:flex-start;justify-content:space-between;min-height:150px;padding:13px;border:1px solid #9995;border-radius:22px;background:linear-gradient(145deg,#d8d8e2,#9fa0b1);box-shadow:0 5px 13px #0002}
+.atl-story-add .atl-story-ring{align-self:center}.atl-story-add>b{font-size:13px;line-height:1.2;text-align:left}.atl-story-person{flex-basis:78px}.atl-story-person>b{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.atl-story-ring{display:grid;place-items:center;width:66px;height:66px;padding:4px;border:3px solid #a855f7;border-radius:50%;background:linear-gradient(135deg,#ec4899,#a855f7)}
+.atl-story-ring>img,.atl-story-ring>span{display:grid;place-items:center;width:100%;height:100%;overflow:hidden;border:2px solid var(--panel,#fff);border-radius:50%;background:var(--accent);color:#171717;font-size:22px;font-weight:950;object-fit:cover}
+.atl-story-add .atl-story-ring{width:58px;height:58px;border:4px dashed #fff;background:#fff8}.atl-story-add .atl-story-ring>span{width:30px;height:30px;border:0;border-radius:50%;background:#a855f7;color:white;font-size:25px}
+.atl-note-bubbles{display:flex;gap:14px;overflow-x:auto;padding:15px 3px 20px;scrollbar-width:none}.atl-note-bubble{position:relative;display:flex;flex:0 0 125px;flex-direction:column;align-items:center;gap:7px;min-width:0}
+.atl-note-avatar{width:62px;height:62px;flex:0 0 62px;border:3px solid #a855f7;border-radius:50%;background:var(--accent);font-size:22px}
+.atl-note-content{position:relative;width:100%;padding:10px 9px;border:2px solid var(--ink);border-radius:13px;background:var(--panel,#fff);box-shadow:3px 3px 0 var(--ink);text-align:center}
+.atl-note-content:before{content:"";position:absolute;top:-8px;left:calc(50% - 7px);width:12px;height:12px;transform:rotate(45deg);border-left:2px solid var(--ink);border-top:2px solid var(--ink);background:var(--panel,#fff)}
+.atl-note-content>b{font-size:11px}.atl-note-content>p{margin:4px 0;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-size:12px;line-height:1.35}.atl-note-content>small{font-size:9px;color:#888}
+.atl-note-delete{position:absolute;top:57px;right:3px;z-index:1;width:23px;height:23px;border:2px solid var(--ink);border-radius:50%;background:#fee2e2;color:#991b1b;font-weight:950}
+.atl-story-viewer{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:14px;background:#050505ed}.atl-story-viewer-close{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:18px;width:40px;height:40px;border:2px solid white;border-radius:50%;background:#111;color:#fff;font-size:27px}
+.atl-story-viewer>article{display:flex;flex-direction:column;gap:12px;width:min(100%,440px);max-height:88dvh;color:#fff}.atl-story-viewer header{display:flex;justify-content:space-between;gap:10px;font-size:13px}.atl-story-viewer header small{opacity:.7}
+.atl-story-viewer article>img,.atl-story-viewer article>video{display:block;width:100%;max-height:68dvh;object-fit:contain;border-radius:14px;background:#111}.atl-story-viewer article>p{white-space:pre-wrap;overflow-wrap:anywhere}
+.atl-story-viewer footer{display:flex;flex-wrap:wrap;gap:8px}.atl-story-viewer footer button{padding:9px 12px;border:2px solid #fff;border-radius:9px;background:#fff;color:#111;font-weight:900}.atl-story-viewer footer button:first-child{background:#fecaca;color:#991b1b}
+@media(max-width:560px){.atl-story-add{flex-basis:92px}.atl-note-bubbles{gap:12px}.atl-note-bubble{flex-basis:112px}}
