@@ -43,6 +43,7 @@ STATUS FITUR ATLANTIC
 =====================
 Sudah tersedia di kode:
 - Chat pribadi real-time dan balasan pesan.
+- Arsip chat per pengguna dengan tampilan daftar arsip dan opsi kembalikan ke daftar utama.
 - Hapus pesan sendiri dengan konfirmasi Neobrutalism.
 - Indikator pesan terkirim, diterima, dan dibaca (mengikuti pengaturan tanda dibaca).
 - Indikator "sedang mengetik" real-time.
