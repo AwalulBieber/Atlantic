@@ -153,7 +153,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   async function createChannel(e) {
     e.preventDefault(); if(!channelName.trim()||busy) return;
     setBusy(true);setError('');
-    const {data,error:e1}=await supabase.from('atlantic_channels').insert({owner_id:user.id,name:channelName.trim(),description:channelDescription.trim()}).select('id,owner_id,name,description,is_public,created_at').single();
+    const {data,error:e1}=await supabase.from('atlantic_channels').insert({owner_id:user.id,name:channelName.trim(),description:channelDescription.trim()}).select('id,owner_id,name,description,is_public,avatar_url,created_at').single();
     if(e1) setError(e1.message);
     else {
       const {error:e2}=await supabase.from('atlantic_channel_members').insert({channel_id:data.id,user_id:user.id,role:'owner'});
