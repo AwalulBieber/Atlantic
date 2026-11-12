@@ -3,6 +3,7 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
 import AtlanticCallManager from './components/AtlanticCallManager';
+import AtlanticContacts from './components/AtlanticContacts';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
@@ -65,6 +66,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
   const [unread, setUnread] = useState({});
   const [incomingNotice, setIncomingNotice] = useState(null);
   const [callIntent, setCallIntent] = useState(null);
@@ -977,11 +979,14 @@ export default function App() {
             <header><div><small>ATLANTIC CREATE</small><b>Buat sesuatu</b></div><button className="icon-btn" onClick={() => setCreateMenuOpen(false)} aria-label="Tutup"><X size={18}/></button></header>
             <button onClick={() => { setActiveTab('chat'); setCreateMenuOpen(false); setNotice('Pilih pengguna dari daftar chat untuk membuka percakapan.'); }}><MessageSquarePlus/><span><b>Chat baru</b><small>Mulai percakapan</small></span></button>
             <button onClick={loadGroupUsers}><Users/><span><b>Grup baru</b><small>Buat grup dan pilih anggota</small></span></button>
+            <button onClick={() => { setContactsOpen(true); setCreateMenuOpen(false); }}><UserRound/><span><b>Tambah kontak</b><small>Cari dan tambahkan teman Atlantic</small></span></button>
             <button onClick={() => { setActiveTab('updates'); setCommunityCreateRequest(v => v + 1); setCreateMenuOpen(false); setNotice(''); }}><ImagePlus/><span><b>Story</b><small>Bagikan momen singkat</small></span></button>
             <button onClick={() => { setActiveTab('updates'); setCommunityCreateRequest(v => v + 1); setCreateMenuOpen(false); setNotice(''); }}><NotebookPen/><span><b>Catatan</b><small>Tulis sesuatu untuk dibagikan</small></span></button>
           </section>
         </div>
       )}
+
+      {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} />}
 
       {activeTab !== 'chat' && (
         <AtlanticCommunity
