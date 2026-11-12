@@ -133,7 +133,7 @@ export default function App() {
   async function loadMyProfile() {
     if (!session?.user?.id) return;
     const [{ data, error }, { data: isAdmin, error: badgeError }] = await Promise.all([
-      supabase.from('profiles').select('id,username,display_name,avatar_url,bio').eq('id', session.user.id).maybeSingle(),
+      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified').eq('id', session.user.id).maybeSingle(),
       supabase.rpc('is_atlantic_admin', { target_user: session.user.id })
     ]);
     if (!error && data) {
@@ -206,7 +206,7 @@ export default function App() {
 
   const { data: people, error: profileError } = await supabase
     .from('profiles')
-    .select('id,username,display_name,avatar_url')
+    .select('id,username,display_name,avatar_url,is_verified')
     .in('id', userIds);
 
   if (profileError) {
@@ -455,7 +455,7 @@ export default function App() {
         <div className="me">
           <div className="avatar">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : initials(myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email)}</div>
           <div>
-            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={16}/></span>}</b>
+            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={16}/></span> : myProfile?.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={16}/></span>}</b>
             <small><i className="online-dot" /> Online</small>
           </div>
         </div>
@@ -477,7 +477,7 @@ export default function App() {
         {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
       </div>
       <div className="person-info">
-        <b>{c.person.display_name || c.person.username}{c.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span>}</b>
+        <b>{c.person.display_name || c.person.username}{c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
         <small>Ketuk untuk membuka chat</small>
       </div>
       <MessageCircle size={17} />
@@ -498,7 +498,7 @@ export default function App() {
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
               <div className="avatar">{active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
-                <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span>}</b>
+                <b>{active.person.display_name || active.person.username}{active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
                 <small>@{active.person.username}</small>
               </div>
               <div className="chat-head-actions">
