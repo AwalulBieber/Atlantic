@@ -16,6 +16,8 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
   const [inviteLink,setInviteLink]=useState('');
   const [inviteLinkId,setInviteLinkId]=useState('');
   const [inviteBusy,setInviteBusy]=useState(false);
+  const [inviteExpiry,setInviteExpiry]=useState('never');
+  const [inviteMaxUses,setInviteMaxUses]=useState('');
 
   async function load(){
     const {data:g,error:ge}=await supabase.from('conversations').select('id,title,description,avatar_url,is_verified,created_by,message_policy,add_member_policy,pinned_message_id').eq('id',conversationId).single();
@@ -62,8 +64,11 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
     if(!isAdmin||inviteBusy)return;
     setInviteBusy(true);setError('');
     const token=crypto.randomUUID().replace(/-/g,'')+crypto.randomUUID().replace(/-/g,'');
+    const maxUses=inviteMaxUses.trim()?Number(inviteMaxUses):null;
+    if(maxUses!==null&&(!Number.isInteger(maxUses)||maxUses<1)){setError('Batas penggunaan harus berupa angka minimal 1.');setInviteBusy(false);return;}
+    const expiresAt=inviteExpiry==='never'?null:new Date(Date.now()+Number(inviteExpiry)*86400000).toISOString();
     const {data:id,error:e}=await supabase.rpc('create_atlantic_invite_link',{
-      p_invite_type:'group',p_resource_id:conversationId,p_token:token,p_expires_at:null,p_max_uses:null
+      p_invite_type:'group',p_resource_id:conversationId,p_token:token,p_expires_at:expiresAt,p_max_uses:maxUses
     });
     if(e){setError('Link undangan gagal dibuat: '+e.message);setInviteBusy(false);return;}
     const url=window.location.origin+'/?atlanticInvite='+encodeURIComponent(token);
@@ -103,6 +108,8 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
         {isAdmin&&<section className="atl-group-invite-link">
           <h3>Undang lewat link</h3>
           <p>Buat link untuk mengundang teman bergabung ke grup ini.</p>
+          <label>Masa berlaku<select value={inviteExpiry} onChange={e=>setInviteExpiry(e.target.value)}><option value="never">Tidak kedaluwarsa</option><option value="1">1 hari</option><option value="7">7 hari</option><option value="30">30 hari</option></select></label>
+          <label>Batas penggunaan (opsional)<input type="number" min="1" max="10000" value={inviteMaxUses} onChange={e=>setInviteMaxUses(e.target.value)} placeholder="Kosong = tanpa batas"/></label>
           <button type="button" onClick={createInviteLink} disabled={inviteBusy}>{inviteBusy?'Memproses…':'Buat / perbarui link undangan'}</button>
           {inviteLink&&<><input readOnly value={inviteLink} onFocus={e=>e.target.select()}/><div><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(inviteLink);onNotice?.('Link disalin.');}catch{setError('Gagal menyalin otomatis. Tekan dan tahan link untuk menyalin.');}}}>Salin link</button><button type="button" className="atl-group-invite-revoke" onClick={revokeInviteLink} disabled={inviteBusy}>Nonaktifkan link</button></div></>}
         </section>}
