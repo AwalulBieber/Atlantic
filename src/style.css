@@ -381,3 +381,6 @@ html[data-theme="dark"] .neo-delete-actions button{border-color:#fff;box-shadow:
   .bubble-row,.swipe-reply-indicator { transition:none !important; }
   .bubble-row.reply-swipe-confirmed .bubble { animation:none !important; }
 }
+
+.atl-inline-verified.atl-user-verified{color:#f28a22}
+.atl-inline-verified.atl-user-verified svg{fill:#f28a22;stroke:#fff;stroke-width:2.5}
