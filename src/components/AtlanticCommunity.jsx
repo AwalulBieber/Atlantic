@@ -30,7 +30,17 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
         supabase.from('atlantic_stories').select('id,user_id,body,media_url,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(60),
         supabase.from('atlantic_notes').select('id,user_id,body,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(60)
       ]);
-      if(s.error) setError('Story: '+s.error.message); else setStories(s.data||[]);
+      if(s.error) setError('Story: '+s.error.message);
+      else {
+        const signedStories=await Promise.all((s.data||[]).map(async story=>{
+          if(!story.media_url)return story;
+          const expiresIn=Math.max(1,Math.floor((new Date(story.expires_at).getTime()-Date.now())/1000));
+          const {data:signed,error:signedError}=await supabase.storage.from('atlantic-stories').createSignedUrl(story.media_url,expiresIn);
+          if(signedError){setError(v=>v||('Media Story: '+signedError.message));return {...story,media_url:null};}
+          return {...story,media_url:signed?.signedUrl||null};
+        }));
+        setStories(signedStories);
+      }
       if(n.error) setError(v=>v||('Catatan: '+n.error.message)); else setNotes(n.data||[]);
     } else if(tab==='channels') {
       const {data,error:e}=await supabase.from('atlantic_channels').select('id,owner_id,name,description,is_public,created_at').eq('is_public',true).order('created_at',{ascending:false}).limit(60);
@@ -88,7 +98,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
       uploadedPath=user.id+'/'+crypto.randomUUID()+'.'+extension;
       const {error:uploadError}=await supabase.storage.from('atlantic-stories').upload(uploadedPath,mediaFile,{cacheControl:'3600',upsert:false,contentType:mediaFile.type});
       if(uploadError){setError('Upload Story gagal: '+uploadError.message);setBusy(false);return;}
-      mediaUrl=supabase.storage.from('atlantic-stories').getPublicUrl(uploadedPath).data.publicUrl;
+      mediaUrl=uploadedPath;
     }
     const table=kind==='story'?'atlantic_stories':'atlantic_notes';
     const payload=kind==='story'?{user_id:user.id,body:text,media_url:mediaUrl}:{user_id:user.id,body:text};
