@@ -52,6 +52,7 @@ Sudah tersedia di kode:
 - Story teks/foto/video dan Catatan yang kedaluwarsa setelah 24 jam.
 - Saluran publik dengan fitur gabung dan posting teks.
 - Panggilan audio dan video langsung satu-lawan-satu berbasis WebRTC, termasuk terima/tolak, mute mikrofon, kontrol kamera, dan akhiri panggilan.
+- Dashboard Admin dengan ringkasan pengguna, chat pribadi, grup, riwayat panggilan, antrean verifikasi, dan daftar pengguna terbaru.
 - Navigasi bawah Liquid Glass, tema, font, warna aksen, dan animasi UI.
 
 BATASAN YANG MASIH ADA
@@ -101,3 +102,13 @@ ATLANTIC LIVE AUDIO/VIDEO CALLS
 - Kontrol tersedia: mute/unmute mikrofon, kamera on/off, dan akhiri panggilan.
 - Saat ini memakai STUN publik. TURN relay belum dikonfigurasi, sehingga beberapa jaringan seluler/Wi-Fi atau NAT ketat dapat membutuhkan konfigurasi TURN tambahan.
 - Migrasi database: jalankan berurutan 202611120012_atlantic_realtime_audio_video_calls.sql, 202611120013_atlantic_restrict_initial_call_state.sql, dan 202611120014_atlantic_restrict_call_signal_permissions.sql.
+
+
+ATLANTIC ADMIN DASHBOARD
+========================
+- Dashboard hanya ditampilkan kepada admin Atlantic.
+- Statistik membaca jumlah pengguna, chat pribadi, grup, riwayat panggilan, dan pengajuan verifikasi yang menunggu.
+- Menampilkan hingga 30 akun terbaru dengan pencarian nama/username.
+- Kebijakan SELECT admin dibatasi melalui fungsi public.is_atlantic_admin(auth.uid()); pengguna biasa tetap mengikuti RLS masing-masing.
+- Dashboard tidak mengambil isi pesan pribadi.
+- Migrasi database: 202611120015_atlantic_admin_dashboard_read_access.sql.
