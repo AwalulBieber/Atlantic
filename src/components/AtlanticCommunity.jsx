@@ -4,7 +4,7 @@ import { Clock3, Plus, Send, Radio, Phone, ImagePlus, NotebookPen, X, Users, Ref
 
 const dateLabel = value => new Date(value).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 
-export default function AtlanticCommunity({ tab, user, profile, onNotice }) {
+export default function AtlanticCommunity({ tab, user, profile, createRequest = 0, onNotice }) {
   const [stories,setStories]=useState([]);
   const [notes,setNotes]=useState([]);
   const [channels,setChannels]=useState([]);
@@ -40,6 +40,7 @@ export default function AtlanticCommunity({ tab, user, profile, onNotice }) {
   },[tab,user?.id]);
 
   useEffect(()=>{load();},[load]);
+  useEffect(()=>{if(createRequest>0)setShowCreate(true);},[createRequest]);
 
   // Keep community feeds synchronized without requiring a manual refresh.
   useEffect(() => {
