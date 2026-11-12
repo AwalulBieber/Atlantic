@@ -22,10 +22,9 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await authClient.auth.getUser(accessToken);
   if (authError || !user) return res.status(401).json({ error: 'Sesi login tidak valid.' });
 
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const turnKeyId = process.env.CLOUDFLARE_TURN_KEY_ID;
   const turnKeySecret = process.env.CLOUDFLARE_TURN_KEY_SECRET;
-  if (!accountId || !turnKeyId || !turnKeySecret) {
+  if (!turnKeyId || !turnKeySecret) {
     return res.status(503).json({ error: 'Cloudflare TURN belum dikonfigurasi.' });
   }
 
@@ -46,8 +45,14 @@ export default async function handler(req, res) {
       console.error('Cloudflare TURN credential request failed:', response.status);
       return res.status(502).json({ error: 'Gagal membuat kredensial TURN.' });
     }
+    const iceServers = payload.iceServers.map(server => ({
+      ...server,
+      urls: Array.isArray(server.urls)
+        ? server.urls.filter(url => !String(url).includes(':53'))
+        : server.urls
+    }));
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    return res.status(200).json({ iceServers: payload.iceServers });
+    return res.status(200).json({ iceServers });
   } catch (error) {
     console.error('Cloudflare TURN request error:', error);
     return res.status(502).json({ error: 'Layanan TURN sedang tidak tersedia.' });
