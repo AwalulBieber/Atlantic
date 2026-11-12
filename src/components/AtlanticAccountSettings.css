@@ -26,3 +26,17 @@
 .atl-avatar-actions{display:grid;justify-items:start;gap:5px}.atl-avatar-actions small{font-size:11px;opacity:.7;line-height:1.4}
 .atl-avatar-actions button{padding:9px 12px;border:2px solid #171717;border-radius:8px;background:var(--accent,#ffd84d);color:#171717;font-weight:900;box-shadow:2px 2px 0 #171717}
 .atl-avatar-actions button:disabled{opacity:.6}
+
+
+.atl-orange-verified{display:inline-flex;align-items:center;white-space:nowrap;border-radius:99px;background:#f28a22;color:#fff;padding:6px 10px;font-size:11px;font-weight:900}
+.atl-verification-panel{display:grid;gap:12px}
+.atl-verification-panel h3{margin:0;font-size:17px}
+.atl-verification-panel>p{margin:0;font-size:13px;line-height:1.5}
+.atl-verification-panel textarea{width:100%;box-sizing:border-box;padding:11px;border:1.5px solid #777;border-radius:9px;background:transparent;color:inherit;font:inherit}
+.atl-verification-panel>button,.atl-verification-request button{padding:9px 12px;border:2px solid #171717;border-radius:8px;background:var(--accent,#ffd84d);color:#171717;font-weight:900;box-shadow:2px 2px 0 #171717}
+.atl-verification-panel>button:disabled{opacity:.6}
+.atl-verification-request{display:grid;gap:7px;padding:12px;border:1.5px solid currentColor;border-radius:11px}
+.atl-verification-request small{font-size:11px;opacity:.65}
+.atl-verification-request p{margin:0;font-size:13px;line-height:1.45}
+.atl-verification-request>div{display:flex;gap:8px;flex-wrap:wrap}
+.atl-verification-request button.atl-secondary{background:#fff;color:#171717}
