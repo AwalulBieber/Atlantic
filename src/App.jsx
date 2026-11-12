@@ -125,6 +125,7 @@ export default function App() {
   setChats([]);
   loadMyProfile();
   loadProfiles();
+  loadSavedMessages();
 } else {
   setMyProfile(null);
   setChats([]);
@@ -574,7 +575,7 @@ export default function App() {
     </div>
   ))}
 
-  {!filtered.length && (
+  {(showSaved ? !savedBusy && !savedMessages.length : !filtered.length) && (
     <p className="empty">{showArchived ? 'Belum ada chat yang diarsipkan' : 'Belum ada percakapan'}</p>
   )}
 </div>
