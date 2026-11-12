@@ -439,3 +439,15 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .person-row .person{flex:1;min-width:0}
 .archive-chat-btn{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border:1.5px solid var(--ink,#171717);border-radius:9px;background:var(--surface,#fff);cursor:pointer;opacity:.8}
 .archive-chat-btn:hover{background:var(--accent,#ffd84d);opacity:1}
+
+
+/* Atlantic saved messages */
+.saved-message-row{display:flex;align-items:stretch;gap:6px;margin:7px 2px;padding:7px;border:2px solid var(--ink,#171717);border-radius:11px;background:var(--surface,#fff);box-shadow:2px 2px 0 var(--ink,#171717)}
+.saved-message-open{display:grid;gap:4px;flex:1;min-width:0;padding:5px;border:0;background:transparent;text-align:left;color:inherit}
+.saved-message-open b{font-size:12px;font-weight:950}
+.saved-message-open span{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85}
+.saved-message-open small{font-size:10px;opacity:.6}
+.saved-message-remove{width:32px;flex:0 0 32px;display:grid;place-items:center;align-self:center;height:32px;border:1.5px solid var(--ink,#171717);border-radius:8px;background:var(--pink,#ff9ec7)}
+.message-save-btn{display:inline-grid;place-items:center;width:23px;height:22px;margin-left:5px;padding:2px;border:1px solid transparent;border-radius:6px;background:transparent;color:inherit;vertical-align:middle}
+.message-save-btn:hover,.message-save-btn.is-saved{background:var(--yellow,#ffd84d);border-color:var(--ink,#171717);color:var(--ink,#171717)}
+.chat-list-tabs button{min-width:0;padding-inline:5px;font-size:10px}
