@@ -44,10 +44,10 @@ STATUS FITUR ATLANTIC
 Sudah tersedia di kode:
 - Chat pribadi real-time dan balasan pesan.
 - Arsip chat per pengguna dengan tampilan daftar arsip dan opsi kembalikan ke daftar utama.
-- Hapus pesan sendiri dengan konfirmasi Neobrutalism.
+- Hapus pesan untuk saya atau untuk semua orang (khusus pengirim) dengan konfirmasi Neobrutalism.
 - Indikator pesan terkirim, diterima, dan dibaca (mengikuti pengaturan tanda dibaca).
 - Indikator "sedang mengetik" real-time.
-- Profil: nama tampilan, username, bio, foto profil, dan pengaturan privasi.
+- Profil: nama tampilan, username, bio, foto profil (unggah, ganti, hapus), serta privasi pencarian anggota grup dan status online real-time.
 - Badge biru Atlantic Verified untuk admin utama; pengajuan verifikasi pengguna dengan badge oranye setelah disetujui admin.
 - Story teks/foto/video dan Catatan yang kedaluwarsa setelah 24 jam.
 - Saluran publik dengan fitur gabung dan posting teks.
@@ -63,6 +63,7 @@ BATASAN YANG MASIH ADA
 - Koneksi panggilan memakai STUN publik; sebagian jaringan/NAT mungkin memerlukan server TURN agar koneksi lebih andal.
 - Push notification belum tersedia.
 - Enkripsi end-to-end belum diimplementasikan.
+- Pengaturan persetujuan undangan grup masih berupa preferensi; alur undangan dan persetujuannya belum tersedia.
 - Moderation dashboard lanjutan belum tersedia.
 
 Catatan: daftar di atas menjelaskan fitur yang sudah dibuat di source code.
@@ -119,3 +120,10 @@ PENGHAPUSAN PESAN PER PENGGUNA
 - "Hapus untuk semua orang" menghapus pesan asli dan menyinkronkan penghapusan melalui Supabase Realtime.
 - Status penghapusan pribadi dibatasi RLS ke pemilik akun dan disinkronkan antar-perangkat.
 - Migrasi realtime: 202611120016_atlantic_message_visibility_realtime.sql.
+
+ATLANTIC PROFILE AND PRESENCE
+=============================
+- Foto profil dapat diunggah dari galeri, diganti, atau dihapus. Foto lama di bucket avatars dibersihkan setelah perubahan profil berhasil disimpan.
+- Profil private tidak ditampilkan pada pemilih anggota ketika pengguna membuat grup baru.
+- Status online memakai Supabase Realtime Presence. Pengguna yang menonaktifkan "Tampilkan status online" tidak mengumumkan kehadirannya.
+- Status online ditampilkan pada header percakapan pribadi.
