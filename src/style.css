@@ -840,3 +840,18 @@ html[data-animations="off"] :where(a,button,input,select,textarea,[role="button"
 .atl-image-cropper-apply{background:var(--accent,#ffd84d);color:#171717;box-shadow:2px 2px 0 var(--ink)}
 @media(max-width:480px){.atl-image-cropper-backdrop{padding:9px}.atl-image-cropper{padding:14px}.atl-image-cropper-stage{width:min(100%,260px)}}
 @media(prefers-reduced-motion:reduce){.atl-image-cropper-stage img{transition:none}}
+
+
+/* Atlantic shareable invite links */
+.atl-group-invite-link{display:grid;gap:9px;margin:14px 0;padding:13px;border:1.5px solid var(--ink,#171717);border-radius:13px;background:var(--paper,#fffdf5);color:var(--ink,#171717)}
+.atl-group-invite-link h3{margin:0;font-size:13px;font-weight:950}
+.atl-group-invite-link p{margin:0;font-size:11px;color:var(--muted,#777)}
+.atl-group-invite-link>button,.atl-group-invite-link>div button{min-height:36px;padding:7px 11px;border:1.5px solid var(--ink);border-radius:8px;background:var(--accent,#ffd84d);color:#171717;font-size:11px;font-weight:900}
+.atl-group-invite-link input,.atl-channel-invite-link input{width:100%;min-width:0;padding:9px;border:1px solid var(--ink,#171717);border-radius:8px;background:var(--panel,#fff);color:var(--ink,#171717);font-size:10px}
+.atl-group-invite-link>div{display:flex;gap:8px;flex-wrap:wrap}
+.atl-group-invite-link>div .atl-group-invite-revoke,.atl-channel-invite-link button:last-child{background:transparent;color:var(--ink,#171717)}
+.atl-channel-owner-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.atl-channel-invite-link{display:flex;align-items:center;gap:7px;margin:10px 0;padding:10px;border:1px solid var(--ink,#171717);border-radius:11px;background:var(--paper,#fffdf5)}
+.atl-channel-invite-link input{flex:1}
+.atl-channel-invite-link button{flex:0 0 auto;min-height:34px;padding:6px 10px;border:1.5px solid var(--ink);border-radius:8px;background:var(--accent,#ffd84d);color:#171717;font-size:10px;font-weight:900}
+@media(max-width:520px){.atl-channel-invite-link{align-items:stretch;flex-wrap:wrap}.atl-channel-invite-link input{flex-basis:100%}.atl-channel-owner-actions{justify-content:flex-start}}
