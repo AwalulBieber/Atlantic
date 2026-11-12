@@ -61,6 +61,9 @@ export default function App() {
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentPreview, setAttachmentPreview] = useState('');
+  const attachmentInputRef = useRef(null);
   const [sending, setSending] = useState(false);
   const [mobileChat, setMobileChat] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -433,10 +436,20 @@ export default function App() {
     }
   }
 
+  function chooseChatAttachment(event) {
+    const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
+    const allowed = ['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','application/pdf'];
+    if (!allowed.includes(file.type)) { setNotice('Format file tidak didukung.'); return; }
+    if (file.size > 50 * 1024 * 1024) { setNotice('Ukuran lampiran maksimal 50 MB.'); return; }
+    if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
+    setAttachmentFile(file); setAttachmentPreview(URL.createObjectURL(file));
+  }
+  useEffect(() => () => { if (attachmentPreview) URL.revokeObjectURL(attachmentPreview); }, [attachmentPreview]);
+
   async function loadMessages(id) {
     const { data, error } = await supabase
       .from('messages')
-      .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at')
+      .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at,media_url,media_type,media_name')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true });
     if (error) {
@@ -450,6 +463,11 @@ export default function App() {
     if (hiddenError) { setNotice('Status hapus pesan gagal dimuat: ' + hiddenError.message); return; }
     const hiddenIds = new Set((hiddenStates || []).map(row => row.message_id));
     const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id));
+    const messagesWithMedia = await Promise.all(visibleMessages.map(async message => {
+      if (!message.media_url) return message;
+      const { data: signed } = await supabase.storage.from('atlantic-chat-media').createSignedUrl(message.media_url, 3600);
+      return { ...message, media_url: signed?.signedUrl || null };
+    }));
     const senderIds = [...new Set((data || []).map(message => message.sender_id).filter(Boolean))];
     const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', senderIds) : { data: [] };
     const senderMap = Object.fromEntries((senderProfiles || []).map(profile => [profile.id, profile]));
@@ -466,7 +484,7 @@ export default function App() {
       if (myProfile?.read_receipts_enabled !== false) receipt.read_at = now;
       await supabase.from('messages').update(receipt).in('id', incomingIds);
     }
-    setMessages(visibleMessages.map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body, senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
+    setMessages(messagesWithMedia.map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body, senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -589,23 +607,20 @@ export default function App() {
   async function sendMessage(e) {
     e.preventDefault();
     const body = draft.trim();
-    if (!body || !active || sending) return;
-    setSending(true);
-    setDraft('');
+    if ((!body && !attachmentFile) || !active || sending) return;
+    setSending(true); setDraft('');
+    let mediaPath = null;
+    if (attachmentFile) {
+      const extension = (attachmentFile.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g,'') || 'bin';
+      mediaPath = active.conversation_id + '/' + session.user.id + '/' + crypto.randomUUID() + '.' + extension;
+      const { error: uploadError } = await supabase.storage.from('atlantic-chat-media').upload(mediaPath, attachmentFile, { upsert:false, contentType:attachmentFile.type });
+      if (uploadError) { setDraft(body); setNotice('Lampiran gagal diunggah: ' + uploadError.message); setSending(false); return; }
+    }
     if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
     typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: active.conversation_id,
-      sender_id: session.user.id,
-      body,
-      reply_to: replyTarget?.id || null
-    });
-    if (error) {
-      setDraft(body);
-      setNotice('Pesan gagal dikirim: ' + error.message);
-    } else {
-      setReplyTarget(null);
-    }
+    const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body, media_url:mediaPath, media_type:attachmentFile?.type || null, media_name:attachmentFile?.name || null, reply_to:replyTarget?.id || null });
+    if (error) { if (mediaPath) await supabase.storage.from('atlantic-chat-media').remove([mediaPath]); setDraft(body); setNotice('Pesan gagal dikirim: ' + error.message); }
+    else { setReplyTarget(null); setAttachmentFile(null); setAttachmentPreview(''); }
     setSending(false);
   }
 
@@ -820,7 +835,8 @@ export default function App() {
                   <div className="bubble">
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.is_group ? (m.replyPreview.senderProfile?.display_name || m.replyPreview.senderProfile?.username || 'Anggota grup') : (active.person.display_name || active.person.username))}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
                     {active.is_group && <b className="group-sender-name">{m.senderProfile?.display_name || m.senderProfile?.username || (m.sender_id === session.user.id ? 'Kamu' : 'Anggota grup')}</b>}
-                    <div>{m.body}</div>
+                    {m.media_url && (m.media_type?.startsWith('image/') ? <img className="atl-message-media" src={m.media_url} alt={m.media_name || 'Foto'} loading="lazy"/> : m.media_type?.startsWith('video/') ? <video className="atl-message-media" src={m.media_url} controls playsInline preload="metadata"/> : <a className="atl-message-file" href={m.media_url} target="_blank" rel="noreferrer">📎 {m.media_name || 'Buka lampiran'}</a>)}
+                    {m.body && <div>{m.body}</div>}
                     <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button><button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button></div>
                   </div>
                 </div>
@@ -834,11 +850,12 @@ export default function App() {
               <div ref={bottomRef} />
             </div>
             {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
+            {attachmentPreview && <div className="atl-chat-attachment-preview"><span>{attachmentFile?.name}</span><button type="button" onClick={() => {setAttachmentFile(null);setAttachmentPreview('');}}>Hapus</button></div>}
             <form className="composer" onSubmit={sendMessage}>
-              <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder={active.is_group ? `Pesan ke ${active.title}…` : 'Tulis pesan…'} autoComplete="off" />
-              <button className="send" disabled={!draft.trim() || sending} aria-label="Kirim pesan">
-                {sending ? <span className="button-spinner" /> : <Send size={19} />}
-              </button>
+              <input ref={attachmentInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" onChange={chooseChatAttachment} hidden />
+              <button type="button" className="atl-chat-attach" onClick={() => attachmentInputRef.current?.click()} aria-label="Lampirkan foto, video, atau file"><ImagePlus size={19}/></button>
+              <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder={active.is_group ? 'Pesan ke ' + active.title + '…' : 'Tulis pesan…'} autoComplete="off" />
+              <button className="send" disabled={(!draft.trim() && !attachmentFile) || sending} aria-label="Kirim pesan">{sending ? <span className="button-spinner" /> : <Send size={19} />}</button>
             </form>
           </>
         ) : (
