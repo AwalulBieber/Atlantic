@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
+import AtlanticCommunity from './components/AtlanticCommunity';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
-  Clock3, Radio, Phone, NotebookPen, ImagePlus, ShieldCheck, Trash2, Reply
+  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, ShieldCheck, Trash2, Reply
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -111,8 +112,10 @@ export default function App() {
   useEffect(() => {
     if (session) {
   setChats([]);
+  loadMyProfile();
   loadProfiles();
 } else {
+  setMyProfile(null);
   setChats([]);
   setActive(null);
   setMessages([]);
@@ -122,6 +125,12 @@ export default function App() {
   seenMessages.current.clear();
     }
   }, [session]);
+
+  async function loadMyProfile() {
+    if (!session?.user?.id) return;
+    const { data, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,bio').eq('id', session.user.id).maybeSingle();
+    if (!error && data) setMyProfile(data);
+  }
 
   async function authenticate(e) {
     e.preventDefault();
@@ -332,6 +341,12 @@ export default function App() {
     setSending(false);
   }
 
+  async function requestCall(callType) {
+    if (!active?.person?.id || !session?.user?.id) return;
+    const { error } = await supabase.from('atlantic_call_sessions').insert({ caller_id: session.user.id, callee_id: active.person.id, call_type: callType, status: 'requested' });
+    setNotice(error ? 'Undangan panggilan gagal: ' + error.message : 'Undangan panggilan tercatat. Panggilan audio/video langsung belum aktif.');
+  }
+
   async function confirmDeleteMessage() {
     const message = deleteTarget;
     if (!message || message.sender_id !== session.user.id) return;
@@ -475,6 +490,10 @@ export default function App() {
               <div className="chat-person">
                 <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={15}/></span>}</b>
                 <small>@{active.person.username}</small>
+              </div>
+              <div className="chat-head-actions">
+                <button type="button" className="icon-btn" onClick={() => requestCall('audio')} title="Undang panggilan suara" aria-label="Undang panggilan suara"><Phone size={18}/></button>
+                <button type="button" className="icon-btn" onClick={() => requestCall('video')} title="Undang panggilan video" aria-label="Undang panggilan video"><Video size={18}/></button>
               </div>
             </header>
             <div className="messages">
@@ -636,13 +655,13 @@ export default function App() {
       )}
 
       {activeTab !== 'chat' && (
-        <section className="tab-placeholder" aria-live="polite">
-          <div className="tab-placeholder-icon">{activeTab === 'updates' ? <Clock3/> : activeTab === 'channels' ? <Radio/> : <Phone/>}</div>
-          <span className="eyebrow">ATLANTIC {activeTab.toUpperCase()}</span>
-          <h2>{activeTab === 'updates' ? 'Pembaruan' : activeTab === 'channels' ? 'Saluran' : 'Panggilan'}</h2>
-          <p>{activeTab === 'updates' ? 'Story dan Catatan akan hadir di sini.' : activeTab === 'channels' ? 'Saluran untuk mengikuti kabar dan komunitas akan hadir di sini.' : 'Riwayat dan fitur panggilan akan hadir di sini.'}</p>
-          <button className="primary" onClick={() => setActiveTab('chat')}>Kembali ke Chat</button>
-        </section>
+        <AtlanticCommunity
+          tab={activeTab}
+          user={session.user}
+          profile={myProfile}
+          onProfileRefresh={loadMyProfile}
+          onNotice={setNotice}
+        />
       )}
 
       <nav className="bottom-nav" aria-label="Navigasi utama">
@@ -657,6 +676,7 @@ export default function App() {
         <AtlanticAccountSettings
           user={session.user}
           onClose={() => setAccountSettingsOpen(false)}
+          onSaved={profile => { setMyProfile(profile); loadMyProfile(); }}
         />
       )}
     </main>

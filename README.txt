@@ -43,3 +43,10 @@ BATASAN V1
 Belum ada kirim gambar/file, grup, story, voice/video call, push notification,
 read receipts, moderation dashboard, maupun verifikasi admin. Fitur-fitur itu
 perlu tahap implementasi dan pengujian terpisah.
+
+
+ATLANTIC COMMUNITY MIGRATION
+============================
+Jalankan SQL secara utuh dari file supabase/migrations/202611120001_community_features.sql melalui Supabase Dashboard > SQL Editor sebelum memakai Story, Catatan, Saluran, dan riwayat undangan panggilan. Migrasi ini hanya menambah tabel baru dan policy RLS; tidak menghapus atau mengubah tabel chat lama.
+
+Catatan: menu Panggilan pada versi ini menyimpan riwayat/undangan. Audio/video real-time belum aktif dan tidak ditampilkan sebagai fitur yang sudah tersedia.
