@@ -100,4 +100,4 @@ ATLANTIC LIVE AUDIO/VIDEO CALLS
 - Tabel sinyal dibatasi RLS untuk dua peserta panggilan; panggilan hanya dapat dibuat oleh anggota percakapan yang sama.
 - Kontrol tersedia: mute/unmute mikrofon, kamera on/off, dan akhiri panggilan.
 - Saat ini memakai STUN publik. TURN relay belum dikonfigurasi, sehingga beberapa jaringan seluler/Wi-Fi atau NAT ketat dapat membutuhkan konfigurasi TURN tambahan.
-- Migrasi database: jalankan berurutan 202611120012_atlantic_realtime_audio_video_calls.sql dan 202611120013_atlantic_restrict_initial_call_state.sql.
+- Migrasi database: jalankan berurutan 202611120012_atlantic_realtime_audio_video_calls.sql, 202611120013_atlantic_restrict_initial_call_state.sql, dan 202611120014_atlantic_restrict_call_signal_permissions.sql.
