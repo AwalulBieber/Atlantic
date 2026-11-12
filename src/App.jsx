@@ -270,7 +270,7 @@ export default function App() {
 
   const { data: conversations, error: conversationError } = await supabase
     .from('conversations')
-    .select('id,title,is_group,created_by,description,avatar_url,is_verified')
+    .select('id,title,is_group,created_by,description,avatar_url,is_verified,pinned_message_id,message_policy,add_member_policy')
     .in('id', ids);
   if (conversationError) { setNotice('Daftar percakapan: ' + conversationError.message); return; }
 
@@ -294,7 +294,7 @@ export default function App() {
     if (conversation.is_group) {
       const groupProfiles = [{ ...(myProfile || {}), id: session.user.id }, ...conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).filter(Boolean)];
       const title = conversation.title || 'Grup Atlantic';
-      return { conversation_id: conversation.id, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_url: conversation.avatar_url, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, is_group: true, is_verified: conversation.is_verified } };
+      return { conversation_id: conversation.id, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_url: conversation.avatar_url, pinned_message_id:conversation.pinned_message_id, message_policy:conversation.message_policy, add_member_policy:conversation.add_member_policy, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, is_group: true, is_verified: conversation.is_verified } };
     }
     const other = conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).find(Boolean);
     return other ? { conversation_id: conversation.id, person: other, is_group: false } : null;
@@ -351,7 +351,7 @@ export default function App() {
 
   async function openGroupChat(group) {
     setNotice('');
-    setActive({ conversation_id: group.conversation_id, person: group.person, is_group: true, title: group.title, members: group.members || [] });
+    setActive({ conversation_id: group.conversation_id, person: group.person, is_group: true, title: group.title, pinned_message_id:group.pinned_message_id, members: group.members || [] });
     setReplyTarget(null);
     setMobileChat(true);
     await loadMessages(group.conversation_id);
@@ -808,6 +808,7 @@ export default function App() {
                 <button type="button" className="icon-btn" onClick={() => requestCall('video')} title="Undang panggilan video" aria-label="Undang panggilan video"><Video size={18}/></button>
               </div>}
             </header>
+            {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
             <div className="messages">
               {messages.map(m => (
                 <div
@@ -1006,7 +1007,7 @@ export default function App() {
       )}
 
       {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} />}
-      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,person:{...current.person,display_name:updated.title,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
+      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
 
       {activeTab !== 'chat' && (
         <AtlanticCommunity
