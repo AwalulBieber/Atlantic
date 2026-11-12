@@ -19,6 +19,8 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const storyMediaInput=useRef(null);
   const [channelName,setChannelName]=useState('');
   const [channelDescription,setChannelDescription]=useState('');
+  const [channelMediaFile,setChannelMediaFile]=useState(null);
+  const channelMediaInput=useRef(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [showCreate,setShowCreate]=useState(false);
@@ -165,14 +167,19 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   }
 
   async function loadPosts(id) {
-    const {data,error:e}=await supabase.from('atlantic_channel_posts').select('id,channel_id,author_id,body,created_at').eq('channel_id',id).order('created_at',{ascending:true}).limit(100);
-    if(e) setError(e.message); else {setPosts(data||[]);await loadPeople((data||[]).map(post=>post.author_id));}
+    const {data,error:e}=await supabase.from('atlantic_channel_posts').select('id,channel_id,author_id,body,created_at,media_url,media_type,media_name').eq('channel_id',id).order('created_at',{ascending:true}).limit(100);
+    if(e) setError(e.message); else {
+      const hydrated=await Promise.all((data||[]).map(async post=>{if(!post.media_url)return post;const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(post.media_url,3600);return {...post,media_url:signed?.signedUrl||null};}));
+      setPosts(hydrated);await loadPeople((data||[]).map(post=>post.author_id));
+    }
   }
 
   async function publishPost(e) {
-    e.preventDefault();const text=body.trim();if(!text||!selectedChannel||busy)return;
-    setBusy(true);const {error:e1}=await supabase.from('atlantic_channel_posts').insert({channel_id:selectedChannel.id,author_id:user.id,body:text});
-    if(e1)setError(e1.message);else{setBody('');await loadPosts(selectedChannel.id);}
+    e.preventDefault();const text=body.trim();if((!text&&!channelMediaFile)||!selectedChannel||busy)return;
+    setBusy(true);setError('');let mediaPath=null;
+    if(channelMediaFile){const ext=(channelMediaFile.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'')||'bin';mediaPath=selectedChannel.id+'/'+user.id+'/'+crypto.randomUUID()+'.'+ext;const {error:uploadError}=await supabase.storage.from('atlantic-channel-media').upload(mediaPath,channelMediaFile,{upsert:false,contentType:channelMediaFile.type});if(uploadError){setError('Upload media saluran gagal: '+uploadError.message);setBusy(false);return;}}
+    const {error:e1}=await supabase.from('atlantic_channel_posts').insert({channel_id:selectedChannel.id,author_id:user.id,body:text,media_url:mediaPath,media_type:channelMediaFile?.type||null,media_name:channelMediaFile?.name||null});
+    if(e1){if(mediaPath)await supabase.storage.from('atlantic-channel-media').remove([mediaPath]);setError(e1.message);}else{setBody('');setChannelMediaFile(null);await loadPosts(selectedChannel.id);}
     setBusy(false);
   }
 
@@ -203,8 +210,8 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
       {selectedChannel?<div className="atl-channel-view">
         <button className="atl-channel-back" onClick={()=>{setSelectedChannel(null);setPosts([]);}}>← Semua saluran</button>
         <h2>{selectedChannel.name}</h2><p>{selectedChannel.description||'Saluran komunitas Atlantic'}</p>
-        <div className="atl-channel-posts">{posts.map(p=><article key={p.id}><b>{people[p.author_id]?.display_name||people[p.author_id]?.username||'Pengguna Atlantic'}</b><p>{p.body}</p><small>{dateLabel(p.created_at)}</small></article>)}{!posts.length&&<div className="atl-community-empty">Belum ada postingan di saluran ini.</div>}</div>
-        <form className="atl-community-compose" onSubmit={publishPost}><input value={body} onChange={e=>setBody(e.target.value)} placeholder="Tulis postingan…" maxLength={2000}/><button disabled={busy||!body.trim()}><Send size={18}/></button></form>
+        <div className="atl-channel-posts">{posts.map(p=><article key={p.id}><b>{people[p.author_id]?.display_name||people[p.author_id]?.username||'Pengguna Atlantic'}</b>{p.media_url&&(p.media_type?.startsWith('image/')?<img className="atl-channel-media" src={p.media_url} alt={p.media_name||'Media saluran'}/>:p.media_type?.startsWith('video/')?<video className="atl-channel-media" src={p.media_url} controls playsInline/>:<a href={p.media_url} target="_blank" rel="noreferrer">📎 {p.media_name||'Lampiran'}</a>)}{p.body&&<p>{p.body}</p>}<small>{dateLabel(p.created_at)}</small></article>)}{!posts.length&&<div className="atl-community-empty">Belum ada postingan di saluran ini.</div>}</div>
+        <form className="atl-community-compose" onSubmit={publishPost}><input ref={channelMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" hidden onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(file.size>50*1024*1024){setError('Ukuran media maksimal 50 MB.');return;}setChannelMediaFile(file);}}/><button type="button" onClick={()=>channelMediaInput.current?.click()} aria-label="Lampirkan media"><ImagePlus size={18}/></button><input value={body} onChange={e=>setBody(e.target.value)} placeholder="Tulis postingan…" maxLength={2000}/><button disabled={busy||(!body.trim()&&!channelMediaFile)}><Send size={18}/></button></form>{channelMediaFile&&<small className="atl-channel-attachment">Lampiran: {channelMediaFile.name} <button type="button" onClick={()=>setChannelMediaFile(null)}>Hapus</button></small>}
       </div>:<div className="atl-channel-grid">{channels.map(c=><article className="atl-channel-card" key={c.id}><div className="atl-channel-mark"><Radio/></div><h3>{c.name}</h3><p>{c.description||'Saluran komunitas Atlantic'}</p><small>Oleh {people[c.owner_id]?.display_name||people[c.owner_id]?.username||'Pengguna Atlantic'} · {dateLabel(c.created_at)}</small><button onClick={()=>joinChannel(c)}><Users size={15}/> Gabung & buka</button></article>)}{!channels.length&&<div className="atl-community-empty">Belum ada saluran publik. Buat saluran pertama.</div>}</div>}
     </>}
     {tab==='calls'&&<div className="atl-community-section"><h2><Phone size={18}/> Riwayat panggilan</h2><p>Riwayat panggilan audio dan video langsung Atlantic.</p>
