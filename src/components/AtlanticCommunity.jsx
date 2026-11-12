@@ -180,11 +180,30 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   async function createChannel(e) {
     e.preventDefault(); if(!channelName.trim()||busy) return;
     setBusy(true);setError('');
-    const {data,error:e1}=await supabase.from('atlantic_channels').insert({owner_id:user.id,name:channelName.trim(),description:channelDescription.trim()}).select('id,owner_id,name,description,is_public,avatar_url,created_at').single();
-    if(e1) setError(e1.message);
-    else {
+    let avatarPath=null;
+    if(channelAvatarFile){
+      const ext=(channelAvatarFile.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+      avatarPath=user.id+'/'+crypto.randomUUID()+'.'+ext;
+      const {error:uploadError}=await supabase.storage.from('atlantic-channel-media').upload(avatarPath,channelAvatarFile,{upsert:false,contentType:channelAvatarFile.type});
+      if(uploadError){setError('Foto saluran gagal diunggah: '+uploadError.message);setBusy(false);return;}
+    }
+    const {data,error:e1}=await supabase.from('atlantic_channels').insert({owner_id:user.id,name:channelName.trim(),description:channelDescription.trim(),avatar_url:avatarPath}).select('id,owner_id,name,description,is_public,avatar_url,created_at').single();
+    if(e1) {
+      if(avatarPath)await supabase.storage.from('atlantic-channel-media').remove([avatarPath]);
+      setError(e1.message);
+    } else {
       const {error:e2}=await supabase.from('atlantic_channel_members').insert({channel_id:data.id,user_id:user.id,role:'owner'});
-      if(e2){await supabase.from('atlantic_channels').delete().eq('id',data.id).eq('owner_id',user.id);setError('Gagal menyiapkan keanggotaan saluran: '+e2.message);} else {setChannelName('');setChannelDescription('');setShowCreate(false);setChannels(v=>[data,...v]);setSelectedChannel(data);}
+      if(e2){
+        await supabase.from('atlantic_channels').delete().eq('id',data.id).eq('owner_id',user.id);
+        if(avatarPath)await supabase.storage.from('atlantic-channel-media').remove([avatarPath]);
+        setError('Gagal menyiapkan keanggotaan saluran: '+e2.message);
+      } else {
+        let avatarSigned=null;
+        if(avatarPath){const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(avatarPath,3600);avatarSigned=signed?.signedUrl||null;}
+        const ready={...data,avatar_path:avatarPath,avatar_url:avatarSigned,member_count:1};
+        setChannelName('');setChannelDescription('');setChannelAvatarFile(null);setChannelAvatarPreview('');
+        setShowCreate(false);setChannels(v=>[ready,...v]);setSelectedChannel(ready);
+      }
     }
     setBusy(false);
   }
@@ -296,7 +315,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     </div>}
     {activeStoryIndex>=0&&stories[activeStoryIndex]&&(()=>{const story=stories[activeStoryIndex];const isVideo=/\.(mp4|webm)(\?|$)/i.test(story.media_url||'');return <div className="atl-story-viewer" onClick={()=>setActiveStoryIndex(-1)}><button className="atl-story-viewer-close" onClick={()=>setActiveStoryIndex(-1)} aria-label="Tutup">×</button><article onClick={e=>e.stopPropagation()}><header><b>{people[story.user_id]?.display_name||people[story.user_id]?.username||'Pengguna Atlantic'}</b><small>{dateLabel(story.created_at)}</small></header>{story.media_url&&(isVideo?<video src={story.media_url} controls autoPlay playsInline/>:<img src={story.media_url} alt="Story"/>)}{story.body&&<p>{story.body}</p>}<footer>{story.user_id===user.id&&<button type="button" onClick={()=>deleteStory(story)} disabled={busy}>Hapus Story</button>}<button type="button" onClick={()=>setActiveStoryIndex(v=>v>0?v-1:-1)}>Tutup</button><button type="button" onClick={()=>setActiveStoryIndex(v=>v<stories.length-1?v+1:-1)}>Berikutnya</button></footer></article></div>;})()}
     {showCreate&&<div className="atl-community-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setShowCreate(false)}><section className="atl-community-modal"><header><b>{tab==='updates'?'Bagikan pembaruan':'Buat saluran'}</b><button onClick={()=>setShowCreate(false)}><X/></button></header>
-      {tab==='updates'?<><label>{body.length>0?'Isi postingan':'Apa yang ingin kamu bagikan?' }<textarea value={body} onChange={e=>setBody(e.target.value)} rows={4} maxLength={500}/></label><div className="atl-story-upload"><input ref={storyMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" onChange={chooseStoryMedia} hidden/><button type="button" onClick={()=>storyMediaInput.current?.click()} disabled={busy}><ImagePlus size={16}/>{mediaFile?'Ganti foto/video':'Tambahkan foto/video'}</button><small>JPG, PNG, WebP, GIF, MP4, WebM · Maks. 20 MB</small>{mediaPreview&&<div className="atl-story-preview">{mediaFile?.type.startsWith('video/')?<video src={mediaPreview} controls playsInline/>:<img src={mediaPreview} alt="Pratinjau Story"/>}<button type="button" onClick={()=>{setMediaFile(null);setMediaPreview('');}}>Hapus media</button></div>}</div><div className="atl-community-modal-actions"><button onClick={()=>publish('story')} disabled={busy||(!body.trim()&&!mediaFile)}><ImagePlus size={16}/> {busy?'Mengunggah…':'Terbitkan Story'}</button><button onClick={()=>publish('note')} disabled={busy||!body.trim()||!!mediaFile}><NotebookPen size={16}/> Buat Catatan</button></div></>:<form onSubmit={createChannel}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<input value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><button className="atl-community-submit" disabled={busy||!channelName.trim()}>Buat saluran</button></form>}
+      {tab==='updates'?<><label>{mediaFile?'Caption Story':'Teks Story'}<textarea value={body} onChange={e=>setBody(e.target.value)} placeholder={mediaFile?'Tulis caption untuk foto atau video Story…':'Apa yang ingin kamu bagikan?'} rows={4} maxLength={500}/></label><div className="atl-story-upload"><input ref={storyMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" onChange={chooseStoryMedia} hidden/><button type="button" onClick={()=>storyMediaInput.current?.click()} disabled={busy}><ImagePlus size={16}/>{mediaFile?'Ganti foto/video':'Tambahkan foto/video'}</button><small>JPG, PNG, WebP, GIF, MP4, WebM · Maks. 20 MB</small>{mediaPreview&&<div className="atl-story-preview">{mediaFile?.type.startsWith('video/')?<video src={mediaPreview} controls playsInline/>:<img src={mediaPreview} alt="Pratinjau Story"/>}<button type="button" onClick={()=>{setMediaFile(null);setMediaPreview('');}}>Hapus media</button></div>}</div><div className="atl-community-modal-actions"><button onClick={()=>publish('story')} disabled={busy||(!body.trim()&&!mediaFile)}><ImagePlus size={16}/> {busy?'Mengunggah…':'Terbitkan Story'}</button><button onClick={()=>publish('note')} disabled={busy||!body.trim()||!!mediaFile}><NotebookPen size={16}/> Buat Catatan</button></div></>:<form onSubmit={createChannel}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<input value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><input type="file" accept="image/jpeg,image/png,image/webp" hidden id="atl-channel-avatar-create-input" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type)){setError('Foto saluran harus JPG, PNG, atau WebP.');return;}if(file.size>5*1024*1024){setError('Foto saluran maksimal 5 MB.');return;}setChannelAvatarFile(file);setChannelAvatarPreview(URL.createObjectURL(file));}}/><label className="atl-channel-avatar-picker" htmlFor="atl-channel-avatar-create-input"><ImagePlus size={16}/> Tambahkan foto profil saluran</label>{channelAvatarPreview&&<img className="atl-channel-avatar-preview" src={channelAvatarPreview} alt="Pratinjau foto saluran"/>}<button className="atl-community-submit" disabled={busy||!channelName.trim()}>Buat saluran</button></form>}
     </section></div>}
   </section>;
 }
