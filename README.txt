@@ -39,10 +39,32 @@ KONFIGURASI SUPABASE
 - Pastikan tabel messages sudah masuk ke publication supabase_realtime.
 - Jalankan tes dengan dua akun berbeda.
 
-BATASAN V1
-Belum ada kirim gambar/file, grup, story, voice/video call, push notification,
-read receipts, moderation dashboard, maupun verifikasi admin. Fitur-fitur itu
-perlu tahap implementasi dan pengujian terpisah.
+STATUS FITUR ATLANTIC
+=====================
+Sudah tersedia di kode:
+- Chat pribadi real-time dan balasan pesan.
+- Hapus pesan sendiri dengan konfirmasi Neobrutalism.
+- Indikator pesan terkirim, diterima, dan dibaca (mengikuti pengaturan tanda dibaca).
+- Indikator "sedang mengetik" real-time.
+- Profil: nama tampilan, username, bio, foto profil, dan pengaturan privasi.
+- Badge biru Atlantic Verified untuk admin utama; pengajuan verifikasi pengguna dengan badge oranye setelah disetujui admin.
+- Story teks dan Catatan yang kedaluwarsa setelah 24 jam.
+- Saluran publik dengan fitur gabung dan posting teks.
+- Riwayat undangan panggilan audio/video (bukan panggilan langsung).
+- Navigasi bawah Liquid Glass, tema, font, warna aksen, dan animasi UI.
+
+BATASAN YANG MASIH ADA
+======================
+- Story belum mendukung unggah foto/video.
+- Chat belum mendukung kirim gambar atau file.
+- Grup chat belum tersedia.
+- Audio/video call langsung belum tersedia; menu Panggilan hanya menyimpan undangan dan riwayat.
+- Push notification belum tersedia.
+- Enkripsi end-to-end belum diimplementasikan.
+- Moderation dashboard lanjutan belum tersedia.
+
+Catatan: daftar di atas menjelaskan fitur yang sudah dibuat di source code.
+Fitur tetap perlu diuji di browser setelah deployment sebelum dianggap siap produksi.
 
 
 ATLANTIC COMMUNITY MIGRATION
