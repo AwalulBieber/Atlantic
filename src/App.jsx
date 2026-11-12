@@ -23,6 +23,14 @@ function time(value) {
   });
 }
 
+function relativeTime(value) {
+  const elapsed = Math.max(0, Date.now() - new Date(value).getTime());
+  if (elapsed < 60_000) return 'Baru saja';
+  if (elapsed < 3_600_000) return Math.floor(elapsed / 60_000) + ' menit lalu';
+  if (elapsed < 86_400_000) return Math.floor(elapsed / 3_600_000) + ' jam lalu';
+  return new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+
 const DEFAULT_SETTINGS = {
   theme: 'light', accent: 'yellow', font: 'ios',
   textSize: 'medium', fps: '60', animations: true
@@ -81,6 +89,7 @@ export default function App() {
   const [contactsOpen, setContactsOpen] = useState(false);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [unread, setUnread] = useState({});
+  const [inboxSummaries, setInboxSummaries] = useState([]);
   const [incomingNotice, setIncomingNotice] = useState(null);
   const [callIntent, setCallIntent] = useState(null);
   const [activeTab, setActiveTab] = useState('chat');
@@ -159,6 +168,7 @@ export default function App() {
   setActive(null);
   setMessages([]);
   setUnread({});
+  setInboxSummaries([]);
   setIncomingNotice(null);
   setAccountSettingsOpen(false);
   seenMessages.current.clear();
@@ -320,7 +330,20 @@ export default function App() {
   }));
   const validChatRows=chatRows.filter(Boolean);
   setChats(validChatRows);
+  void refreshInboxSummaries();
   return validChatRows;
+  }
+
+  async function refreshInboxSummaries() {
+    if (!session?.user?.id) return;
+    const { data, error } = await supabase.rpc('get_atlantic_unread_summaries');
+    if (error) {
+      console.warn('Atlantic inbox summary:', error.message);
+      return;
+    }
+    const summaries = data || [];
+    setInboxSummaries(summaries);
+    setUnread(Object.fromEntries(summaries.map(item => [item.conversation_id, Number(item.unread_count) || 0])));
   }
 
   async function loadGroupUsers() {
@@ -454,7 +477,7 @@ export default function App() {
 
       setUnread(old => {
         const next = { ...old };
-        delete next[person.id];
+        delete next[conversationId];
         return next;
       });
       setIncomingNotice(null);
@@ -479,6 +502,9 @@ export default function App() {
   useEffect(() => () => { if (attachmentPreview) URL.revokeObjectURL(attachmentPreview); }, [attachmentPreview]);
 
   async function loadMessages(id) {
+    // Persist read state per user, including when read receipts are disabled.
+    const { error: markReadError } = await supabase.rpc('mark_atlantic_conversation_read', { p_conversation_id: id });
+    if (markReadError) console.warn('Atlantic mark read:', markReadError.message);
     const { data, error } = await supabase
       .from('messages')
       .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at,media_url,media_type,media_name')
@@ -517,6 +543,7 @@ export default function App() {
       await supabase.from('messages').update(receipt).in('id', incomingIds);
     }
     setMessages(messagesWithMedia.map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body, senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
+    void refreshInboxSummaries();
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -598,9 +625,8 @@ export default function App() {
         if (profileError || !person) return;
 
         const targetChat = chats.find(chat => chat.conversation_id === message.conversation_id);
-        const unreadKey = targetChat?.is_group ? message.conversation_id : person.id;
         await supabase.from('messages').update({ delivered_at: new Date().toISOString() }).eq('id', message.id).is('delivered_at', null);
-        setUnread(old => ({ ...old, [unreadKey]: (old[unreadKey] || 0) + 1 }));
+        void refreshInboxSummaries();
         setIncomingNotice({ person, body: message.body || 'Mengirim pesan', conversationId: message.conversation_id, isGroup: Boolean(targetChat?.is_group), groupTitle: targetChat?.title });
       })
       .subscribe();
@@ -797,6 +823,20 @@ export default function App() {
 
         <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Tersimpan</button></div>
         <AtlanticGroupInvitations user={session.user} onNotice={setNotice} onAccepted={async conversationId=>{const updated=await loadProfiles();const joined=updated?.find(item=>item.conversation_id===conversationId);if(joined)openGroupChat(joined);}} />
+        {!showSaved && !showArchived && inboxSummaries.length > 0 && <section className="atl-inbox-summary" aria-label="Pesan belum dibaca">
+          <header><b>Pesan belum dibaca</b><span>{inboxSummaries.reduce((total, item) => total + (Number(item.unread_count) || 0), 0)} total</span></header>
+          {inboxSummaries.map(item => {
+            const chat = chats.find(entry => entry.conversation_id === item.conversation_id);
+            if (!chat) return null;
+            const sender = chat.is_group ? chat.members?.find(member => member.id === item.latest_sender_id) : chat.person;
+            const preview = item.latest_body || (item.latest_media_type?.startsWith('image/') ? 'Foto' : item.latest_media_type?.startsWith('video/') ? 'Video' : 'Lampiran');
+            return <button type="button" className="atl-inbox-summary-row" key={item.conversation_id} onClick={() => chat.is_group ? openGroupChat(chat) : openChat(chat.person)}>
+              <span className="atl-inbox-summary-avatar">{chat.person.avatar_url ? <img src={chat.person.avatar_url} alt=""/> : chat.is_group ? <Users size={16}/> : initials(chat.person.display_name || chat.person.username)}</span>
+              <span className="atl-inbox-summary-copy"><b>{chat.person.display_name || chat.person.username}</b><small>{chat.is_group && sender ? sender.display_name || sender.username || 'Anggota' : ''}{chat.is_group && sender ? ': ' : ''}{preview}</small></span>
+              <span className="atl-inbox-summary-meta"><small>{item.latest_created_at ? relativeTime(item.latest_created_at) : ''}</small><i>{item.unread_count}</i></span>
+            </button>;
+          })}
+        </section>}
         <div className="section-title"><span>{showSaved ? 'Pesan Tersimpan' : showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{showSaved ? savedMessages.length : filtered.length}</span></div>
         <div className="people">
   {showSaved ? (savedBusy ? <p className="empty">Memuat pesan tersimpan…</p> : savedMessages.map(item => {
@@ -818,7 +858,7 @@ export default function App() {
           <b>{c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
           <small>Ketuk untuk membuka chat</small>
         </div>
-        {(unread[c.is_group ? c.conversation_id : c.person.id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.is_group ? c.conversation_id : c.person.id] || 0) + ' pesan belum dibaca'}>{(unread[c.is_group ? c.conversation_id : c.person.id] || 0) > 99 ? '99+' : unread[c.is_group ? c.conversation_id : c.person.id]}</span>}
+        {(unread[c.conversation_id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.conversation_id] || 0) + ' pesan belum dibaca'}>{(unread[c.conversation_id] || 0) > 99 ? '99+' : unread[c.conversation_id]}</span>}
         <MessageCircle size={17} />
       </button>
       <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
