@@ -678,3 +678,10 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-channel-profile-avatar img{width:100%;height:100%;object-fit:cover}
 .atl-group-avatar{overflow:hidden}
 .atl-group-avatar img{width:100%;height:100%;object-fit:cover}
+
+
+/* Atlantic video-call settings */
+.atl-call-video-settings{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin:12px auto 0;padding:12px;border:2px dashed var(--ink);border-radius:12px;background:var(--paper,#f7f4e9)}
+.atl-call-video-settings button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:9px 12px;border:2px solid var(--ink);border-radius:9px;background:#fff;color:var(--ink);font-size:12px;font-weight:900;box-shadow:2px 2px 0 var(--ink)}
+.atl-call-video-settings button:disabled{opacity:.45;cursor:not-allowed}
+.atl-call-video-settings small{flex-basis:100%;color:var(--muted,#777);font-size:11px}
