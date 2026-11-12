@@ -41,6 +41,27 @@ export default function AtlanticCommunity({ tab, user, profile, onNotice }) {
 
   useEffect(()=>{load();},[load]);
 
+  // Keep community feeds synchronized without requiring a manual refresh.
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase.channel('atlantic-community-' + tab + '-' + user.id);
+    if (tab === 'updates') {
+      channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'atlantic_stories' }, load)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'atlantic_notes' }, load);
+    } else if (tab === 'channels') {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'atlantic_channels' }, load);
+      if (selectedChannel?.id) {
+        channel.on('postgres_changes', {
+          event: '*', schema: 'public', table: 'atlantic_channel_posts',
+          filter: 'channel_id=eq.' + selectedChannel.id
+        }, () => loadPosts(selectedChannel.id));
+      }
+    }
+    channel.subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [tab, user?.id, selectedChannel?.id, load]);
+
   async function publish(kind) {
     const text=body.trim(); if(!text||busy) return;
     setBusy(true); setError('');
