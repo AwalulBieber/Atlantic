@@ -42,8 +42,8 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
       if(uploadError){setError(uploadError.message);setBusy(false);return;}
       avatarPath=next;
     }
-    const {error:e}=await supabase.from('conversations').update({title:group.title.trim(),description:group.description.trim(),avatar_url:avatarPath}).eq('id',conversationId);
-    if(e){if(avatarFile&&avatarPath)await supabase.storage.from('atlantic-chat-media').remove([avatarPath]);setError(e.message);}
+    const {error:updateError}=await supabase.from('conversations').update({title:group.title.trim(),description:group.description.trim(),avatar_url:avatarPath}).eq('id',conversationId);
+    if(updateError){if(avatarFile&&avatarPath)await supabase.storage.from('atlantic-chat-media').remove([avatarPath]);setError(updateError.message);}
     else{
       if(group.avatar_url&&avatarPath!==group.avatar_url)await supabase.storage.from('atlantic-chat-media').remove([group.avatar_url]);
       const {data:signed}=avatarPath?await supabase.storage.from('atlantic-chat-media').createSignedUrl(avatarPath,3600):{data:null};
