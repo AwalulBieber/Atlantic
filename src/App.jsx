@@ -3,12 +3,13 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
 import AtlanticCallManager from './components/AtlanticCallManager';
+import AtlanticAdminDashboard from './components/AtlanticAdminDashboard';
 import AtlanticContacts from './components/AtlanticContacts';
 import AtlanticGroupInfo from './components/AtlanticGroupInfo';
 import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users,  
-  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
+  Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
 
@@ -71,6 +72,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [adminDashboardOpen, setAdminDashboardOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [unread, setUnread] = useState({});
@@ -745,6 +747,7 @@ export default function App() {
         <header className="topbar">
           <div className="brand"><Waves /> ATLANTIC</div>
           <div className="top-actions">
+            {myProfile?.is_admin && <button className="icon-btn" onClick={() => setAdminDashboardOpen(true)} title="Dashboard Admin" aria-label="Dashboard Admin"><ShieldCheck size={19} /></button>}
             <button className="icon-btn" onClick={() => setAccountSettingsOpen(true)} title="Profil dan privasi" aria-label="Profil dan privasi">
               <UserRound size={19} />
             </button>
@@ -1019,6 +1022,7 @@ export default function App() {
         </div>
       )}
 
+      {adminDashboardOpen && <AtlanticAdminDashboard user={session.user} onClose={() => setAdminDashboardOpen(false)} onNotice={setNotice} />}
       {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} />}
       {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
 
