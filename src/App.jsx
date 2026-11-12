@@ -300,6 +300,14 @@ export default function App() {
           const { data: original } = await supabase.from('messages').select('id,body,sender_id').eq('id', incoming.reply_to).maybeSingle();
           incoming.replyPreview = original || null;
         }
+        if (incoming.sender_id !== session.user.id) {
+          const now = new Date().toISOString();
+          const receipt = { delivered_at: now };
+          if (myProfile?.read_receipts_enabled !== false) receipt.read_at = now;
+          await supabase.from('messages').update(receipt).eq('id', incoming.id);
+          incoming.delivered_at = now;
+          if (receipt.read_at) incoming.read_at = now;
+        }
         setMessages(old => old.some(m => m.id === incoming.id) ? old : [...old, incoming]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       })
