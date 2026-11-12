@@ -5,7 +5,7 @@ import AtlanticCommunity from './components/AtlanticCommunity';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
-  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply
+  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -64,6 +64,9 @@ export default function App() {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const swipeTimer = useRef(null);
+  const typingChannelRef = useRef(null);
+  const typingStopTimer = useRef(null);
+  const [otherTyping, setOtherTyping] = useState(false);
 
   const seenMessages = useRef(new Set());
   const bottomRef = useRef(null);
@@ -258,7 +261,7 @@ export default function App() {
   async function loadMessages(id) {
     const { data, error } = await supabase
       .from('messages')
-      .select('id,conversation_id,sender_id,body,created_at,reply_to')
+      .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true });
     if (error) {
@@ -270,6 +273,13 @@ export default function App() {
     if (replyIds.length) {
       const { data: originals } = await supabase.from('messages').select('id,body,sender_id').in('id', replyIds);
       replyMap = Object.fromEntries((originals || []).map(item => [item.id, item]));
+    }
+    const incomingIds = (data || []).filter(m => m.sender_id !== session.user.id).map(m => m.id);
+    if (incomingIds.length) {
+      const now = new Date().toISOString();
+      const receipt = { delivered_at: now };
+      if (myProfile?.read_receipts_enabled !== false) receipt.read_at = now;
+      await supabase.from('messages').update(receipt).in('id', incomingIds);
     }
     setMessages((data || []).map(m => ({ ...m, replyPreview: replyMap[m.reply_to] || null })));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
@@ -291,6 +301,9 @@ export default function App() {
         }
         setMessages(old => old.some(m => m.id === incoming.id) ? old : [...old, incoming]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${active.conversation_id}` }, payload => {
+        setMessages(old => old.map(m => m.id === payload.new.id ? { ...m, delivered_at: payload.new.delivered_at, read_at: payload.new.read_at } : m));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
         const deleted = payload.old;
@@ -329,6 +342,36 @@ export default function App() {
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [session?.user?.id, active?.conversation_id]);
+
+  useEffect(() => {
+    if (!active?.conversation_id || !session?.user?.id) return;
+    const channel = supabase.channel('atlantic-typing-' + active.conversation_id);
+    typingChannelRef.current = channel;
+    channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      if (payload?.user_id !== session.user.id) {
+        setOtherTyping(Boolean(payload?.is_typing));
+        if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+        if (payload?.is_typing) typingStopTimer.current = setTimeout(() => setOtherTyping(false), 2400);
+      }
+    }).subscribe();
+    return () => {
+      if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+      typingChannelRef.current = null;
+      setOtherTyping(false);
+      supabase.removeChannel(channel);
+    };
+  }, [active?.conversation_id, session?.user?.id]);
+
+  function updateDraft(value) {
+    setDraft(value);
+    const channel = typingChannelRef.current;
+    if (!channel) return;
+    if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+    channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: Boolean(value.trim()) } });
+    if (value.trim()) typingStopTimer.current = setTimeout(() => {
+      channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
+    }, 1400);
+  }
 
   async function sendMessage(e) {
     e.preventDefault();
@@ -499,7 +542,7 @@ export default function App() {
               <div className="avatar">{active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
                 <b>{active.person.display_name || active.person.username}{active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
-                <small>@{active.person.username}</small>
+                <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : `@${active.person.username}`}</small>
               </div>
               <div className="chat-head-actions">
                 <button type="button" className="icon-btn" onClick={() => requestCall('audio')} title="Undang panggilan suara" aria-label="Undang panggilan suara"><Phone size={18}/></button>
@@ -535,7 +578,7 @@ export default function App() {
                   <div className="bubble">
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.person.display_name || active.person.username)}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
                     <div>{m.body}</div>
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button>{m.sender_id === session.user.id && <button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button>}</div>
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button>{m.sender_id === session.user.id && <button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button>}</div>
                   </div>
                 </div>
               ))}
@@ -549,7 +592,7 @@ export default function App() {
             </div>
             {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
             <form className="composer" onSubmit={sendMessage}>
-              <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Tulis pesan…" autoComplete="off" />
+              <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder="Tulis pesan…" autoComplete="off" />
               <button className="send" disabled={!draft.trim() || sending} aria-label="Kirim pesan">
                 {sending ? <span className="button-spinner" /> : <Send size={19} />}
               </button>
