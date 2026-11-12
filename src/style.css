@@ -530,3 +530,32 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-call-mini-end{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border:2px solid #171717;border-radius:11px;background:#ff7777;color:#171717}
 @keyframes atl-call-mini-in{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:520px){.atl-call-mini-overlay{right:10px;bottom:calc(88px + env(safe-area-inset-bottom));width:min(330px,calc(100vw - 20px))}}
+
+
+/* Atlantic mutual contacts */
+.atl-contacts-backdrop{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:14px;background:#080b13a8;backdrop-filter:blur(5px)}
+.atl-contacts-modal{width:min(100%,520px);max-height:min(90dvh,850px);overflow:auto;padding:18px;border:3px solid var(--ink);border-radius:16px;background:var(--panel,#fffdf5);color:var(--ink);box-shadow:7px 7px 0 var(--ink)}
+.atl-contacts-modal>header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.atl-contacts-modal>header small{font-size:10px;font-weight:900;letter-spacing:1px;color:#888}
+.atl-contacts-modal>header h2{margin:3px 0;font-size:24px;font-weight:950}
+.atl-contacts-modal>header button{width:38px;height:38px;border:2px solid var(--ink);border-radius:9px;background:var(--panel,#fff);color:var(--ink)}
+.atl-contacts-search{display:flex;align-items:center;gap:9px;padding:11px 13px;border:2px solid var(--ink);border-radius:10px;background:var(--paper);margin-bottom:15px}
+.atl-contacts-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit}
+.atl-contacts-section{margin:18px 0}
+.atl-contacts-section h3{display:flex;align-items:center;gap:7px;margin:0 0 9px;font-size:14px;font-weight:950}
+.atl-contact-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #8884;min-width:0}
+.atl-contact-avatar{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;overflow:hidden;border:2px solid var(--ink);border-radius:50%;background:var(--accent);font-weight:950}
+.atl-contact-avatar img{width:100%;height:100%;object-fit:cover}
+.atl-contact-person{display:grid;gap:2px;min-width:0;flex:1}
+.atl-contact-person b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atl-contact-person>small{font-size:11px;color:#888}
+.atl-contact-verified{color:#e59b36}
+.atl-contact-actions{display:flex;gap:5px}
+.atl-contact-actions button,.atl-contact-add{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:6px 9px;border:2px solid var(--ink);border-radius:8px;background:var(--panel,#fff);color:var(--ink);font-weight:850}
+.atl-contact-actions button:first-child{background:var(--accent)}
+.atl-contact-add{background:#b9f4cf}
+.atl-contacts-message{padding:9px 11px;border-radius:8px;background:#d9fbe6;color:#14532d;font-size:12px}
+.atl-contacts-message.error{background:#fee2e2;color:#991b1b}
+.atl-contacts-empty{padding:14px;border:1px dashed #999;border-radius:9px;color:#888;text-align:center;font-size:12px}
+.atl-contacts-modal>footer{padding-top:12px;border-top:1px solid #8884;color:#888;font-size:11px;line-height:1.5}
+@media(max-width:560px){.atl-contacts-backdrop{padding:8px}.atl-contacts-modal{padding:14px;max-height:94dvh}.atl-contact-row{gap:7px}.atl-contact-actions button{padding:5px 7px}}
