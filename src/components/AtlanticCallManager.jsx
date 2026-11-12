@@ -166,7 +166,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
     pc.ontrack = event => {
       const [streamFromPeer] = event.streams;
-      if (streamFromPeer) setRemoteStream(streamFromPeer);
+      setRemoteStream(streamFromPeer || new MediaStream([event.track]));
     };
     pc.onicecandidate = event => {
       if (event.candidate) {
