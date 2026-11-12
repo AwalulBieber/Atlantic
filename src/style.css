@@ -254,7 +254,7 @@ html[data-theme="dark"] .font-choice small { color: #ccc; } html[data-theme="dar
 
 /* Atlantic bottom navigation */
 .bottom-nav {
-  position: fixed; z-index: 15; left: 50%; bottom: max(12px, env(safe-area-inset-bottom));
+  position: fixed; z-index: 30; left: 50%; bottom: max(12px, env(safe-area-inset-bottom));
   transform: translateX(-50%); width: min(620px, calc(100% - 28px));
   min-height: 70px; display: grid; grid-template-columns: 1fr 1fr 66px 1fr 1fr;
   align-items: center; gap: 4px; padding: 7px 10px;
@@ -325,9 +325,12 @@ html[data-theme="dark"] .create-menu>button span small { color:#bbb; }
 html[data-theme="dark"] .neo-delete-modal{background:#242424;color:#fff;border-color:#fff;box-shadow:8px 8px 0 #fff}
 html[data-theme="dark"] .neo-delete-actions button{border-color:#fff;box-shadow:3px 3px 0 #fff}
 @media(max-width:700px){.reply-composer-preview{margin-left:10px;margin-right:10px}}
-\n.avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}\n
+
+.avatar { position: relative; overflow: hidden; }
+.avatar img { display:block; width:100%; height:100%; object-fit:cover; border-radius:inherit; }
+
 /* Atlantic community features */
-.atl-community{position:fixed;z-index:4;inset:0;overflow:auto;padding:38px 24px 112px 24px;background:var(--paper);color:var(--ink)}
+.app-shell{position:relative;isolation:isolate}.atl-community{position:absolute;z-index:10;inset:0;overflow:auto;padding:38px 24px 112px 24px;background:var(--paper);color:var(--ink)}
 .atl-community-head{max-width:900px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;gap:18px}
 .atl-community-head h1{margin:5px 0;font-size:clamp(28px,5vw,40px);font-weight:950;letter-spacing:-1.5px}
 .atl-community-head p,.atl-community-section>p{margin:0;color:#777;font-size:13px}
@@ -363,3 +366,18 @@ html[data-theme="dark"] .neo-delete-actions button{border-color:#fff;box-shadow:
 
 .chat-head-actions{display:flex;align-items:center;gap:4px;margin-left:auto}.chat-head-actions .icon-btn{width:36px;height:36px}
 @media(max-width:700px){.chat-head-actions{gap:0}.chat-head-actions .icon-btn{width:32px;height:34px;padding:5px}}
+
+
+/* Reply swipe feedback and isolated full-page navigation */
+.bubble-row { position:relative; transition:transform .18s cubic-bezier(.2,.8,.2,1); touch-action:pan-y; }
+.bubble-row.reply-swiping { transition:none; }
+.swipe-reply-indicator { position:absolute; left:-38px; top:50%; width:30px; height:30px; display:grid; place-items:center; border-radius:50%; background:#1685d8; color:#fff; opacity:0; transform:scale(.65); transition:opacity .12s ease,transform .12s ease; pointer-events:none; }
+.swipe-reply-indicator.visible { opacity:1; transform:scale(1); }
+.bubble-row.mine .swipe-reply-indicator { left:auto; right:-38px; }
+.bubble-row.reply-swipe-confirmed .bubble { animation:reply-confirm .42s cubic-bezier(.2,.8,.2,1); }
+@keyframes reply-confirm { 0% { transform:translateX(0) scale(1); } 35% { transform:translateX(9px) scale(1.025); } 70% { transform:translateX(-3px) scale(.99); } 100% { transform:translateX(0) scale(1); } }
+.me b .atl-inline-verified { margin-left:6px; }
+@media (prefers-reduced-motion: reduce) {
+  .bubble-row,.swipe-reply-indicator { transition:none !important; }
+  .bubble-row.reply-swipe-confirmed .bubble { animation:none !important; }
+}
