@@ -68,8 +68,9 @@ create or replace function public.accept_atlantic_invite(p_token text)
 returns table(invite_type text,resource_id uuid,title text)
 language plpgsql security definer set search_path=public
 as $$
-declare l public.atlantic_invite_links%rowtype;
-declare result_title text;
+declare
+  l public.atlantic_invite_links%rowtype;
+  result_title text;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
   select * into l from public.atlantic_invite_links where token=p_token for update;
