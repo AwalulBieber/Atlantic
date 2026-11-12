@@ -66,6 +66,7 @@ export default function App() {
   const swipeTimer = useRef(null);
   const typingChannelRef = useRef(null);
   const typingStopTimer = useRef(null);
+  const typingIndicatorTimer = useRef(null);
   const [otherTyping, setOtherTyping] = useState(false);
 
   const seenMessages = useRef(new Set());
@@ -136,7 +137,7 @@ export default function App() {
   async function loadMyProfile() {
     if (!session?.user?.id) return;
     const [{ data, error }, { data: isAdmin, error: badgeError }] = await Promise.all([
-      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified').eq('id', session.user.id).maybeSingle(),
+      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified,read_receipts_enabled').eq('id', session.user.id).maybeSingle(),
       supabase.rpc('is_atlantic_admin', { target_user: session.user.id })
     ]);
     if (!error && data) {
@@ -336,6 +337,7 @@ export default function App() {
           .eq('id', message.sender_id).single();
         if (profileError || !person) return;
 
+        await supabase.from('messages').update({ delivered_at: new Date().toISOString() }).eq('id', message.id).is('delivered_at', null);
         setUnread(old => ({ ...old, [person.id]: (old[person.id] || 0) + 1 }));
         setIncomingNotice({ person, body: message.body || 'Mengirim pesan' });
       })
@@ -350,12 +352,13 @@ export default function App() {
     channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
       if (payload?.user_id !== session.user.id) {
         setOtherTyping(Boolean(payload?.is_typing));
-        if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
-        if (payload?.is_typing) typingStopTimer.current = setTimeout(() => setOtherTyping(false), 2400);
+        if (typingIndicatorTimer.current) clearTimeout(typingIndicatorTimer.current);
+        if (payload?.is_typing) typingIndicatorTimer.current = setTimeout(() => setOtherTyping(false), 2400);
       }
     }).subscribe();
     return () => {
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+      if (typingIndicatorTimer.current) clearTimeout(typingIndicatorTimer.current);
       typingChannelRef.current = null;
       setOtherTyping(false);
       supabase.removeChannel(channel);
