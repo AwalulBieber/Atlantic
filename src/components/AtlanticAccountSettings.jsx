@@ -42,7 +42,14 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       const adminMode = (!adminError && admin === true) || user.email?.toLowerCase() === 'awalulhakim94@gmail.com';
       setIsAdmin(adminMode);
       const { data: requests, error: requestError } = await supabase.from("atlantic_verification_requests").select("id,user_id,note,status,requested_at,review_note").order("requested_at", { ascending: false }).limit(adminMode ? 100 : 10);
-      if (!requestError && alive) setVerificationRequests(requests || []);
+      if (!requestError && alive) {
+        const applicantIds = [...new Set((requests || []).map(request => request.user_id).filter(Boolean))];
+        const { data: applicants } = applicantIds.length
+          ? await supabase.from("profiles").select("id,username,display_name,avatar_url").in("id", applicantIds)
+          : { data: [] };
+        const applicantMap = Object.fromEntries((applicants || []).map(applicant => [applicant.id, applicant]));
+        setVerificationRequests((requests || []).map(request => ({ ...request, applicant: applicantMap[request.user_id] || null })));
+      }
     }
     load();
     return () => { alive = false; };
@@ -205,7 +212,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
               <p>Pengajuan pengguna yang menunggu pemeriksaan.</p>
               {verificationRequests.filter(r => r.status === "pending").length === 0 && <p className="atl-muted">Belum ada pengajuan baru.</p>}
               {verificationRequests.filter(r => r.status === "pending").map(request => <article className="atl-verification-request" key={request.id}>
-                <b>Pengguna: {request.user_id.slice(0, 8)}…</b><small>{new Date(request.requested_at).toLocaleString("id-ID")}</small><p>{request.note || "Tidak ada keterangan tambahan."}</p>
+                <b>{request.applicant?.display_name || request.applicant?.username || "Pengguna Atlantic"}</b><small>{request.applicant?.username ? "@" + request.applicant.username + " · " : ""}{new Date(request.requested_at).toLocaleString("id-ID")}</small><p>{request.note || "Tidak ada keterangan tambahan."}</p>
                 <div><button type="button" onClick={async () => { const { error } = await supabase.rpc("review_atlantic_verification_request", { request_id: request.id, approve: true, admin_note: "Disetujui oleh admin Atlantic." }); if (error) setMessage("Gagal menyetujui: " + error.message); else { setMessage("Pengajuan disetujui."); setVerificationRequests(v => v.map(x => x.id === request.id ? { ...x, status: "approved" } : x)); } }}>Setujui</button><button type="button" className="atl-secondary" onClick={async () => { const { error } = await supabase.rpc("review_atlantic_verification_request", { request_id: request.id, approve: false, admin_note: "Belum memenuhi kriteria verifikasi." }); if (error) setMessage("Gagal menolak: " + error.message); else { setMessage("Pengajuan ditolak."); setVerificationRequests(v => v.map(x => x.id === request.id ? { ...x, status: "rejected" } : x)); } }}>Tolak</button></div>
               </article>)}
             </> : <>
