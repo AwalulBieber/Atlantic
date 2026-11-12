@@ -7,6 +7,7 @@ import AtlanticAdminDashboard from './components/AtlanticAdminDashboard';
 import AtlanticContacts from './components/AtlanticContacts';
 import AtlanticGroupInfo from './components/AtlanticGroupInfo';
 import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
+import AtlanticPolls from './components/AtlanticPolls';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
@@ -935,6 +936,8 @@ export default function App() {
               </div>}
             </header>
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
+            {active.is_group&&<AtlanticPolls targetType="group" targetId={active.conversation_id} user={session.user} canCreate onNotice={setNotice}/>}
+
             <div className="messages">
               {messages.map(m => (
                 <div
