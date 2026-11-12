@@ -1,9 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, X, Minus, Maximize2 } from 'lucide-react';
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, X, Minus, Maximize2, Camera, FlipHorizontal, Settings2 } from 'lucide-react';
 
+const turnUrls = (import.meta.env.VITE_TURN_URLS || '').split(',').map(value => value.trim()).filter(Boolean);
 const rtcConfig = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  iceServers: [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+    ...(turnUrls.length && import.meta.env.VITE_TURN_USERNAME && import.meta.env.VITE_TURN_CREDENTIAL
+      ? [{ urls: turnUrls, username: import.meta.env.VITE_TURN_USERNAME, credential: import.meta.env.VITE_TURN_CREDENTIAL }]
+      : [])
+  ],
+  iceCandidatePoolSize: 10
 };
 
 export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
@@ -17,6 +24,9 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [minimized, setMinimized] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState('user');
+  const [mirrorSelf, setMirrorSelf] = useState(true);
+  const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -57,6 +67,9 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     pendingIceRef.current = [];
     setElapsed(0);
     setMinimized(false);
+    setCameraFacing('user');
+    setMirrorSelf(true);
+    setCameraSettingsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -161,8 +174,14 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       }
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') setPhase('Terhubung');
-      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') setPhase('Koneksi terputus');
+      if (pc.connectionState === 'connected') { setPhase('Terhubung'); setError(''); }
+      if (pc.connectionState === 'disconnected') setPhase('Jaringan terputus, mencoba menyambungkan…');
+      if (pc.connectionState === 'failed') {
+        setPhase('Koneksi gagal');
+        setError(turnUrls.length
+          ? 'Jalur media gagal tersambung. Coba ulangi panggilan atau ganti jaringan.'
+          : 'Jaringan tidak mengizinkan koneksi langsung. Atlantic memerlukan konfigurasi TURN agar panggilan lintas jaringan lebih stabil.');
+      }
     };
     return pc;
   }, [sendSignal]);
@@ -176,7 +195,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Browser ini tidak mendukung akses mikrofon/kamera. Buka Atlantic melalui HTTPS dan browser terbaru.');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: request.callType === 'video'
+        video: request.callType === 'video' ? { facingMode: { ideal: 'user' } } : false
       });
       attachStream(stream);
       const { data: session, error: insertError } = await supabase.from('atlantic_call_sessions')
@@ -223,7 +242,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Browser ini tidak mendukung akses mikrofon/kamera. Buka Atlantic melalui HTTPS dan browser terbaru.');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: incoming.call_type === 'video'
+        video: incoming.call_type === 'video' ? { facingMode: { ideal: 'user' } } : false
       });
       attachStream(stream);
       const activeCall = { ...incoming, peerId: incoming.caller_id, peerName: incoming.peerName || 'Pengguna Atlantic', direction: 'incoming' };
@@ -294,6 +313,33 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     localStreamRef.current?.getVideoTracks().forEach(track => { track.enabled = !next; });
     setCameraOff(next);
   };
+
+  const switchCamera = useCallback(async () => {
+    if (!localStreamRef.current || !pcRef.current) return;
+    const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
+    let replacementStream;
+    try {
+      replacementStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: nextFacing } }
+      });
+      const replacementTrack = replacementStream.getVideoTracks()[0];
+      if (!replacementTrack) throw new Error('Kamera yang dipilih tidak tersedia.');
+      const videoSender = pcRef.current.getSenders().find(sender => sender.track?.kind === 'video');
+      if (!videoSender) throw new Error('Track video belum siap. Coba nyalakan kamera lagi.');
+      await videoSender.replaceTrack(replacementTrack);
+      const currentStream = localStreamRef.current;
+      const previousTrack = currentStream.getVideoTracks()[0];
+      const nextStream = new MediaStream([...currentStream.getAudioTracks(), replacementTrack]);
+      previousTrack?.stop();
+      attachStream(nextStream);
+      setCameraFacing(nextFacing);
+      setCameraOff(false);
+    } catch (err) {
+      replacementStream?.getTracks().forEach(track => track.stop());
+      setError(err.message || 'Gagal mengganti kamera.');
+    }
+  }, [attachStream, cameraFacing]);
 
   useEffect(() => {
     if (!call?.started_at) return;
@@ -385,15 +431,21 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
         <div className="atl-call-peer">{call.peerName}<small>{phase || 'Menghubungkan…'}{phase === 'Terhubung' ? ' · ' + Math.floor(elapsed / 60).toString().padStart(2,'0') + ':' + (elapsed % 60).toString().padStart(2,'0') : ''}</small></div>
         {call.call_type === 'video' && <div className="atl-call-video-grid">
           <video ref={remoteVideoRef} autoPlay playsInline className="atl-call-remote-video"/>
-          <video ref={localVideoRef} autoPlay muted playsInline className="atl-call-local-video"/>
+          <video ref={localVideoRef} autoPlay muted playsInline className="atl-call-local-video" style={{ transform: mirrorSelf && cameraFacing === 'user' ? 'scaleX(-1)' : 'none' }}/>
         </div>}
         {call.call_type === 'audio' && <><audio ref={remoteAudioRef} autoPlay/><div className="atl-call-audio-art"><Phone size={38}/></div></>}
         {error && <p className="atl-call-error">{error}</p>}
         <div className="atl-call-actions">
           <button className={muted ? 'muted' : ''} type="button" onClick={toggleMute}>{muted ? <MicOff size={18}/> : <Mic size={18}/>} {muted ? 'Mic mati' : 'Bisukan'}</button>
           {call.call_type === 'video' && <button className={cameraOff ? 'muted' : ''} type="button" onClick={toggleCamera}>{cameraOff ? <VideoOff size={18}/> : <Video size={18}/>} {cameraOff ? 'Kamera mati' : 'Kamera'}</button>}
+          {call.call_type === 'video' && <button type="button" onClick={() => setCameraSettingsOpen(open => !open)}><Settings2 size={18}/> Pengaturan video</button>}
           <button className="decline" type="button" onClick={endCall}><PhoneOff size={18}/> Akhiri</button>
         </div>
+        {call.call_type === 'video' && cameraSettingsOpen && <div className="atl-call-video-settings">
+          <button type="button" onClick={switchCamera} disabled={cameraOff}><Camera size={17}/> Kamera {cameraFacing === 'user' ? 'depan' : 'belakang'}</button>
+          <button type="button" onClick={() => setMirrorSelf(value => !value)}><FlipHorizontal size={17}/> Mirror {mirrorSelf ? 'aktif' : 'nonaktif'}</button>
+          <small>Mirror hanya mengubah tampilan kamera sendiri.</small>
+        </div>}
       </> : <><h2>Panggilan gagal</h2><p className="atl-call-error">{error}</p><div className="atl-call-actions"><button type="button" onClick={() => setError('')}>Tutup</button></div></>}
     </section>
   </div></>;
