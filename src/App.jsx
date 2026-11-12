@@ -409,23 +409,30 @@ export default function App() {
       setNotice(error.message);
       return;
     }
+    const messageIds = (data || []).map(message => message.id);
+    const { data: hiddenStates, error: hiddenError } = messageIds.length
+      ? await supabase.from('message_user_states').select('message_id').eq('user_id', session.user.id).eq('is_deleted', true).in('message_id', messageIds)
+      : { data: [], error: null };
+    if (hiddenError) { setNotice('Status hapus pesan gagal dimuat: ' + hiddenError.message); return; }
+    const hiddenIds = new Set((hiddenStates || []).map(row => row.message_id));
+    const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id));
     const senderIds = [...new Set((data || []).map(message => message.sender_id).filter(Boolean))];
     const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', senderIds) : { data: [] };
     const senderMap = Object.fromEntries((senderProfiles || []).map(profile => [profile.id, profile]));
-    const replyIds = [...new Set((data || []).map(m => m.reply_to).filter(Boolean))];
+    const replyIds = [...new Set(visibleMessages.map(m => m.reply_to).filter(Boolean))];
     let replyMap = {};
     if (replyIds.length) {
       const { data: originals } = await supabase.from('messages').select('id,body,sender_id').in('id', replyIds);
       replyMap = Object.fromEntries((originals || []).map(item => [item.id, item]));
     }
-    const incomingIds = (data || []).filter(m => m.sender_id !== session.user.id).map(m => m.id);
+    const incomingIds = visibleMessages.filter(m => m.sender_id !== session.user.id).map(m => m.id);
     if (incomingIds.length) {
       const now = new Date().toISOString();
       const receipt = { delivered_at: now };
       if (myProfile?.read_receipts_enabled !== false) receipt.read_at = now;
       await supabase.from('messages').update(receipt).in('id', incomingIds);
     }
-    setMessages((data || []).map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
+    setMessages(visibleMessages.map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body, senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -571,13 +578,25 @@ export default function App() {
     setNotice('');
   }
 
-  async function confirmDeleteMessage() {
+  async function confirmDeleteMessage(scope) {
     const message = deleteTarget;
-    if (!message || message.sender_id !== session.user.id) return;
-    const { error } = await supabase.from('messages').delete().eq('id', message.id).eq('sender_id', session.user.id);
+    if (!message) return;
+    let error = null;
+    if (scope === 'everyone') {
+      if (message.sender_id !== session.user.id) return;
+      ({ error } = await supabase.from('messages').delete().eq('id', message.id).eq('sender_id', session.user.id));
+    } else {
+      ({ error } = await supabase.from('message_user_states').upsert({
+        message_id: message.id,
+        user_id: session.user.id,
+        is_deleted: true
+      }, { onConflict: 'message_id,user_id' }));
+    }
     if (error) setNotice('Pesan gagal dihapus: ' + error.message);
     else {
-      setMessages(old => old.filter(m => m.id !== message.id).map(m => m.reply_to === message.id ? { ...m, reply_to: null, replyPreview: null } : m));
+      setMessages(old => old.filter(m => m.id !== message.id).map(m => m.reply_to === message.id
+        ? { ...m, reply_to: null, replyPreview: { ...(m.replyPreview || {}), body: 'Pesan dihapus' } }
+        : m));
       if (replyTarget?.id === message.id) setReplyTarget(null);
     }
     setDeleteTarget(null);
@@ -760,7 +779,7 @@ export default function App() {
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.is_group ? (m.replyPreview.senderProfile?.display_name || m.replyPreview.senderProfile?.username || 'Anggota grup') : (active.person.display_name || active.person.username))}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
                     {active.is_group && <b className="group-sender-name">{m.senderProfile?.display_name || m.senderProfile?.username || (m.sender_id === session.user.id ? 'Kamu' : 'Anggota grup')}</b>}
                     <div>{m.body}</div>
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button>{m.sender_id === session.user.id && <button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button>}</div>
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button><button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button></div>
                   </div>
                 </div>
               ))}
@@ -790,7 +809,7 @@ export default function App() {
       </section>
 
       {notice && <button className="toast" onClick={() => setNotice('')}>{notice}　×</button>}
-      {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Konfirmasi hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pesan ini akan dihapus untuk semua orang dalam percakapan.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={confirmDeleteMessage}>HAPUS</button></div></section></div>}
+      {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={() => confirmDeleteMessage('me')}>UNTUK SAYA</button>{deleteTarget.sender_id === session.user.id && <button type="button" onClick={() => confirmDeleteMessage('everyone')}>UNTUK SEMUA</button>}</div></section></div>}
       {incomingNotice && (
         <button className="toast" onClick={() => { const person = incomingNotice.person; setIncomingNotice(null); openChat(person); }}>
           <b>{incomingNotice.person.display_name || incomingNotice.person.username}</b><br />
