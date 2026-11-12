@@ -14,6 +14,8 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
+  const [verificationRequests, setVerificationRequests] = useState([]);
+  const [verificationNote, setVerificationNote] = useState("");
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -28,7 +30,10 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       if (!alive) return;
       if (profileError) setMessage(profileError.message);
       else setProfile({ ...DEFAULTS, ...(p || {}) });
-      setIsAdmin((!adminError && admin === true) || user.email?.toLowerCase() === 'awalulhakim94@gmail.com');
+      const adminMode = (!adminError && admin === true) || user.email?.toLowerCase() === 'awalulhakim94@gmail.com';
+      setIsAdmin(adminMode);
+      const { data: requests, error: requestError } = await supabase.from("atlantic_verification_requests").select("id,user_id,note,status,requested_at,review_note").order("requested_at", { ascending: false }).limit(adminMode ? 100 : 10);
+      if (!requestError && alive) setVerificationRequests(requests || []);
     }
     load();
     return () => { alive = false; };
@@ -99,12 +104,13 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
         <nav className="atl-settings-tabs">
           <button type="button" className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}>Profil</button>
           <button type="button" className={tab === "privacy" ? "active" : ""} onClick={() => setTab("privacy")}>Privasi</button>
+          <button type="button" className={tab === "verification" ? "active" : ""} onClick={() => setTab("verification")}>Verifikasi</button>
         </nav>
         <form onSubmit={save} className="atl-settings-body">
           {tab === "profile" && <>
             <div className="atl-admin-status">
               <div><strong>{profile.display_name || profile.username || "Pengguna Atlantic"}</strong><small>{profile.username ? "@" + profile.username : user?.email}</small></div>
-              {isAdmin && <span className="atl-blue-verified">✓ Atlantic Verified</span>}
+              {isAdmin ? <span className="atl-blue-verified">✓ Atlantic Verified</span> : profile.is_verified && <span className="atl-orange-verified">✓ Terverifikasi</span>}
             </div>
             <div className="atl-avatar-editor">
               <div className="atl-avatar-preview">
@@ -121,6 +127,24 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
             <label>Username<input value={profile.username || ""} onChange={e => update("username", e.target.value)} maxLength={30}/></label>
             <label>Bio<textarea value={profile.bio || ""} onChange={e => update("bio", e.target.value)} maxLength={160} rows={3}/></label>
           </>}
+          {tab === "verification" && <section className="atl-verification-panel">
+            <h3>Verifikasi Atlantic</h3>
+            {isAdmin ? <>
+              <p>Pengajuan pengguna yang menunggu pemeriksaan.</p>
+              {verificationRequests.filter(r => r.status === "pending").length === 0 && <p className="atl-muted">Belum ada pengajuan baru.</p>}
+              {verificationRequests.filter(r => r.status === "pending").map(request => <article className="atl-verification-request" key={request.id}>
+                <b>Pengguna: {request.user_id.slice(0, 8)}…</b><small>{new Date(request.requested_at).toLocaleString("id-ID")}</small><p>{request.note || "Tidak ada keterangan tambahan."}</p>
+                <div><button type="button" onClick={async () => { const { error } = await supabase.rpc("review_atlantic_verification_request", { request_id: request.id, approve: true, admin_note: "Disetujui oleh admin Atlantic." }); if (error) setMessage("Gagal menyetujui: " + error.message); else { setMessage("Pengajuan disetujui."); setVerificationRequests(v => v.map(x => x.id === request.id ? { ...x, status: "approved" } : x)); } }}>Setujui</button><button type="button" className="atl-secondary" onClick={async () => { const { error } = await supabase.rpc("review_atlantic_verification_request", { request_id: request.id, approve: false, admin_note: "Belum memenuhi kriteria verifikasi." }); if (error) setMessage("Gagal menolak: " + error.message); else { setMessage("Pengajuan ditolak."); setVerificationRequests(v => v.map(x => x.id === request.id ? { ...x, status: "rejected" } : x)); } }}>Tolak</button></div>
+              </article>)}
+            </> : <>
+              <p>Ajukan verifikasi akun. Badge oranye akan muncul setelah pengajuan disetujui admin Atlantic.</p>
+              {profile.is_verified ? <span className="atl-orange-verified">✓ Akun kamu sudah terverifikasi</span> : <>
+                <label>Keterangan pengajuan<textarea value={verificationNote} onChange={e => setVerificationNote(e.target.value)} maxLength={500} rows={3} placeholder="Jelaskan alasan akun kamu perlu diverifikasi (opsional)."/></label>
+                <button type="button" disabled={verificationRequests.some(r => r.status === "pending")} onClick={async () => { const { error } = await supabase.from("atlantic_verification_requests").insert({ user_id: user.id, note: verificationNote.trim() }); if (error) setMessage(error.code === "23505" ? "Pengajuan kamu masih menunggu pemeriksaan." : "Gagal mengirim pengajuan: " + error.message); else { setMessage("Pengajuan verifikasi berhasil dikirim."); setVerificationRequests(v => [{ id: crypto.randomUUID(), user_id: user.id, note: verificationNote.trim(), status: "pending", requested_at: new Date().toISOString() }, ...v]); } }}>{verificationRequests.some(r => r.status === "pending") ? "Pengajuan sedang ditinjau" : "Kirim pengajuan verifikasi"}</button>
+              </>}
+              {verificationRequests.filter(r => r.status !== "pending").slice(0,3).map(r => <p className="atl-muted" key={r.id}>Pengajuan {r.status === "approved" ? "disetujui" : "ditolak"} · {new Date(r.requested_at).toLocaleDateString("id-ID")}{r.review_note ? " — " + r.review_note : ""}</p>)}
+            </>}
+          </section>}
           {tab === "privacy" && <>
             <label className="atl-switch-row"><span><b>Akun private</b><small>Batasi penemuan profil melalui fitur pencarian yang mendukung privasi.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
             <label className="atl-switch-row"><span><b>Tampilkan status online</b><small>Izinkan pengguna melihat status online.</small></span><input type="checkbox" checked={!!profile.show_online_status} onChange={e => update("show_online_status", e.target.checked)}/></label>
