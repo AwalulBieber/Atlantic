@@ -135,7 +135,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
         }
       });
     });
-  }, [handleSignal]);
+  }, [cleanup, handleSignal]);
 
   const createPeer = useCallback((activeCall, stream) => {
     const pc = new RTCPeerConnection(rtcConfig);
@@ -233,6 +233,13 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       if (!offerRow?.payload) throw new Error('Penawaran panggilan tidak ditemukan. Coba panggil ulang.');
       await supabase.from('atlantic_call_sessions').update({ status: 'accepted' }).eq('id', activeCall.id);
       await pc.setRemoteDescription(new RTCSessionDescription(offerRow.payload));
+      const { data: earlierIce, error: iceError } = await supabase.from('atlantic_call_signals')
+        .select('payload').eq('call_id', activeCall.id).eq('signal_type', 'ice')
+        .eq('sender_id', activeCall.peerId).order('created_at', { ascending: true });
+      if (iceError) throw iceError;
+      for (const row of earlierIce || []) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(row.payload)); } catch {}
+      }
       await flushIce();
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -284,6 +291,12 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [call?.id, call?.started_at]);
+
+  useEffect(() => () => {
+    if (signalChannelRef.current) supabase.removeChannel(signalChannelRef.current);
+    pcRef.current?.close();
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
