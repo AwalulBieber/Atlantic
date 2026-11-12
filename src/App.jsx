@@ -320,7 +320,7 @@ export default function App() {
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, [active?.conversation_id, session?.user?.id]);
+  }, [active?.conversation_id, session?.user?.id, myProfile?.read_receipts_enabled]);
 
   useEffect(() => {
     if (!session) return;
@@ -390,6 +390,8 @@ export default function App() {
     if (!body || !active || sending) return;
     setSending(true);
     setDraft('');
+    if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+    typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
     const { error } = await supabase.from('messages').insert({
       conversation_id: active.conversation_id,
       sender_id: session.user.id,
