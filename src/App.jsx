@@ -5,7 +5,7 @@ import AtlanticCommunity from './components/AtlanticCommunity';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
-  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, ShieldCheck, Trash2, Reply
+  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -59,7 +59,11 @@ export default function App() {
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [replyTarget, setReplyTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [swipeState, setSwipeState] = useState({ id: null, offset: 0 });
+  const [swipeFeedbackId, setSwipeFeedbackId] = useState(null);
   const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const swipeTimer = useRef(null);
 
   const seenMessages = useRef(new Set());
   const bottomRef = useRef(null);
@@ -128,8 +132,14 @@ export default function App() {
 
   async function loadMyProfile() {
     if (!session?.user?.id) return;
-    const { data, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,bio').eq('id', session.user.id).maybeSingle();
-    if (!error && data) setMyProfile(data);
+    const [{ data, error }, { data: isAdmin, error: badgeError }] = await Promise.all([
+      supabase.from('profiles').select('id,username,display_name,avatar_url,bio').eq('id', session.user.id).maybeSingle(),
+      supabase.rpc('is_atlantic_admin', { target_user: session.user.id })
+    ]);
+    if (!error && data) {
+      const isPrimaryAdmin = session.user.email?.toLowerCase() === 'awalulhakim94@gmail.com';
+      setMyProfile({ ...data, is_admin: isAdmin === true || (!badgeError && isAdmin === true) || isPrimaryAdmin });
+    }
   }
 
   async function authenticate(e) {
@@ -443,9 +453,9 @@ export default function App() {
         </header>
 
         <div className="me">
-          <div className="avatar">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : initials(session.user.user_metadata?.display_name || session.user.email)}</div>
+          <div className="avatar">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : initials(myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email)}</div>
           <div>
-            <b>{session.user.user_metadata?.display_name || session.user.email}</b>
+            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={16}/></span>}</b>
             <small><i className="online-dot" /> Online</small>
           </div>
         </div>
@@ -467,7 +477,7 @@ export default function App() {
         {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : initials(c.person.display_name || c.person.username)}
       </div>
       <div className="person-info">
-        <b>{c.person.display_name || c.person.username}{c.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14}/></span>}</b>
+        <b>{c.person.display_name || c.person.username}{c.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span>}</b>
         <small>Ketuk untuk membuka chat</small>
       </div>
       <MessageCircle size={17} />
@@ -488,7 +498,7 @@ export default function App() {
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
               <div className="avatar">{active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
-                <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={15}/></span>}</b>
+                <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span>}</b>
                 <small>@{active.person.username}</small>
               </div>
               <div className="chat-head-actions">
@@ -498,9 +508,30 @@ export default function App() {
             </header>
             <div className="messages">
               {messages.map(m => (
-                <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id} id={`message-${m.id}`}
-                  onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
-                  onTouchEnd={e => { const delta = e.changedTouches[0].clientX - touchStartX.current; if (delta > 65) setReplyTarget(m); }}>
+                <div
+                  className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
+                  key={m.id}
+                  id={`message-${m.id}`}
+                  style={swipeState.id === m.id ? { transform: `translateX(${swipeState.offset}px)` } : undefined}
+                  onTouchStart={e => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
+                  onTouchMove={e => {
+                    const dx = e.touches[0].clientX - touchStartX.current;
+                    const dy = e.touches[0].clientY - touchStartY.current;
+                    if (dx > 6 && dx > Math.abs(dy)) setSwipeState({ id: m.id, offset: Math.min(dx, 92) });
+                  }}
+                  onTouchEnd={e => {
+                    const dx = e.changedTouches[0].clientX - touchStartX.current;
+                    const dy = e.changedTouches[0].clientY - touchStartY.current;
+                    if (dx > 65 && dx > Math.abs(dy)) {
+                      setReplyTarget(m);
+                      setSwipeFeedbackId(m.id);
+                      if (swipeTimer.current) clearTimeout(swipeTimer.current);
+                      swipeTimer.current = setTimeout(() => setSwipeFeedbackId(null), 650);
+                    }
+                    setSwipeState({ id: null, offset: 0 });
+                  }}
+                >
+                  <div className={`swipe-reply-indicator ${swipeState.id === m.id && swipeState.offset > 12 ? 'visible' : ''}`} style={swipeState.id === m.id ? { opacity: Math.min(swipeState.offset / 65, 1) } : undefined}><Reply size={15}/></div>
                   <div className="bubble">
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.person.display_name || active.person.username)}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
                     <div>{m.body}</div>
