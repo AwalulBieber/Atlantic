@@ -417,16 +417,21 @@ export default function App() {
   async function openChat(person) {
     setNotice('');
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      const user = authData?.user;
-      if (!user) throw new Error('Sesi login tidak ditemukan. Silakan login ulang.');
-      if (user.id === person.id) throw new Error('Kamu tidak bisa membuka chat dengan akun sendiri.');
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('Sesi login tidak ditemukan. Silakan login ulang.');
+      if (userId === person.id) throw new Error('Kamu tidak bisa membuka chat dengan akun sendiri.');
 
-      const { data: conversationId, error: rpcError } = await supabase.rpc(
-        'create_direct_conversation', { target_user: person.id }
-      );
-      if (rpcError) throw rpcError;
+      // Reuse the conversation already loaded in the chat list; only ask the
+      // database to create/find one when this user has no existing chat row.
+      const existingChat = chats.find(chat => !chat.is_group && chat.person?.id === person.id);
+      let conversationId = existingChat?.conversation_id;
+      if (!conversationId) {
+        const { data, error } = await supabase.rpc(
+          'create_direct_conversation', { target_user: person.id }
+        );
+        if (error) throw error;
+        conversationId = data;
+      }
       if (!conversationId) throw new Error('Database tidak mengembalikan ID percakapan.');
 
       setUnread(old => {
@@ -438,8 +443,8 @@ export default function App() {
       setReplyTarget(null);
       setActive({ conversation_id: conversationId, person });
       setMobileChat(true);
-      await loadMessages(conversationId);
-      await loadProfiles();
+      // The active-chat effect loads messages and subscribes to realtime.
+      // Avoid loading the same history twice or refreshing every chat profile.
     } catch (err) {
       setNotice('Gagal membuka chat: ' + (err?.message || 'Terjadi kesalahan.'));
     }
