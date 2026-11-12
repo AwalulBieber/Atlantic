@@ -3,7 +3,7 @@ import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
 import {
-  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore,
+  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, 
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
@@ -46,6 +46,9 @@ export default function App() {
   const [chats, setChats] = useState([]);
   const [archivedIds, setArchivedIds] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+  const [savedMessages, setSavedMessages] = useState([]);
+  const [savedBusy, setSavedBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -244,6 +247,45 @@ export default function App() {
     conversation_id: m.conversation_id,
     person: peopleWithBadges.find(p => p.id === m.user_id)
   })).filter(c => c.person));
+  }
+
+  async function loadSavedMessages() {
+    if (!session?.user?.id) return;
+    setSavedBusy(true);
+    const { data, error } = await supabase.from('saved_messages')
+      .select('id,message_id,saved_at,message:messages!saved_messages_message_id_fkey(id,conversation_id,sender_id,body,created_at)')
+      .eq('user_id', session.user.id)
+      .order('saved_at', { ascending: false });
+    if (error) setNotice('Pesan tersimpan gagal dimuat: ' + error.message);
+    else setSavedMessages((data || []).filter(item => item.message));
+    setSavedBusy(false);
+  }
+
+  async function toggleSavedMessage(message) {
+    const existing = savedMessages.find(item => item.message_id === message.id);
+    if (existing) {
+      const { error } = await supabase.from('saved_messages').delete().eq('id', existing.id).eq('user_id', session.user.id);
+      if (error) { setNotice('Pesan gagal dihapus dari tersimpan: ' + error.message); return; }
+      setSavedMessages(items => items.filter(item => item.id !== existing.id));
+      setNotice('Pesan dihapus dari Pesan Tersimpan.');
+    } else {
+      const { data, error } = await supabase.from('saved_messages').insert({ user_id: session.user.id, message_id: message.id })
+        .select('id,message_id,saved_at,message:messages!saved_messages_message_id_fkey(id,conversation_id,sender_id,body,created_at)').single();
+      if (error) { setNotice('Pesan gagal disimpan: ' + error.message); return; }
+      setSavedMessages(items => [data, ...items]);
+      setNotice('Pesan berhasil disimpan.');
+    }
+  }
+
+  async function openSavedMessage(item) {
+    const message = item.message;
+    const chat = chats.find(entry => entry.conversation_id === message.conversation_id);
+    if (!chat?.person) { setNotice('Percakapan asal pesan tidak ditemukan.'); return; }
+    setActive({ conversation_id: message.conversation_id, person: chat.person });
+    setMobileChat(true);
+    setShowSaved(false);
+    await loadMessages(message.conversation_id);
+    setTimeout(() => document.getElementById(`message-${message.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 180);
   }
 
   async function toggleArchive(conversationId) {
@@ -553,10 +595,15 @@ export default function App() {
           <input placeholder="Cari Chat…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        <div className="chat-list-tabs"><button className={!showArchived ? 'active' : ''} onClick={() => setShowArchived(false)}>Semua chat</button><button className={showArchived ? 'active' : ''} onClick={() => setShowArchived(true)}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button></div>
-        <div className="section-title"><span>{showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{filtered.length}</span></div>
+        <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Tersimpan</button></div>
+        <div className="section-title"><span>{showSaved ? 'Pesan Tersimpan' : showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{showSaved ? savedMessages.length : filtered.length}</span></div>
         <div className="people">
-  {filtered.map(c => (
+  {showSaved ? (savedBusy ? <p className="empty">Memuat pesan tersimpan…</p> : savedMessages.map(item => {
+    const message = item.message;
+    const chat = chats.find(entry => entry.conversation_id === message.conversation_id);
+    const author = message.sender_id === session.user.id ? 'Kamu' : (chat?.person?.display_name || chat?.person?.username || 'Pengguna');
+    return <div className="saved-message-row" key={item.id}><button type="button" className="saved-message-open" onClick={() => openSavedMessage(item)}><b>{author}</b><span>{message.body || 'Pesan'}</span><small>{time(message.created_at)} · Buka percakapan</small></button><button type="button" className="saved-message-remove" onClick={() => toggleSavedMessage(message)} aria-label="Hapus dari pesan tersimpan"><X size={15}/></button></div>;
+  })) : filtered.map(c => (
     <div className="person-row" key={c.conversation_id}>
       <button
         className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
@@ -626,7 +673,7 @@ export default function App() {
                   <div className="bubble">
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.person.display_name || active.person.username)}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
                     <div>{m.body}</div>
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button>{m.sender_id === session.user.id && <button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button>}</div>
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button>{m.sender_id === session.user.id && <button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button>}</div>
                   </div>
                 </div>
               ))}
