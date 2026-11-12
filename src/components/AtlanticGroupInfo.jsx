@@ -5,6 +5,7 @@ import { X, Users, BadgeCheck, Camera, ShieldCheck, Send } from 'lucide-react';
 export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpdated }) {
   const [group,setGroup]=useState(null);
   const [members,setMembers]=useState([]);
+  const [recentMessages,setRecentMessages]=useState([]);
   const [request,setRequest]=useState(null);
   const [note,setNote]=useState('');
   const [busy,setBusy]=useState(false);
@@ -18,6 +19,8 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
     if(ge){setError(ge.message);return;}
     setGroup(g);
     if(g.avatar_url){const {data:signed}=await supabase.storage.from('atlantic-chat-media').createSignedUrl(g.avatar_url,3600);setAvatarUrl(signed?.signedUrl||'');}
+    const {data:messageRows}=await supabase.from('messages').select('id,body,created_at,sender_id').eq('conversation_id',conversationId).order('created_at',{ascending:false}).limit(40);
+    setRecentMessages(messageRows||[]);
     const {data:m,error:me}=await supabase.from('conversation_members').select('user_id,role,joined_at').eq('conversation_id',conversationId).order('joined_at');
     if(me){setError(me.message);return;}
     const ids=(m||[]).map(x=>x.user_id);
@@ -42,7 +45,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
       if(uploadError){setError(uploadError.message);setBusy(false);return;}
       avatarPath=next;
     }
-    const {error:updateError}=await supabase.from('conversations').update({title:group.title.trim(),description:group.description.trim(),avatar_url:avatarPath,message_policy:group.message_policy,add_member_policy:group.add_member_policy}).eq('id',conversationId);
+    const {error:updateError}=await supabase.from('conversations').update({title:group.title.trim(),description:group.description.trim(),avatar_url:avatarPath,message_policy:group.message_policy,add_member_policy:group.add_member_policy,pinned_message_id:group.pinned_message_id||null}).eq('id',conversationId);
     if(updateError){if(avatarFile&&avatarPath)await supabase.storage.from('atlantic-chat-media').remove([avatarPath]);setError(updateError.message);}
     else{
       if(group.avatar_url&&avatarPath!==group.avatar_url)await supabase.storage.from('atlantic-chat-media').remove([group.avatar_url]);
@@ -80,6 +83,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
           <h3>⚙️ Pengaturan grup</h3>
           <label><span><b>Kirim pesan</b><small>Siapa yang boleh mengirim pesan di grup ini</small></span><select value={group.message_policy||'all'} onChange={e=>setGroup({...group,message_policy:e.target.value})}><option value="all">Semua anggota</option><option value="admins">Hanya admin</option></select></label>
           <label><span><b>Tambah anggota</b><small>Siapa yang boleh menambahkan anggota baru</small></span><select value={group.add_member_policy||'admins'} onChange={e=>setGroup({...group,add_member_policy:e.target.value})}><option value="admins">Hanya admin</option><option value="all">Semua anggota</option></select></label>
+          <label><span><b>Sematkan pesan</b><small>Pilih pesan yang ditampilkan sebagai pesan penting grup</small></span><select value={group.pinned_message_id||''} onChange={e=>setGroup({...group,pinned_message_id:e.target.value||null})}><option value="">Tidak ada pesan disematkan</option>{recentMessages.map(message=><option key={message.id} value={message.id}>{(message.body||'Lampiran').slice(0,65)} · {new Date(message.created_at).toLocaleDateString('id-ID')}</option>)}</select></label>
           <p>Pengaturan berlaku langsung setelah menekan Simpan perubahan di atas.</p>
         </section>}
         <section className="atl-group-verification">
