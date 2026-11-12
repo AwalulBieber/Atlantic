@@ -51,15 +51,15 @@ Sudah tersedia di kode:
 - Badge biru Atlantic Verified untuk admin utama; pengajuan verifikasi pengguna dengan badge oranye setelah disetujui admin.
 - Story teks/foto/video dan Catatan yang kedaluwarsa setelah 24 jam.
 - Saluran publik dengan fitur gabung dan posting teks.
-- Riwayat undangan panggilan audio/video (bukan panggilan langsung).
+- Panggilan audio dan video langsung satu-lawan-satu berbasis WebRTC, termasuk terima/tolak, mute mikrofon, kontrol kamera, dan akhiri panggilan.
 - Navigasi bawah Liquid Glass, tema, font, warna aksen, dan animasi UI.
 
 BATASAN YANG MASIH ADA
 ======================
 - Story mendukung foto/video hingga 20 MB per file (JPG, PNG, WebP, GIF, MP4, WebM); media disimpan privat dan URL akses berakhir mengikuti masa aktif Story.
 - Chat belum mendukung kirim gambar atau file.
-- Grup chat belum tersedia.
-- Audio/video call langsung belum tersedia; menu Panggilan hanya menyimpan undangan dan riwayat.
+- Panggilan grup belum tersedia.
+- Koneksi panggilan memakai STUN publik; sebagian jaringan/NAT mungkin memerlukan server TURN agar koneksi lebih andal.
 - Push notification belum tersedia.
 - Enkripsi end-to-end belum diimplementasikan.
 - Moderation dashboard lanjutan belum tersedia.
@@ -72,7 +72,7 @@ ATLANTIC COMMUNITY MIGRATION
 ============================
 Jalankan SQL secara utuh dari file supabase/migrations/202611120001_community_features.sql melalui Supabase Dashboard > SQL Editor sebelum memakai Story, Catatan, Saluran, dan riwayat undangan panggilan. Migrasi ini hanya menambah tabel baru dan policy RLS; tidak menghapus atau mengubah tabel chat lama.
 
-Catatan: menu Panggilan pada versi ini menyimpan riwayat/undangan. Audio/video real-time belum aktif dan tidak ditampilkan sebagai fitur yang sudah tersedia.
+Catatan: panggilan langsung memerlukan izin mikrofon/kamera dan koneksi HTTPS. Sediakan konfigurasi TURN sebelum penggunaan skala luas agar koneksi antarjaringan lebih andal.
 
 
 ATLANTIC SAVED MESSAGES
@@ -90,3 +90,14 @@ ATLANTIC GROUP CHAT
 - Batas anggota grup saat ini 100 akun termasuk pembuat grup.
 - Pembuatan grup memakai RPC terautentikasi; fungsi tidak dapat dijalankan oleh role anon. Penambahan anggota langsung dibatasi kepada pembuat percakapan.
 - Panggilan audio/video grup langsung belum tersedia.
+
+
+ATLANTIC LIVE AUDIO/VIDEO CALLS
+===============================
+- Panggilan audio/video satu-lawan-satu dari header chat pribadi.
+- Penerima mendapat pop-up panggilan masuk dan dapat menerima atau menolak.
+- WebRTC mengirim media langsung antarperangkat; Supabase Realtime + tabel atlantic_call_signals hanya digunakan untuk pertukaran SDP/ICE dan status panggilan.
+- Tabel sinyal dibatasi RLS untuk dua peserta panggilan; panggilan hanya dapat dibuat oleh anggota percakapan yang sama.
+- Kontrol tersedia: mute/unmute mikrofon, kamera on/off, dan akhiri panggilan.
+- Saat ini memakai STUN publik. TURN relay belum dikonfigurasi, sehingga beberapa jaringan seluler/Wi-Fi atau NAT ketat dapat membutuhkan konfigurasi TURN tambahan.
+- Migrasi database: supabase/migrations/202611120012_atlantic_realtime_audio_video_calls.sql.
