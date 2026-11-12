@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { X, Users, BadgeCheck, Camera, ShieldCheck, Send } from 'lucide-react';
-import AtlanticPolls from './AtlanticPolls';
 
 export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpdated, onNotice }) {
   const [group,setGroup]=useState(null);
@@ -127,7 +126,6 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
           <label><span><b>Sematkan pesan</b><small>Pilih pesan yang ditampilkan sebagai pesan penting grup</small></span><select value={group.pinned_message_id||''} onChange={e=>setGroup({...group,pinned_message_id:e.target.value||null})}><option value="">Tidak ada pesan disematkan</option>{recentMessages.map(message=><option key={message.id} value={message.id}>{(message.body||'Lampiran').slice(0,65)} · {new Date(message.created_at).toLocaleDateString('id-ID')}</option>)}</select></label>
           <p>Pengaturan berlaku langsung setelah menekan Simpan perubahan di atas.</p>
         </section>}
-        <AtlanticPolls targetType="group" targetId={conversationId} user={user} canCreate onNotice={onNotice}/>
         <section className="atl-group-verification">
           <h3><ShieldCheck size={17}/> Atlantic Verified</h3>
           {group.is_verified?<p>Grup ini sudah terverifikasi Atlantic.</p>:request?.status==='pending'?<p>Permintaan verifikasi sedang diperiksa admin Atlantic.</p>:isAdmin?<><form onSubmit={submitVerification}><textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={500} placeholder="Jelaskan identitas dan tujuan grup…"/><button disabled={busy}><Send size={15}/> Ajukan verifikasi</button></form>{request?.status==='rejected'&&<p>Pengajuan terakhir ditolak: {request.admin_note||'Tidak ada catatan'}. Kamu bisa mengajukan ulang.</p>}</>:<p>Hanya admin grup yang dapat mengajukan verifikasi.</p>}
