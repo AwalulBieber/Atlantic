@@ -82,6 +82,7 @@ export default function App() {
   const typingStopTimer = useRef(null);
   const typingIndicatorTimer = useRef(null);
   const [otherTyping, setOtherTyping] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
 
   const seenMessages = useRef(new Set());
   const bottomRef = useRef(null);
@@ -149,10 +150,40 @@ export default function App() {
     }
   }, [session]);
 
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setOnlineUsers([]);
+      return;
+    }
+    const channel = supabase.channel('atlantic-presence', {
+      config: { presence: { key: session.user.id } }
+    });
+    const syncOnlineUsers = () => {
+      const state = channel.presenceState();
+      setOnlineUsers(Object.keys(state).filter(id => id !== session.user.id));
+    };
+    channel
+      .on('presence', { event: 'sync' }, syncOnlineUsers)
+      .on('presence', { event: 'join' }, syncOnlineUsers)
+      .on('presence', { event: 'leave' }, syncOnlineUsers)
+      .subscribe(async status => {
+        if (status === 'SUBSCRIBED' && myProfile?.show_online_status === true) {
+          await channel.track({
+            user_id: session.user.id,
+            online_at: new Date().toISOString()
+          });
+        }
+      });
+    return () => {
+      setOnlineUsers([]);
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, myProfile?.show_online_status]);
+
   async function loadMyProfile() {
     if (!session?.user?.id) return;
     const [{ data, error }, { data: isAdmin, error: badgeError }] = await Promise.all([
-      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified,read_receipts_enabled').eq('id', session.user.id).maybeSingle(),
+      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified,read_receipts_enabled,show_online_status').eq('id', session.user.id).maybeSingle(),
       supabase.rpc('is_atlantic_admin', { target_user: session.user.id })
     ]);
     if (!error && data) {
@@ -751,7 +782,7 @@ export default function App() {
               <div className="avatar">{active.is_group ? <Users size={20}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
                 <b>{active.person.display_name || active.person.username}{active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
-                <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : `@${active.person.username}`}</small>
+                <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
               </div>
               {!active.is_group && <div className="chat-head-actions">
                 <button type="button" className="icon-btn" onClick={() => requestCall('audio')} title="Undang panggilan suara" aria-label="Undang panggilan suara"><Phone size={18}/></button>
