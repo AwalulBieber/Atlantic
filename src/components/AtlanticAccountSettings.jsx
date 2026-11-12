@@ -16,6 +16,10 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [message, setMessage] = useState("");
   const [verificationRequests, setVerificationRequests] = useState([]);
   const [verificationNote, setVerificationNote] = useState("");
+  const [dashboard, setDashboard] = useState(null);
+  const [dashboardBusy, setDashboardBusy] = useState(false);
+  const [dashboardError, setDashboardError] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -38,6 +42,35 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     load();
     return () => { alive = false; };
   }, [user?.id]);
+
+  async function loadDashboard() {
+    if (!isAdmin || dashboardBusy) return;
+    setDashboardBusy(true);
+    setDashboardError("");
+    const [users, groups, privateChats, calls, pending, recent] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
+      supabase.from("conversations").select("id", { count: "exact", head: true }).eq("is_group", true),
+      supabase.from("conversations").select("id", { count: "exact", head: true }).eq("is_group", false),
+      supabase.from("atlantic_call_sessions").select("id", { count: "exact", head: true }),
+      supabase.from("atlantic_verification_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("profiles").select("id,username,display_name,avatar_url,is_verified,created_at").order("created_at", { ascending: false }).limit(30)
+    ]);
+    const failed = [users, groups, privateChats, calls, pending, recent].find(result => result.error);
+    if (failed) setDashboardError(failed.error.message || "Data dashboard gagal dimuat.");
+    else setDashboard({
+      users: users.count || 0,
+      groups: groups.count || 0,
+      privateChats: privateChats.count || 0,
+      calls: calls.count || 0,
+      pending: pending.count || 0,
+      recentUsers: recent.data || []
+    });
+    setDashboardBusy(false);
+  }
+
+  useEffect(() => {
+    if (tab === "admin" && isAdmin) loadDashboard();
+  }, [tab, isAdmin]);
 
   function update(key, value) {
     setProfile(current => ({ ...current, [key]: value }));
@@ -105,6 +138,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           <button type="button" className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}>Profil</button>
           <button type="button" className={tab === "privacy" ? "active" : ""} onClick={() => setTab("privacy")}>Privasi</button>
           <button type="button" className={tab === "verification" ? "active" : ""} onClick={() => setTab("verification")}>Verifikasi</button>
+          {isAdmin && <button type="button" className={tab === "admin" ? "active" : ""} onClick={() => setTab("admin")}>Admin</button>}
         </nav>
         <form onSubmit={save} className="atl-settings-body">
           {tab === "profile" && <>
@@ -145,6 +179,33 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
               {verificationRequests.filter(r => r.status !== "pending").slice(0,3).map(r => <p className="atl-muted" key={r.id}>Pengajuan {r.status === "approved" ? "disetujui" : "ditolak"} · {new Date(r.requested_at).toLocaleDateString("id-ID")}{r.review_note ? " — " + r.review_note : ""}</p>)}
             </>}
           </section>}
+          {tab === "admin" && isAdmin && <section className="atl-admin-dashboard">
+            <div className="atl-admin-dashboard-title">
+              <div><h3>Dashboard Admin</h3><p>Ringkasan aktivitas dan akun Atlantic.</p></div>
+              <button type="button" onClick={loadDashboard} disabled={dashboardBusy}>{dashboardBusy ? "Memuat…" : "↻ Refresh"}</button>
+            </div>
+            {dashboardError && <p className="atl-settings-message" role="alert">{dashboardError}</p>}
+            {dashboardBusy && !dashboard && <p className="atl-muted">Mengambil data dashboard…</p>}
+            {dashboard && <>
+              <div className="atl-admin-stats">
+                <article><small>Total pengguna</small><strong>{dashboard.users}</strong></article>
+                <article><small>Chat pribadi</small><strong>{dashboard.privateChats}</strong></article>
+                <article><small>Grup</small><strong>{dashboard.groups}</strong></article>
+                <article><small>Riwayat panggilan</small><strong>{dashboard.calls}</strong></article>
+                <article className="pending"><small>Verifikasi menunggu</small><strong>{dashboard.pending}</strong></article>
+              </div>
+              <div className="atl-admin-users-head"><h4>Pengguna terbaru</h4><input value={userSearch} onChange={e => setUserSearch(e.target.value)} placeholder="Cari nama atau username…" aria-label="Cari pengguna"/></div>
+              <div className="atl-admin-users">
+                {dashboard.recentUsers.filter(person => ((person.display_name || "") + " " + (person.username || "")).toLowerCase().includes(userSearch.toLowerCase())).map(person => <article key={person.id}>
+                  <div className="atl-admin-user-avatar">{person.avatar_url ? <img src={person.avatar_url} alt=""/> : (person.display_name || person.username || "A").slice(0,1).toUpperCase()}</div>
+                  <div><b>{person.display_name || person.username || "Pengguna Atlantic"}</b><small>{person.username ? "@" + person.username : "Tanpa username"} · Bergabung {person.created_at ? new Date(person.created_at).toLocaleDateString("id-ID") : "—"}</small></div>
+                  {person.is_verified && <span className="atl-orange-verified">✓</span>}
+                </article>)}
+                {dashboard.recentUsers.filter(person => ((person.display_name || "") + " " + (person.username || "")).toLowerCase().includes(userSearch.toLowerCase())).length === 0 && <p className="atl-muted">Pengguna tidak ditemukan.</p>}
+              </div>
+              <button type="button" className="atl-admin-open-verification" onClick={() => setTab("verification")}>Kelola pengajuan verifikasi →</button>
+            </>}
+          </section>}
           {tab === "privacy" && <>
             <label className="atl-switch-row"><span><b>Akun private</b><small>Batasi penemuan profil melalui fitur pencarian yang mendukung privasi.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
             <label className="atl-switch-row"><span><b>Tampilkan status online</b><small>Izinkan pengguna melihat status online.</small></span><input type="checkbox" checked={!!profile.show_online_status} onChange={e => update("show_online_status", e.target.checked)}/></label>
@@ -152,7 +213,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
             <label>Siapa yang boleh mengundang ke grup<select value={profile.group_invite_policy || "everyone"} onChange={e => update("group_invite_policy", e.target.value)}><option value="everyone">Semua orang</option><option value="approval">Perlu persetujuan</option></select></label>
           </>}
           {message && <p className="atl-settings-message" role="status">{message}</p>}
-          <footer><button type="button" className="atl-secondary" onClick={onClose}>Tutup</button><button type="submit" disabled={busy || uploading}>{busy ? "Menyimpan…" : "Simpan perubahan"}</button></footer>
+          {tab !== "admin" && <footer><button type="button" className="atl-secondary" onClick={onClose}>Tutup</button>{(tab === "profile" || tab === "privacy") && <button type="submit" disabled={busy || uploading}>{busy ? "Menyimpan…" : "Simpan perubahan"}</button>}</footer>}
         </form>
       </section>
     </div>
