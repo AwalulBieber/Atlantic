@@ -623,7 +623,7 @@ export default function App() {
   ))}
 
   {(showSaved ? !savedBusy && !savedMessages.length : !filtered.length) && (
-    <p className="empty">{showArchived ? 'Belum ada chat yang diarsipkan' : 'Belum ada percakapan'}</p>
+    <p className="empty">{showSaved ? 'Belum ada pesan tersimpan' : showArchived ? 'Belum ada chat yang diarsipkan' : 'Belum ada percakapan'}</p>
   )}
 </div>
         <footer className="side-foot">ATLANTIC WEB <span>•</span> V1.1</footer>
