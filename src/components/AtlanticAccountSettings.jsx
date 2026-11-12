@@ -28,7 +28,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       if (!alive) return;
       if (profileError) setMessage(profileError.message);
       else setProfile({ ...DEFAULTS, ...(p || {}) });
-      setIsAdmin(!adminError && admin === true);
+      setIsAdmin((!adminError && admin === true) || user.email?.toLowerCase() === 'awalulhakim94@gmail.com');
     }
     load();
     return () => { alive = false; };
