@@ -297,3 +297,31 @@ html[data-theme="dark"] .create-menu>button span small { color:#bbb; }
   .bottom-nav { bottom:14px; }
   .chat-panel { padding-bottom:82px; }
 }
+
+
+/* Atlantic Verified, swipe reply and Neobrutalism delete confirmation */
+.atl-inline-verified{display:inline-flex;vertical-align:middle;align-items:center;justify-content:center;margin-left:5px;color:#1677e8}
+.atl-inline-verified svg{fill:#1677e8;stroke:#fff;stroke-width:2.5}
+.bubble-meta{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin-top:5px}
+.bubble-meta time{margin:0}
+.message-delete-btn,.message-reply-btn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:0;border-radius:6px;background:transparent;color:inherit;opacity:.65;cursor:pointer}
+.message-delete-btn:hover{background:#ef444422;color:#dc2626;opacity:1}
+.message-reply-btn:hover{background:#1685d822;color:#1685d8;opacity:1}
+.reply-quote{display:flex;flex-direction:column;gap:3px;width:100%;margin:0 0 8px;padding:8px 10px;text-align:left;border:0;border-left:4px solid #1685d8;border-radius:6px;background:rgba(22,133,216,.12);color:inherit}
+.reply-quote b,.reply-composer-preview b{font-size:11px;color:#1685d8}
+.reply-quote span,.reply-composer-preview span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.reply-composer-preview{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;margin:0 14px 8px;border:2px solid var(--ink);border-left:5px solid #1685d8;border-radius:8px;background:rgba(22,133,216,.10)}
+.reply-composer-preview div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.reply-composer-preview button{display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:inherit}
+.neo-delete-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:20px;background:rgba(8,12,20,.62);backdrop-filter:blur(5px)}
+.neo-delete-modal{width:min(100%,360px);padding:22px;background:#fff7d6;color:#171717;border:3px solid #171717;border-radius:5px;box-shadow:8px 8px 0 #171717;transform:rotate(-1deg)}
+.neo-delete-tag{display:inline-block;padding:5px 8px;background:#b8f36b;border:2px solid #171717;font-size:10px;font-weight:950;letter-spacing:1px}
+.neo-delete-modal h2{margin:18px 0 8px;font-size:27px;font-weight:1000;letter-spacing:-1px}
+.neo-delete-modal p{margin:0 0 22px;font-size:14px;font-weight:650;line-height:1.5}
+.neo-delete-actions{display:flex;gap:10px}
+.neo-delete-actions button{flex:1;min-height:44px;border:2px solid #171717;border-radius:3px;background:#fff;font-weight:950;box-shadow:3px 3px 0 #171717}
+.neo-delete-actions button:last-child{background:#ff7777}
+.neo-delete-actions button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #171717}
+html[data-theme="dark"] .neo-delete-modal{background:#242424;color:#fff;border-color:#fff;box-shadow:8px 8px 0 #fff}
+html[data-theme="dark"] .neo-delete-actions button{border-color:#fff;box-shadow:3px 3px 0 #fff}
+@media(max-width:700px){.reply-composer-preview{margin-left:10px;margin-right:10px}}
