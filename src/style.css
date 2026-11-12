@@ -411,3 +411,15 @@ html[data-theme="dark"] .neo-delete-actions button{border-color:#fff;box-shadow:
 @media(prefers-reduced-motion:reduce){.bubble-row,.atl-community,.bottom-nav,.bottom-nav .nav-create{animation:none!important;transition:none!important}}
 
 html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply-indicator,html[data-animations="off"] .atl-community,html[data-animations="off"] .bottom-nav,html[data-animations="off"] .bottom-nav .nav-create,html[data-animations="off"] .typing-indicator i{animation:none!important;transition:none!important}
+
+
+/* Atlantic Story photo and video media */
+.atl-story-card{overflow:hidden;display:flex;flex-direction:column;gap:9px}
+.atl-story-card p{margin:0;white-space:pre-wrap}
+.atl-story-media{display:block;width:100%;max-height:340px;object-fit:cover;border:2px solid var(--ink);border-radius:9px;background:#111}
+.atl-story-upload{display:grid;gap:8px;padding:12px;border:2px dashed #999;border-radius:10px}
+.atl-story-upload>button,.atl-story-preview>button{justify-self:start;display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border:2px solid var(--ink);border-radius:8px;background:var(--accent);color:#171717;font-weight:900;box-shadow:2px 2px 0 var(--ink)}
+.atl-story-upload>small{font-size:10px;color:#777}
+.atl-story-preview{display:grid;gap:8px;justify-items:start}
+.atl-story-preview img,.atl-story-preview video{display:block;width:100%;max-height:260px;object-fit:contain;border:2px solid var(--ink);border-radius:8px;background:#111}
+.atl-community-modal{max-height:90dvh;overflow:auto}
