@@ -855,3 +855,9 @@ html[data-animations="off"] :where(a,button,input,select,textarea,[role="button"
 .atl-channel-invite-link input{flex:1}
 .atl-channel-invite-link button{flex:0 0 auto;min-height:34px;padding:6px 10px;border:1.5px solid var(--ink);border-radius:8px;background:var(--accent,#ffd84d);color:#171717;font-size:10px;font-weight:900}
 @media(max-width:520px){.atl-channel-invite-link{align-items:stretch;flex-wrap:wrap}.atl-channel-invite-link input{flex-basis:100%}.atl-channel-owner-actions{justify-content:flex-start}}
+
+
+.atl-group-invite-link>label,.atl-channel-invite-settings label{display:grid;gap:5px;font-size:10px;font-weight:850}
+.atl-group-invite-link>label select,.atl-group-invite-link>label input,.atl-channel-invite-settings select,.atl-channel-invite-settings input{width:100%;min-height:35px;padding:7px 9px;border:1px solid var(--ink,#171717);border-radius:8px;background:var(--panel,#fff);color:var(--ink,#171717);font-size:11px}
+.atl-channel-invite-settings{display:flex;gap:10px;flex-wrap:wrap;margin:9px 0}
+.atl-channel-invite-settings label{flex:1;min-width:150px}
