@@ -1,0 +1,1 @@
+revoke update on table public.atlantic_call_signals from authenticated, anon, public;
