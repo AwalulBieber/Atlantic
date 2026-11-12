@@ -505,3 +505,6 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .neo-delete-actions{flex-wrap:wrap}
 .neo-delete-actions button{min-width:0;padding:0 7px;font-size:11px;letter-spacing:.1px}
 @media(max-width:390px){.neo-delete-modal{padding:18px}.neo-delete-actions{gap:7px}.neo-delete-actions button{font-size:10px}}
+
+
+.atl-online-dot{display:inline-block;width:7px;height:7px;margin:0 5px 1px 0;border-radius:50%;background:#22c55e;box-shadow:0 0 0 2px var(--paper)}
