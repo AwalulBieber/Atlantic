@@ -11,7 +11,7 @@ import AtlanticPolls from './components/AtlanticPolls';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
-  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BadgeCheck, Trash2, Reply, CheckCheck
+  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -80,6 +80,7 @@ export default function App() {
   const [draft, setDraft] = useState('');
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState('');
+  const [showChatPolls, setShowChatPolls] = useState(false);
   const attachmentInputRef = useRef(null);
   const [sending, setSending] = useState(false);
   const [mobileChat, setMobileChat] = useState(false);
@@ -936,8 +937,6 @@ export default function App() {
               </div>}
             </header>
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
-            {active.is_group&&<AtlanticPolls targetType="group" targetId={active.conversation_id} user={session.user} canCreate onNotice={setNotice}/>}
-
             <div className="messages">
               {messages.map(m => (
                 <div
@@ -983,9 +982,11 @@ export default function App() {
             </div>
             {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
             {attachmentPreview && <div className="atl-chat-attachment-preview"><span>{attachmentFile?.name}</span><button type="button" onClick={() => {setAttachmentFile(null);setAttachmentPreview('');}}>Hapus</button></div>}
+            {showChatPolls && active.is_group && <div className="atl-chat-polls-panel"><AtlanticPolls targetType="group" targetId={active.conversation_id} user={session.user} canCreate onNotice={setNotice}/></div>}
             <form className="composer" onSubmit={sendMessage}>
               <input ref={attachmentInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" onChange={chooseChatAttachment} hidden />
               <button type="button" className="atl-chat-attach" onClick={() => attachmentInputRef.current?.click()} aria-label="Lampirkan foto, video, atau file"><ImagePlus size={19}/></button>
+              {active.is_group && <button type="button" className={`atl-chat-attach atl-chat-poll-trigger${showChatPolls ? ' is-active' : ''}`} onClick={() => setShowChatPolls(value => !value)} aria-label="Buka fitur polling" title="Polling"><BarChart3 size={19}/></button>}
               <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder={active.is_group ? 'Pesan ke ' + active.title + '…' : 'Tulis pesan…'} autoComplete="off" />
               <button className="send" disabled={(!draft.trim() && !attachmentFile) || sending} aria-label="Kirim pesan">{sending ? <span className="button-spinner" /> : <Send size={19} />}</button>
             </form>
