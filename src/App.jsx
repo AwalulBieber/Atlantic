@@ -365,6 +365,8 @@ export default function App() {
 
   async function openGroupChat(group) {
     setNotice('');
+    setUnread(old => { const next = { ...old }; delete next[group.conversation_id]; return next; });
+    setIncomingNotice(null);
     setActive({ conversation_id: group.conversation_id, person: group.person, is_group: true, title: group.title, pinned_message_id:group.pinned_message_id, members: group.members || [] });
     setReplyTarget(null);
     setMobileChat(true);
@@ -586,13 +588,15 @@ export default function App() {
           .eq('id', message.sender_id).single();
         if (profileError || !person) return;
 
+        const targetChat = chats.find(chat => chat.conversation_id === message.conversation_id);
+        const unreadKey = targetChat?.is_group ? message.conversation_id : person.id;
         await supabase.from('messages').update({ delivered_at: new Date().toISOString() }).eq('id', message.id).is('delivered_at', null);
-        setUnread(old => ({ ...old, [person.id]: (old[person.id] || 0) + 1 }));
-        setIncomingNotice({ person, body: message.body || 'Mengirim pesan' });
+        setUnread(old => ({ ...old, [unreadKey]: (old[unreadKey] || 0) + 1 }));
+        setIncomingNotice({ person, body: message.body || 'Mengirim pesan', conversationId: message.conversation_id, isGroup: Boolean(targetChat?.is_group), groupTitle: targetChat?.title });
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, [session?.user?.id, active?.conversation_id]);
+  }, [session?.user?.id, active?.conversation_id, chats]);
 
   useEffect(() => {
     if (!active?.conversation_id || !session?.user?.id) return;
@@ -805,6 +809,7 @@ export default function App() {
           <b>{c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
           <small>Ketuk untuk membuka chat</small>
         </div>
+        {(unread[c.is_group ? c.conversation_id : c.person.id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.is_group ? c.conversation_id : c.person.id] || 0) + ' pesan belum dibaca'}>{(unread[c.is_group ? c.conversation_id : c.person.id] || 0) > 99 ? '99+' : unread[c.is_group ? c.conversation_id : c.person.id]}</span>}
         <MessageCircle size={17} />
       </button>
       <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
@@ -899,9 +904,18 @@ export default function App() {
       {atlanticDialog && <div className="atl-dialog-backdrop" onMouseDown={event => { if(event.target===event.currentTarget) closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false); }}><section className="atl-dialog-card" role="dialog" aria-modal="true" aria-labelledby="atl-dialog-title"><span className="atl-dialog-eyebrow">ATLANTIC / CONFIRMATION</span><h2 id="atl-dialog-title">{atlanticDialog.title || 'Konfirmasi'}</h2><p>{atlanticDialog.message}</p>{atlanticDialog.type==='prompt' && <textarea autoFocus value={atlanticDialogValue} onChange={event=>setAtlanticDialogValue(event.target.value)} placeholder={atlanticDialog.placeholder || 'Tulis di sini…'} maxLength={atlanticDialog.maxLength || 1000}/>}<footer><button type="button" className="atl-dialog-cancel" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false)}>{atlanticDialog.cancelLabel || 'Batal'}</button><button type="button" className="atl-dialog-confirm" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?atlanticDialogValue:true)}>{atlanticDialog.confirmLabel || 'Lanjutkan'}</button></footer></section></div>}
       {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={() => confirmDeleteMessage('me')}>UNTUK SAYA</button>{deleteTarget.sender_id === session.user.id && <button type="button" onClick={() => confirmDeleteMessage('everyone')}>UNTUK SEMUA</button>}</div></section></div>}
       {incomingNotice && (
-        <button className="toast" onClick={() => { const person = incomingNotice.person; setIncomingNotice(null); openChat(person); }}>
-          <b>{incomingNotice.person.display_name || incomingNotice.person.username}</b><br />
-          {incomingNotice.body}<span>　×</span>
+        <button className="toast incoming-message-toast" onClick={() => {
+          const notice = incomingNotice;
+          setIncomingNotice(null);
+          if (notice.isGroup) {
+            const group = chats.find(chat => chat.conversation_id === notice.conversationId);
+            if (group) openGroupChat(group);
+          } else openChat(notice.person);
+        }}>
+          <b>{incomingNotice.person.display_name || incomingNotice.person.username}</b>
+          {incomingNotice.isGroup && <small> di {incomingNotice.groupTitle || 'Grup Atlantic'}</small>}
+          <span className="incoming-toast-body">{incomingNotice.body}</span>
+          <span className="incoming-toast-close">×</span>
         </button>
       )}
 
