@@ -111,7 +111,16 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'atlantic_call_signals',
         filter: 'call_id=eq.' + callId
-      }, payload => { handleSignal(payload.new).catch(err => setError(err.message || 'Sinyal panggilan gagal diproses.')); });
+      }, payload => { handleSignal(payload.new).catch(err => setError(err.message || 'Sinyal panggilan gagal diproses.')); })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'atlantic_call_sessions',
+        filter: 'id=eq.' + callId
+      }, payload => {
+        if (['declined','cancelled','ended','missed'].includes(payload.new.status) && callRef.current?.id === callId) {
+          setPhase(payload.new.status === 'declined' ? 'Panggilan ditolak' : 'Panggilan berakhir');
+          cleanup();
+        }
+      });
     signalChannelRef.current = channel;
     await new Promise((resolve, reject) => {
       let settled = false;
@@ -295,6 +304,14 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
         event: 'INSERT', schema: 'public', table: 'atlantic_call_sessions',
         filter: 'callee_id=eq.' + user.id
       }, payload => { if (payload.new.status === 'requested') showIncoming(payload.new); })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'atlantic_call_sessions',
+        filter: 'callee_id=eq.' + user.id
+      }, payload => {
+        if (['cancelled','declined','ended','missed'].includes(payload.new.status)) {
+          setIncoming(current => current?.id === payload.new.id ? null : current);
+        }
+      })
       .subscribe();
     loadPending();
     return () => { alive = false; supabase.removeChannel(channel); };
