@@ -7,7 +7,7 @@ const DEFAULTS = {
   read_receipts_enabled: true, group_invite_policy: "everyone",
 };
 
-export default function AtlanticAccountSettings({ user, onClose }) {
+export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [tab, setTab] = useState("profile");
   const [profile, setProfile] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -81,7 +81,7 @@ export default function AtlanticAccountSettings({ user, onClose }) {
     };
     const { error } = await supabase.from("profiles").update(payload).eq("id", user.id);
     setBusy(false);
-    setMessage(error ? "Gagal menyimpan: " + error.message : "Perubahan berhasil disimpan.");
+    if (error) setMessage("Gagal menyimpan: " + error.message);\n    else { setMessage("Perubahan berhasil disimpan."); onSaved?.(profile); }
   }
 
   if (!profile) {
