@@ -27,6 +27,8 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [channelInviteLink,setChannelInviteLink]=useState('');
   const [channelInviteLinkId,setChannelInviteLinkId]=useState('');
   const [channelInviteBusy,setChannelInviteBusy]=useState(false);
+  const [channelInviteExpiry,setChannelInviteExpiry]=useState('never');
+  const [channelInviteMaxUses,setChannelInviteMaxUses]=useState('');
   const [channelMediaFile,setChannelMediaFile]=useState(null);
   const channelMediaInput=useRef(null);
   const [busy,setBusy]=useState(false);
@@ -284,8 +286,11 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     if(!selectedChannel||selectedChannel.owner_id!==user.id||channelInviteBusy)return;
     setChannelInviteBusy(true);setError('');
     const token=crypto.randomUUID().replace(/-/g,'')+crypto.randomUUID().replace(/-/g,'');
+    const maxUses=channelInviteMaxUses.trim()?Number(channelInviteMaxUses):null;
+    if(maxUses!==null&&(!Number.isInteger(maxUses)||maxUses<1)){setError('Batas penggunaan link harus berupa angka minimal 1.');setChannelInviteBusy(false);return;}
+    const expiresAt=channelInviteExpiry==='never'?null:new Date(Date.now()+Number(channelInviteExpiry)*86400000).toISOString();
     const {data:id,error:e}=await supabase.rpc('create_atlantic_invite_link',{
-      p_invite_type:'channel',p_resource_id:selectedChannel.id,p_token:token,p_expires_at:null,p_max_uses:null
+      p_invite_type:'channel',p_resource_id:selectedChannel.id,p_token:token,p_expires_at:expiresAt,p_max_uses:maxUses
     });
     if(e){setError('Link undangan saluran gagal dibuat: '+e.message);setChannelInviteBusy(false);return;}
     const url=window.location.origin+'/?atlanticInvite='+encodeURIComponent(token);
@@ -360,6 +365,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
           <div><h2>{selectedChannel.name}</h2><p>{selectedChannel.description||'Saluran komunitas Atlantic'}</p><small>{posts.length} postingan · {selectedChannel.owner_id===user.id?'Saluran milikmu':'Saluran komunitas'}</small></div>
           {selectedChannel.owner_id===user.id&&<div className="atl-channel-owner-actions"><button type="button" className="atl-channel-settings-btn" onClick={()=>{setChannelName(selectedChannel.name);setChannelDescription(selectedChannel.description||'');setChannelAvatarPreview('');setChannelSettingsOpen(true);}}>Pengaturan</button><button type="button" className="atl-channel-settings-btn" onClick={createChannelInviteLink} disabled={channelInviteBusy}>{channelInviteBusy?'Memproses…':'Undang teman'}</button></div>}
         </div>
+        {selectedChannel.owner_id===user.id&&<div className="atl-channel-invite-settings"><label>Masa berlaku<select value={channelInviteExpiry} onChange={e=>setChannelInviteExpiry(e.target.value)}><option value="never">Tidak kedaluwarsa</option><option value="1">1 hari</option><option value="7">7 hari</option><option value="30">30 hari</option></select></label><label>Batas penggunaan (opsional)<input type="number" min="1" max="10000" value={channelInviteMaxUses} onChange={e=>setChannelInviteMaxUses(e.target.value)} placeholder="Kosong = tanpa batas"/></label></div>}
         {channelInviteLink&&<div className="atl-channel-invite-link"><input readOnly value={channelInviteLink} onFocus={e=>e.target.select()}/><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(channelInviteLink);onNotice?.('Link saluran disalin.');}catch{setError('Gagal menyalin otomatis. Tekan dan tahan link untuk menyalin.');}}}>Salin</button><button type="button" onClick={revokeChannelInviteLink} disabled={channelInviteBusy}>Nonaktifkan</button></div>}
         <div className="atl-channel-posts">{posts.map(p=><article key={p.id}><div className="atl-channel-post-author"><span>{people[p.author_id]?.avatar_url?<img src={people[p.author_id].avatar_url} alt=""/>:(people[p.author_id]?.display_name||people[p.author_id]?.username||'A').slice(0,1).toUpperCase()}</span><b>{people[p.author_id]?.display_name||people[p.author_id]?.username||'Pengguna Atlantic'} {people[p.author_id]?.is_verified&&<BadgeCheck size={13}/>}</b></div>{p.media_url&&(p.media_type?.startsWith('image/')?<img className="atl-channel-media" src={p.media_url} alt={p.media_name||'Media saluran'}/>:p.media_type?.startsWith('video/')?<video className="atl-channel-media" src={p.media_url} controls playsInline/>:<a href={p.media_url} target="_blank" rel="noreferrer">📎 {p.media_name||'Lampiran'}</a>)}{p.body&&<p>{p.body}</p>}<small>{dateLabel(p.created_at)}</small>{(p.author_id===user.id||selectedChannel.owner_id===user.id)&&<button type="button" className="atl-channel-delete-post" onClick={()=>deleteChannelPost(p)} disabled={busy}>Hapus postingan</button>}</article>)}{!posts.length&&<div className="atl-community-empty">Belum ada postingan di saluran ini.</div>}</div>
         <form className="atl-community-compose" onSubmit={publishPost}><input ref={channelMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" hidden onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(file.size>50*1024*1024){setError('Ukuran media maksimal 50 MB.');return;}setChannelMediaFile(file);}}/><button type="button" onClick={()=>channelMediaInput.current?.click()} aria-label="Lampirkan media"><ImagePlus size={18}/></button><input value={body} onChange={e=>setBody(e.target.value)} placeholder="Tulis postingan…" maxLength={2000}/><button disabled={busy||(!body.trim()&&!channelMediaFile)}><Send size={18}/></button></form>{channelMediaFile&&<small className="atl-channel-attachment">Lampiran: {channelMediaFile.name} <button type="button" onClick={()=>setChannelMediaFile(null)}>Hapus</button></small>}
