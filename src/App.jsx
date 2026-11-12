@@ -4,7 +4,7 @@ import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
-  Clock3, Radio, Phone, NotebookPen, ImagePlus
+  Clock3, Radio, Phone, NotebookPen, ImagePlus, ShieldCheck, Trash2, Reply
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -55,6 +55,9 @@ export default function App() {
   const [incomingNotice, setIncomingNotice] = useState(null);
   const [activeTab, setActiveTab] = useState('chat');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [replyTarget, setReplyTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const touchStartX = useRef(0);
 
   const seenMessages = useRef(new Set());
   const bottomRef = useRef(null);
@@ -191,9 +194,13 @@ export default function App() {
     return;
   }
 
+  const peopleWithBadges = await Promise.all((people || []).map(async person => {
+    const { data: isAdmin, error: badgeError } = await supabase.rpc('is_atlantic_admin', { target_user: person.id });
+    return { ...person, is_admin: !badgeError && isAdmin === true };
+  }));
   setChats((members || []).map(m => ({
     conversation_id: m.conversation_id,
-    person: people.find(p => p.id === m.user_id)
+    person: peopleWithBadges.find(p => p.id === m.user_id)
   })).filter(c => c.person));
   }
 
@@ -218,6 +225,7 @@ export default function App() {
         return next;
       });
       setIncomingNotice(null);
+      setReplyTarget(null);
       setActive({ conversation_id: conversationId, person });
       setMobileChat(true);
       await loadMessages(conversationId);
@@ -230,14 +238,20 @@ export default function App() {
   async function loadMessages(id) {
     const { data, error } = await supabase
       .from('messages')
-      .select('id,conversation_id,sender_id,body,created_at')
+      .select('id,conversation_id,sender_id,body,created_at,reply_to')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true });
     if (error) {
       setNotice(error.message);
       return;
     }
-    setMessages(data || []);
+    const replyIds = [...new Set((data || []).map(m => m.reply_to).filter(Boolean))];
+    let replyMap = {};
+    if (replyIds.length) {
+      const { data: originals } = await supabase.from('messages').select('id,body,sender_id').in('id', replyIds);
+      replyMap = Object.fromEntries((originals || []).map(item => [item.id, item]));
+    }
+    setMessages((data || []).map(m => ({ ...m, replyPreview: replyMap[m.reply_to] || null })));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
   }
 
@@ -249,9 +263,18 @@ export default function App() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'messages',
         filter: `conversation_id=eq.${active.conversation_id}`
-      }, payload => {
-        setMessages(old => old.some(m => m.id === payload.new.id) ? old : [...old, payload.new]);
+      }, async payload => {
+        const incoming = payload.new;
+        if (incoming.reply_to) {
+          const { data: original } = await supabase.from('messages').select('id,body,sender_id').eq('id', incoming.reply_to).maybeSingle();
+          incoming.replyPreview = original || null;
+        }
+        setMessages(old => old.some(m => m.id === incoming.id) ? old : [...old, incoming]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
+        const deleted = payload.old;
+        if (deleted?.id) setMessages(old => old.filter(m => m.id !== deleted.id).map(m => m.reply_to === deleted.id ? { ...m, reply_to: null, replyPreview: null } : m));
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
@@ -296,13 +319,28 @@ export default function App() {
     const { error } = await supabase.from('messages').insert({
       conversation_id: active.conversation_id,
       sender_id: session.user.id,
-      body
+      body,
+      reply_to: replyTarget?.id || null
     });
     if (error) {
       setDraft(body);
       setNotice('Pesan gagal dikirim: ' + error.message);
+    } else {
+      setReplyTarget(null);
     }
     setSending(false);
+  }
+
+  async function confirmDeleteMessage() {
+    const message = deleteTarget;
+    if (!message || message.sender_id !== session.user.id) return;
+    const { error } = await supabase.from('messages').delete().eq('id', message.id).eq('sender_id', session.user.id);
+    if (error) setNotice('Pesan gagal dihapus: ' + error.message);
+    else {
+      setMessages(old => old.filter(m => m.id !== message.id).map(m => m.reply_to === message.id ? { ...m, reply_to: null, replyPreview: null } : m));
+      if (replyTarget?.id === message.id) setReplyTarget(null);
+    }
+    setDeleteTarget(null);
   }
 
   async function logout() {
@@ -413,7 +451,7 @@ export default function App() {
         {initials(c.person.display_name || c.person.username)}
       </div>
       <div className="person-info">
-        <b>{c.person.display_name || c.person.username}</b>
+        <b>{c.person.display_name || c.person.username}{c.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={14}/></span>}</b>
         <small>Ketuk untuk membuka chat</small>
       </div>
       <MessageCircle size={17} />
@@ -434,14 +472,20 @@ export default function App() {
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
               <div className="avatar">{initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person">
-                <b>{active.person.display_name || active.person.username}</b>
+                <b>{active.person.display_name || active.person.username}{active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><ShieldCheck size={15}/></span>}</b>
                 <small>@{active.person.username}</small>
               </div>
             </header>
             <div className="messages">
               {messages.map(m => (
-                <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id}>
-                  <div className="bubble"><div>{m.body}</div><time>{time(m.created_at)}</time></div>
+                <div className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''}`} key={m.id} id={`message-${m.id}`}
+                  onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
+                  onTouchEnd={e => { const delta = e.changedTouches[0].clientX - touchStartX.current; if (delta > 65) setReplyTarget(m); }}>
+                  <div className="bubble">
+                    {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.person.display_name || active.person.username)}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
+                    <div>{m.body}</div>
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button>{m.sender_id === session.user.id && <button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button>}</div>
+                  </div>
                 </div>
               ))}
               {!messages.length && (
@@ -452,6 +496,7 @@ export default function App() {
               )}
               <div ref={bottomRef} />
             </div>
+            {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
             <form className="composer" onSubmit={sendMessage}>
               <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Tulis pesan…" autoComplete="off" />
               <button className="send" disabled={!draft.trim() || sending} aria-label="Kirim pesan">
@@ -469,6 +514,7 @@ export default function App() {
       </section>
 
       {notice && <button className="toast" onClick={() => setNotice('')}>{notice}　×</button>}
+      {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Konfirmasi hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pesan ini akan dihapus untuk semua orang dalam percakapan.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={confirmDeleteMessage}>HAPUS</button></div></section></div>}
       {incomingNotice && (
         <button className="toast" onClick={() => { const person = incomingNotice.person; setIncomingNotice(null); openChat(person); }}>
           <b>{incomingNotice.person.display_name || incomingNotice.person.username}</b><br />
