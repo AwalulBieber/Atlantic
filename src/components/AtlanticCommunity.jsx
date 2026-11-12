@@ -48,9 +48,9 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
           return {...story,media_url:signed?.signedUrl||null};
         }));
         setStories(signedStories);
-        await loadPeople([...(s.data||[]).map(story=>story.user_id),...(n.data||[]).map(note=>note.user_id)]);
       }
       if(n.error) setError(v=>v||('Catatan: '+n.error.message)); else setNotes(n.data||[]);
+      await loadPeople([...(s.data||[]).map(story=>story.user_id),...(n.data||[]).map(note=>note.user_id)]);
     } else if(tab==='channels') {
       const {data,error:e}=await supabase.from('atlantic_channels').select('id,owner_id,name,description,is_public,created_at').eq('is_public',true).order('created_at',{ascending:false}).limit(60);
       if(e) setError(e.message); else {setChannels(data||[]);await loadPeople((data||[]).map(channel=>channel.owner_id));}
@@ -128,7 +128,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     if(e1) setError(e1.message);
     else {
       const {error:e2}=await supabase.from('atlantic_channel_members').insert({channel_id:data.id,user_id:user.id,role:'owner'});
-      if(e2) setError(e2.message); else {setChannelName('');setChannelDescription('');setShowCreate(false);setChannels(v=>[data,...v]);setSelectedChannel(data);}
+      if(e2){await supabase.from('atlantic_channels').delete().eq('id',data.id).eq('owner_id',user.id);setError('Gagal menyiapkan keanggotaan saluran: '+e2.message);} else {setChannelName('');setChannelDescription('');setShowCreate(false);setChannels(v=>[data,...v]);setSelectedChannel(data);}
     }
     setBusy(false);
   }
