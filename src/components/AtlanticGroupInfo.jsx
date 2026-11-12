@@ -50,7 +50,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
     else{
       if(group.avatar_url&&avatarPath!==group.avatar_url)await supabase.storage.from('atlantic-chat-media').remove([group.avatar_url]);
       const {data:signed}=avatarPath?await supabase.storage.from('atlantic-chat-media').createSignedUrl(avatarPath,3600):{data:null};
-      setAvatarUrl(signed?.signedUrl||'');setAvatarFile(null);setAvatarPreview('');const saved={...group,avatar_url:avatarPath};setGroup(saved);onUpdated?.(saved);
+      setAvatarUrl(signed?.signedUrl||'');setAvatarFile(null);setAvatarPreview('');const saved={...group,avatar_url:avatarPath,avatar_signed_url:signed?.signedUrl||null};setGroup(saved);onUpdated?.(saved);
     }
     setBusy(false);
   }
