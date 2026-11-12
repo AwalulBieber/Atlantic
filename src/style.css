@@ -630,3 +630,19 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 
 .atl-pinned-message{display:grid;gap:3px;width:calc(100% - 24px);margin:10px 12px 0;padding:9px 12px;text-align:left;border:2px solid var(--ink);border-radius:10px;background:#fff1b8;color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
 .atl-pinned-message span{font-size:10px;font-weight:950;color:#8a5a00}.atl-pinned-message b{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Group invitation inbox */
+.atl-group-invites-widget{padding:8px 12px 10px;border-bottom:1px solid #8883}
+.atl-group-invites-trigger{display:flex;align-items:center;gap:7px;width:100%;padding:8px 11px;border:2px solid var(--ink);border-radius:9px;background:var(--panel,#fff);color:var(--ink);font-size:12px;font-weight:900;box-shadow:2px 2px 0 var(--ink)}
+.atl-group-invites-trigger b{margin-left:auto;display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:20px;background:var(--pink);border:1px solid var(--ink)}
+.atl-group-invites-backdrop{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:14px;background:#090b14a8;backdrop-filter:blur(5px)}
+.atl-group-invites-modal{width:min(100%,480px);max-height:85dvh;overflow:auto;border:3px solid var(--ink);border-radius:14px;background:var(--panel,#fff);color:var(--ink);box-shadow:7px 7px 0 var(--ink)}
+.atl-group-invites-modal>header{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:2px solid var(--ink);background:var(--pink)}
+.atl-group-invites-modal>header b{display:flex;align-items:center;gap:8px;font-weight:950}.atl-group-invites-modal>header button{display:grid;place-items:center;width:34px;height:34px;border:2px solid var(--ink);border-radius:8px;background:#fff}
+.atl-group-invites-modal>article{display:flex;align-items:center;gap:10px;padding:13px;border-bottom:1px solid #8885}
+.atl-group-invites-avatar{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;border:2px solid var(--ink);border-radius:12px;background:var(--accent)}
+.atl-group-invites-info{display:grid;gap:4px;min-width:0;flex:1}.atl-group-invites-info b{font-size:13px;overflow-wrap:anywhere}.atl-group-invites-info small{font-size:10px;color:var(--muted)}
+.atl-group-invites-actions{display:grid;gap:5px}.atl-group-invites-actions button{display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 8px;border:1.5px solid var(--ink);border-radius:7px;background:#a7efbd;font-size:10px;font-weight:900}.atl-group-invites-actions button+button{background:#fee2e2}
+.atl-group-invites-empty,.atl-group-invites-error{margin:0;padding:22px;text-align:center;font-size:12px;color:var(--muted)}.atl-group-invites-error{color:#b91c1c}
+.atl-group-invites-modal>footer{display:flex;align-items:center;gap:6px;padding:10px 14px;font-size:10px;color:var(--muted)}
+@media(max-width:480px){.atl-group-invites-backdrop{padding:0}.atl-group-invites-modal{width:100%;max-height:100dvh;height:auto;border-radius:0 0 14px 14px}}
