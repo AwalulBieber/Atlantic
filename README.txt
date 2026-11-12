@@ -112,3 +112,10 @@ ATLANTIC ADMIN DASHBOARD
 - Kebijakan SELECT admin dibatasi melalui fungsi public.is_atlantic_admin(auth.uid()); pengguna biasa tetap mengikuti RLS masing-masing.
 - Dashboard tidak mengambil isi pesan pribadi.
 - Migrasi database: 202611120015_atlantic_admin_dashboard_read_access.sql.
+
+PENGHAPUSAN PESAN PER PENGGUNA
+=============================
+- "Hapus untuk saya" menyimpan status tersembunyi di message_user_states, sehingga pesan tetap ada untuk anggota lain.
+- "Hapus untuk semua orang" menghapus pesan asli dan menyinkronkan penghapusan melalui Supabase Realtime.
+- Status penghapusan pribadi dibatasi RLS ke pemilik akun dan disinkronkan antar-perangkat.
+- Migrasi realtime: 202611120016_atlantic_message_visibility_realtime.sql.
