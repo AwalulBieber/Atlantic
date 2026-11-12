@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
+import AtlanticCallManager from './components/AtlanticCallManager';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users,  
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check,
@@ -66,6 +67,7 @@ export default function App() {
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [unread, setUnread] = useState({});
   const [incomingNotice, setIncomingNotice] = useState(null);
+  const [callIntent, setCallIntent] = useState(null);
   const [activeTab, setActiveTab] = useState('chat');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [communityCreateRequest, setCommunityCreateRequest] = useState(0);
@@ -558,10 +560,15 @@ export default function App() {
     setSending(false);
   }
 
-  async function requestCall(callType) {
-    if (!active?.person?.id || !session?.user?.id) return;
-    const { error } = await supabase.from('atlantic_call_sessions').insert({ caller_id: session.user.id, callee_id: active.person.id, call_type: callType, status: 'requested' });
-    setNotice(error ? 'Undangan panggilan gagal: ' + error.message : 'Undangan panggilan tercatat. Panggilan audio/video langsung belum aktif.');
+  function requestCall(callType) {
+    if (!active?.person?.id || !active?.conversation_id || active.is_group || !session?.user?.id) return;
+    setCallIntent({
+      id: crypto.randomUUID(),
+      callType,
+      conversationId: active.conversation_id,
+      target: active.person
+    });
+    setNotice('');
   }
 
   async function confirmDeleteMessage() {
@@ -935,6 +942,12 @@ export default function App() {
         <button className={activeTab === 'channels' ? 'active' : ''} onClick={() => setActiveTab('channels')}><Radio/><span>Saluran</span></button>
         <button className={activeTab === 'calls' ? 'active' : ''} onClick={() => setActiveTab('calls')}><Phone/><span>Panggilan</span></button>
       </nav>
+
+      <AtlanticCallManager
+        user={session.user}
+        intent={callIntent}
+        onIntentHandled={() => setCallIntent(null)}
+      />
 
       {accountSettingsOpen && (
         <AtlanticAccountSettings
