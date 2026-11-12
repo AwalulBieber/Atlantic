@@ -627,3 +627,6 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-group-permissions select{max-width:155px;padding:9px;border:2px solid var(--ink);border-radius:9px;background:var(--panel,#fff);color:var(--ink);font-weight:850}
 .atl-group-permissions>p{margin:0;font-size:10px;color:var(--muted)}
 @media(max-width:480px){.atl-channel-profile-head{gap:9px;padding:10px}.atl-channel-profile-avatar{width:50px;height:50px;flex-basis:50px}.atl-channel-profile-head h2{font-size:16px}.atl-channel-settings-btn{padding:7px;font-size:10px}.atl-group-permissions{margin:10px 14px}.atl-group-permissions label{align-items:flex-start;flex-direction:column}.atl-group-permissions select{max-width:none;width:100%}}
+
+.atl-pinned-message{display:grid;gap:3px;width:calc(100% - 24px);margin:10px 12px 0;padding:9px 12px;text-align:left;border:2px solid var(--ink);border-radius:10px;background:#fff1b8;color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.atl-pinned-message span{font-size:10px;font-weight:950;color:#8a5a00}.atl-pinned-message b{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
