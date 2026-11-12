@@ -33,7 +33,8 @@ const FONT_OPTIONS = [
 ];
 
 export default function App() {
-  const [session, setSession] = useState(null);\n  const [myProfile, setMyProfile] = useState(null);
+  const [session, setSession] = useState(null);
+  const [myProfile, setMyProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
