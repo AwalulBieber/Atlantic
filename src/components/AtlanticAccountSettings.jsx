@@ -207,10 +207,10 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
             </>}
           </section>}
           {tab === "privacy" && <>
-            <label className="atl-switch-row"><span><b>Akun private</b><small>Batasi penemuan profil melalui fitur pencarian yang mendukung privasi.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
-            <label className="atl-switch-row"><span><b>Tampilkan status online</b><small>Izinkan pengguna melihat status online.</small></span><input type="checkbox" checked={!!profile.show_online_status} onChange={e => update("show_online_status", e.target.checked)}/></label>
+            <label className="atl-switch-row"><span><b>Akun private</b><small>Sembunyikan profil dari daftar pemilihan anggota saat pengguna membuat grup baru.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
+            <label className="atl-switch-row"><span><b>Tampilkan status online</b><small>Jika aktif, status online kamu dapat terlihat di header chat.</small></span><input type="checkbox" checked={!!profile.show_online_status} onChange={e => update("show_online_status", e.target.checked)}/></label>
             <label className="atl-switch-row"><span><b>Tanda dibaca</b><small>Izinkan tanda pesan telah dibaca.</small></span><input type="checkbox" checked={!!profile.read_receipts_enabled} onChange={e => update("read_receipts_enabled", e.target.checked)}/></label>
-            <label>Siapa yang boleh mengundang ke grup<select value={profile.group_invite_policy || "everyone"} onChange={e => update("group_invite_policy", e.target.value)}><option value="everyone">Semua orang</option><option value="approval">Perlu persetujuan</option></select></label>
+            <label>Siapa yang boleh mengundang ke grup<select value={profile.group_invite_policy || "everyone"} onChange={e => update("group_invite_policy", e.target.value)}><option value="everyone">Semua orang</option><option value="approval">Perlu persetujuan</option></select><small className="atl-settings-hint">Pengaturan persetujuan undangan belum aktif; pilihan ini belum membatasi undangan grup.</small></label>
           </>}
           {message && <p className="atl-settings-message" role="status">{message}</p>}
           {tab !== "admin" && <footer><button type="button" className="atl-secondary" onClick={onClose}>Tutup</button>{(tab === "profile" || tab === "privacy") && <button type="submit" disabled={busy || uploading}>{busy ? "Menyimpan…" : "Simpan perubahan"}</button>}</footer>}
