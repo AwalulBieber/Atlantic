@@ -25,6 +25,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
   const callRef = useRef(null);
   const pendingIceRef = useRef([]);
   const endedRef = useRef(false);
+  const startedIntentRef = useRef(null);
 
   const attachStream = useCallback((stream) => {
     setLocalStream(stream);
@@ -90,6 +91,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
     const pc = pcRef.current;
     if (signal.signal_type === 'answer' && pc && !pc.remoteDescription) {
       await pc.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      if (callRef.current) { callRef.current.status = 'accepted'; setCall({ ...callRef.current }); }
       await flushIce();
     } else if (signal.signal_type === 'ice' && pc) {
       if (pc.remoteDescription) {
@@ -187,7 +189,10 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
   }, [attachStream, cleanup, createPeer, onIntentHandled, sendSignal, subscribeSignals, user?.id]);
 
   useEffect(() => {
-    if (intent?.id) startOutgoing(intent);
+    if (intent?.id && startedIntentRef.current !== intent.id) {
+      startedIntentRef.current = intent.id;
+      startOutgoing(intent);
+    }
   }, [intent?.id, startOutgoing]);
 
   const acceptIncoming = useCallback(async () => {
@@ -232,13 +237,11 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
 
   const rejectIncoming = useCallback(async () => {
     if (!incoming) return;
+    await supabase.from('atlantic_call_signals').insert({
+      call_id: incoming.id, sender_id: user.id, recipient_id: incoming.caller_id,
+      signal_type: 'decline', payload: {}
+    });
     await supabase.from('atlantic_call_sessions').update({ status: 'declined', ended_at: new Date().toISOString() }).eq('id', incoming.id);
-    try {
-      await supabase.from('atlantic_call_signals').insert({
-        call_id: incoming.id, sender_id: user.id, recipient_id: incoming.caller_id,
-        signal_type: 'decline', payload: {}
-      });
-    } catch {}
     setIncoming(null);
   }, [incoming, user?.id]);
 
@@ -300,7 +303,7 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
   if (!incoming && !call && !error) return null;
   return <div className="atl-call-backdrop">
     <section className={'atl-call-modal ' + (call?.call_type === 'video' ? 'is-video' : '')}>
-      <header><b>{incoming ? 'Panggilan masuk' : call?.direction === 'outgoing' ? 'Panggilan keluar' : 'Panggilan berlangsung'}</b><button type="button" onClick={call ? endCall : () => { setIncoming(null); setError(''); }} aria-label="Tutup"><X size={19}/></button></header>
+      <header><b>{incoming ? 'Panggilan masuk' : call?.direction === 'outgoing' ? 'Panggilan keluar' : 'Panggilan berlangsung'}</b><button type="button" onClick={call ? endCall : incoming ? rejectIncoming : () => { setIncoming(null); setError(''); }} aria-label="Tutup"><X size={19}/></button></header>
       {incoming ? <>
         <div className="atl-call-incoming-icon">{incoming.call_type === 'video' ? <Video size={32}/> : <Phone size={32}/>}</div>
         <h2>{incoming.peerName || 'Pengguna Atlantic'}</h2>
