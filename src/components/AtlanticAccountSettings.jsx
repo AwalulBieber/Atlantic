@@ -11,6 +11,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [tab, setTab] = useState("profile");
   const [profile, setProfile] = useState(null);
   const [savedAvatarUrl, setSavedAvatarUrl] = useState("");
+  const [pendingAvatarPath, setPendingAvatarPath] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -115,6 +116,8 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       setMessage("Upload gagal: " + uploadError.message + ". Pastikan bucket avatars dan izin upload sudah dibuat di Supabase.");
     } else {
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      if (pendingAvatarPath) await supabase.storage.from("avatars").remove([pendingAvatarPath]);
+      setPendingAvatarPath(path);
       update("avatar_url", data.publicUrl);
       setMessage("Foto berhasil diunggah. Tekan Simpan perubahan untuk menerapkannya.");
     }
@@ -139,12 +142,18 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     else {
       const oldAvatarPath = avatarObjectPath(savedAvatarUrl);
       const nextAvatarPath = avatarObjectPath(profile.avatar_url);
+      let cleanupMessage = "Perubahan berhasil disimpan.";
       if (oldAvatarPath && oldAvatarPath !== nextAvatarPath) {
         const { error: cleanupError } = await supabase.storage.from("avatars").remove([oldAvatarPath]);
-        if (cleanupError) setMessage("Perubahan tersimpan, tetapi foto lama gagal dibersihkan: " + cleanupError.message);
-        else setMessage("Perubahan berhasil disimpan.");
-      } else setMessage("Perubahan berhasil disimpan.");
+        if (cleanupError) cleanupMessage = "Perubahan tersimpan, tetapi foto lama gagal dibersihkan: " + cleanupError.message;
+      }
+      if (pendingAvatarPath && pendingAvatarPath !== nextAvatarPath) {
+        const { error: pendingCleanupError } = await supabase.storage.from("avatars").remove([pendingAvatarPath]);
+        if (pendingCleanupError) cleanupMessage = "Perubahan tersimpan, tetapi foto sementara gagal dibersihkan: " + pendingCleanupError.message;
+      }
+      setMessage(cleanupMessage);
       setSavedAvatarUrl(profile.avatar_url || "");
+      setPendingAvatarPath(null);
       onSaved?.(profile);
     }
   }
