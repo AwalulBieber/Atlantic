@@ -145,7 +145,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     {error&&<div className="atl-community-error">{error}</div>}
     {tab==='updates'&&<>
       <div className="atl-community-section"><h2><Clock3 size={18}/> Story</h2><p>Story teks tampil selama 24 jam.</p>
-        <div className="atl-story-grid">{stories.map(s=><article className="atl-story-card" key={s.id}><small>{s.user_id===user.id?'Story kamu':'Story Atlantic'} · {dateLabel(s.created_at)}</small>{s.media_url&&( /\\.(mp4|webm)(\\?|$)/i.test(s.media_url)?<video className="atl-story-media" src={s.media_url} controls playsInline preload="metadata"/>:<img className="atl-story-media" src={s.media_url} alt="Media Story" loading="lazy"/>)}{s.body?.trim()&&<p>{s.body}</p>}</article>)}
+        <div className="atl-story-grid">{stories.map(s=><article className="atl-story-card" key={s.id}><small>{s.user_id===user.id?'Story kamu':'Story Atlantic'} · {dateLabel(s.created_at)}</small>{s.media_url&&( /\.(mp4|webm)(\?|$)/i.test(s.media_url)?<video className="atl-story-media" src={s.media_url} controls playsInline preload="metadata"/>:<img className="atl-story-media" src={s.media_url} alt="Media Story" loading="lazy"/>)}{s.body?.trim()&&<p>{s.body}</p>}</article>)}
         {!stories.length&&<div className="atl-community-empty">Belum ada Story. Jadilah yang pertama berbagi.</div>}</div>
       </div>
       <div className="atl-community-section"><h2><NotebookPen size={18}/> Catatan</h2><p>Catatan singkat yang aktif selama 24 jam.</p>
