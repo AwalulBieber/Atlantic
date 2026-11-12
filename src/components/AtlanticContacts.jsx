@@ -59,7 +59,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
   const incoming=rows.filter(r=>r.status==='pending'&&r.addressee_id===user.id);
   const outgoing=rows.filter(r=>r.status==='pending'&&r.requester_id===user.id);
   const contacts=rows.filter(r=>r.status==='accepted');
-  const filtered=searchProfiles.filter(p=>!rows.some(r=>[r.requester_id,r.addressee_id].includes(p.id)));
+  const filtered=searchProfiles.filter(p=>!rows.some(r=>['pending','accepted'].includes(r.status)&&[r.requester_id,r.addressee_id].includes(p.id)));
 
   async function sendRequest(person){
     setBusy(true);setError('');setNotice('');
