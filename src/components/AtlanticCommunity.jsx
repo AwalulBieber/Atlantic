@@ -29,6 +29,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [showCreate,setShowCreate]=useState(false);
   const [refreshing,setRefreshing]=useState(false);
   const [activeStoryIndex,setActiveStoryIndex]=useState(-1);
+  const [communitySearch,setCommunitySearch]=useState('');
 
   const storyGroups = [...stories.reduce((groups, story, index) => {
     const existing = groups.get(story.user_id);
@@ -36,6 +37,15 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     else groups.set(story.user_id, { userId: story.user_id, firstIndex: index, items: [{ story, index }] });
     return groups;
   }, new Map()).values()];
+  const searchTerm=communitySearch.trim().toLowerCase();
+  const visibleStoryGroups=storyGroups.filter(group=>{
+    const person=people[group.userId]||{};
+    return !searchTerm||String(person.display_name||'').toLowerCase().includes(searchTerm)||String(person.username||'').toLowerCase().includes(searchTerm);
+  });
+  const visibleNotes=notes.filter(note=>{
+    const person=people[note.user_id]||{};
+    return !searchTerm||String(person.display_name||'').toLowerCase().includes(searchTerm)||String(person.username||'').toLowerCase().includes(searchTerm)||note.body.toLowerCase().includes(searchTerm);
+  });
 
   async function loadPeople(ids) {
     const unique=[...new Set((ids||[]).filter(Boolean))];
@@ -245,16 +255,17 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     </header>
     {error&&<div className="atl-community-error">{error}</div>}
     {tab==='updates'&&<>
+      <label className="atl-community-search"><Search size={17}/><input value={communitySearch} onChange={e=>setCommunitySearch(e.target.value)} placeholder="Cari status atau catatan…"/></label>
       <div className="atl-community-section"><h2><Clock3 size={18}/> Story</h2><p>Story teks, foto, dan video tampil selama 24 jam.</p>
         <div className="atl-story-strip">
           <button type="button" className="atl-story-add" onClick={()=>setShowCreate(true)}><span className="atl-story-ring"><span>+</span></span><b>Tambah Status</b></button>
-          {storyGroups.map(group=>{const s=group.items[0].story;const person=people[group.userId]||{};return <button type="button" className="atl-story-person" key={group.userId} onClick={()=>setActiveStoryIndex(group.firstIndex)}><span className="atl-story-ring"><span className="atl-story-ring-inner">{person.avatar_url?<img src={person.avatar_url} alt=""/>:(person.display_name||person.username||'A').slice(0,1).toUpperCase()}</span>{group.items.length>1&&<i>{group.items.length}</i>}</span><b>{group.userId===user.id?'Status kamu':(person.display_name||person.username||'Pengguna').split(' ')[0]}</b></button>;})}
-          {!stories.length&&<p className="atl-community-empty">Belum ada pembaruan status. Ketuk "Tambah Status" untuk membuat Story pertamamu.</p>}
+          {visibleStoryGroups.map(group=>{const s=group.items[0].story;const person=people[group.userId]||{};return <button type="button" className="atl-story-person" key={group.userId} onClick={()=>setActiveStoryIndex(group.firstIndex)}><span className="atl-story-ring"><span className="atl-story-ring-inner">{person.avatar_url?<img src={person.avatar_url} alt=""/>:(person.display_name||person.username||'A').slice(0,1).toUpperCase()}</span>{group.items.length>1&&<i>{group.items.length}</i>}</span><b>{group.userId===user.id?'Status kamu':(person.display_name||person.username||'Pengguna').split(' ')[0]}</b></button>;})}
+          {!visibleStoryGroups.length&&<p className="atl-community-empty">{searchTerm?'Tidak ada status yang cocok.':'Belum ada pembaruan status. Ketuk "Tambah Status" untuk membuat Story pertamamu.'}</p>}
         </div>
       </div>
       <div className="atl-community-section"><h2><NotebookPen size={18}/> Catatan</h2><p>Catatan singkat yang aktif selama 24 jam.</p>
-        <div className="atl-note-bubbles">{notes.map(n=><article className="atl-note-bubble" key={n.id}><div className="atl-note-avatar">{people[n.user_id]?.avatar_url?<img src={people[n.user_id].avatar_url} alt=""/>:(people[n.user_id]?.display_name||people[n.user_id]?.username||'A').slice(0,1).toUpperCase()}</div><div className="atl-note-content"><b>{n.user_id===user.id?'Catatanmu':(people[n.user_id]?.display_name||people[n.user_id]?.username||'Pengguna Atlantic')}</b><p>{n.body}</p><small>{dateLabel(n.created_at)}</small></div>{n.user_id===user.id&&<button type="button" className="atl-note-delete" onClick={()=>deleteNote(n)} aria-label="Hapus catatan">×</button>}</article>)}
-        {!notes.length&&<div className="atl-community-empty">Belum ada Catatan. Buat catatan singkat untuk teman-temanmu.</div>}</div>
+        <div className="atl-note-bubbles">{visibleNotes.map(n=><article className="atl-note-bubble" key={n.id}><div className="atl-note-avatar">{people[n.user_id]?.avatar_url?<img src={people[n.user_id].avatar_url} alt=""/>:(people[n.user_id]?.display_name||people[n.user_id]?.username||'A').slice(0,1).toUpperCase()}</div><div className="atl-note-content"><b>{n.user_id===user.id?'Catatanmu':(people[n.user_id]?.display_name||people[n.user_id]?.username||'Pengguna Atlantic')}</b><p>{n.body}</p><small>{dateLabel(n.created_at)}</small></div>{n.user_id===user.id&&<button type="button" className="atl-note-delete" onClick={()=>deleteNote(n)} aria-label="Hapus catatan">×</button>}</article>)}
+        {!visibleNotes.length&&<div className="atl-community-empty">{searchTerm?'Tidak ada catatan yang cocok.':'Belum ada Catatan. Buat catatan singkat untuk teman-temanmu.'}</div>}</div>
       </div>
     </>}
     {tab==='channels'&&<>
