@@ -57,6 +57,7 @@ export default function App() {
   const [incomingNotice, setIncomingNotice] = useState(null);
   const [activeTab, setActiveTab] = useState('chat');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [communityCreateRequest, setCommunityCreateRequest] = useState(0);
   const [replyTarget, setReplyTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [swipeState, setSwipeState] = useState({ id: null, offset: 0 });
@@ -735,8 +736,8 @@ export default function App() {
           <section className="create-menu" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Buat baru">
             <header><div><small>ATLANTIC CREATE</small><b>Buat sesuatu</b></div><button className="icon-btn" onClick={() => setCreateMenuOpen(false)} aria-label="Tutup"><X size={18}/></button></header>
             <button onClick={() => { setActiveTab('chat'); setCreateMenuOpen(false); setNotice('Pilih pengguna dari daftar chat untuk membuka percakapan.'); }}><MessageSquarePlus/><span><b>Chat baru</b><small>Mulai percakapan</small></span></button>
-            <button onClick={() => { setActiveTab('updates'); setCreateMenuOpen(false); setNotice('Fitur Story dan Catatan sedang disiapkan.'); }}><ImagePlus/><span><b>Story</b><small>Bagikan momen singkat</small></span></button>
-            <button onClick={() => { setActiveTab('updates'); setCreateMenuOpen(false); setNotice('Fitur Catatan sedang disiapkan.'); }}><NotebookPen/><span><b>Catatan</b><small>Tulis sesuatu untuk dibagikan</small></span></button>
+            <button onClick={() => { setActiveTab('updates'); setCommunityCreateRequest(v => v + 1); setCreateMenuOpen(false); setNotice(''); }}><ImagePlus/><span><b>Story</b><small>Bagikan momen singkat</small></span></button>
+            <button onClick={() => { setActiveTab('updates'); setCommunityCreateRequest(v => v + 1); setCreateMenuOpen(false); setNotice(''); }}><NotebookPen/><span><b>Catatan</b><small>Tulis sesuatu untuk dibagikan</small></span></button>
           </section>
         </div>
       )}
@@ -746,6 +747,7 @@ export default function App() {
           tab={activeTab}
           user={session.user}
           profile={myProfile}
+          createRequest={communityCreateRequest}
           onProfileRefresh={loadMyProfile}
           onNotice={setNotice}
         />
