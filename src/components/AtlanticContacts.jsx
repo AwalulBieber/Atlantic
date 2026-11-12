@@ -55,7 +55,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat }) {
     return ()=>{supabase.removeChannel(channel);};
   },[user?.id,load]);
 
-  const personById=useMemo(()=>Object.fromEntries(profiles.map(p=>[p.id,p])),[profiles]);
+  const personById=useMemo(()=>Object.fromEntries([...profiles,...searchProfiles].map(p=>[p.id,p])),[profiles,searchProfiles]);
   const incoming=rows.filter(r=>r.status==='pending'&&r.addressee_id===user.id);
   const outgoing=rows.filter(r=>r.status==='pending'&&r.requester_id===user.id);
   const contacts=rows.filter(r=>r.status==='accepted');
