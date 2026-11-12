@@ -109,6 +109,7 @@ export default function App() {
   const [onlineUsers, setOnlineUsers] = useState([]);
 
   const seenMessages = useRef(new Set());
+  const handledInviteToken = useRef('');
   const bottomRef = useRef(null);
 
   const [settings, setSettings] = useState(() => {
@@ -155,6 +156,51 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id || !window.location.search) return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('atlanticInvite');
+    if (!token || handledInviteToken.current === token) return;
+    handledInviteToken.current = token;
+
+    (async () => {
+      const clearInviteFromUrl = () => {
+        params.delete('atlanticInvite');
+        const query = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (query ? '?' + query : '') + window.location.hash);
+      };
+      const { data: previews, error: previewError } = await supabase.rpc('get_atlantic_invite_preview', { p_token: token });
+      const invite = previews?.[0];
+      if (previewError || !invite) {
+        setNotice('Link undangan Atlantic tidak valid, sudah kedaluwarsa, atau telah dinonaktifkan.');
+        clearInviteFromUrl();
+        return;
+      }
+      const accepted = await openAtlanticDialog({
+        title: invite.invite_type === 'group' ? 'Gabung grup Atlantic?' : 'Ikuti saluran Atlantic?',
+        message: (invite.invite_type === 'group' ? 'Kamu diundang bergabung ke grup ' : 'Kamu diundang mengikuti saluran ') + invite.title + '. Lanjutkan?',
+        confirmLabel: invite.invite_type === 'group' ? 'Gabung grup' : 'Ikuti saluran'
+      });
+      if (accepted) {
+        const { data: joined, error: joinError } = await supabase.rpc('accept_atlantic_invite', { p_token: token });
+        if (joinError) {
+          setNotice('Undangan gagal digunakan: ' + joinError.message);
+        } else {
+          const result = joined?.[0];
+          setNotice(invite.invite_type === 'group' ? 'Berhasil bergabung ke grup ' + (result?.title || invite.title) + '.' : 'Berhasil mengikuti saluran ' + (result?.title || invite.title) + '. Buka tab Saluran untuk melihat pembaruannya.');
+          if (invite.invite_type === 'group') {
+            const refreshed = await loadProfiles();
+            const group = refreshed?.find(item => item.conversation_id === invite.resource_id);
+            if (group) await openGroupChat(group);
+          } else {
+            setActiveTab('channels');
+          }
+        }
+      }
+      clearInviteFromUrl();
+    })();
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (session) {
