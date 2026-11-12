@@ -81,7 +81,8 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     };
     const { error } = await supabase.from("profiles").update(payload).eq("id", user.id);
     setBusy(false);
-    if (error) setMessage("Gagal menyimpan: " + error.message);\n    else { setMessage("Perubahan berhasil disimpan."); onSaved?.(profile); }
+    if (error) setMessage("Gagal menyimpan: " + error.message);
+    else { setMessage("Perubahan berhasil disimpan."); onSaved?.(profile); }
   }
 
   if (!profile) {
