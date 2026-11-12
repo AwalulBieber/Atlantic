@@ -252,7 +252,7 @@ export default function App() {
   const chatRows = (conversations || []).map(conversation => {
     const conversationMembers = (members || []).filter(member => member.conversation_id === conversation.id);
     if (conversation.is_group) {
-      const groupProfiles = [myProfile, ...conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).filter(Boolean)].filter(Boolean);
+      const groupProfiles = [{ ...(myProfile || {}), id: session.user.id }, ...conversationMembers.map(member => peopleWithBadges.find(person => person.id === member.user_id)).filter(Boolean)];
       const title = conversation.title || 'Grup Atlantic';
       return { conversation_id: conversation.id, is_group: true, title, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, is_group: true } };
     }
@@ -273,6 +273,7 @@ export default function App() {
     setGroupSelected([]);
     setGroupTitle('');
     setGroupSearch('');
+    setActiveTab('chat');
     setCreateMenuOpen(false);
     setGroupCreateOpen(true);
   }
