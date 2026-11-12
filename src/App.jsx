@@ -191,6 +191,13 @@ export default function App() {
 
   const ids = mine.map(c => c.conversation_id);
 
+  // When a user reconnects, mark any previously queued messages as delivered.
+  await supabase.from('messages')
+    .update({ delivered_at: new Date().toISOString() })
+    .in('conversation_id', ids)
+    .neq('sender_id', session.user.id)
+    .is('delivered_at', null);
+
   const { data: members, error: memberError } = await supabase
     .from('conversation_members')
     .select('conversation_id,user_id')
