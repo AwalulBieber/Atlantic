@@ -22,39 +22,38 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await authClient.auth.getUser(accessToken);
   if (authError || !user) return res.status(401).json({ error: 'Sesi login tidak valid.' });
 
-  const turnKeyId = process.env.CLOUDFLARE_TURN_KEY_ID;
-  const turnKeySecret = process.env.CLOUDFLARE_TURN_KEY_SECRET;
-  if (!turnKeyId || !turnKeySecret) {
-    return res.status(503).json({ error: 'Cloudflare TURN belum dikonfigurasi.' });
+  const xirsysIdent = process.env.XIRSYS_IDENT;
+  const xirsysSecret = process.env.XIRSYS_SECRET;
+  const xirsysChannel = process.env.XIRSYS_CHANNEL;
+  const xirsysPath = process.env.XIRSYS_PATH || 'https://global.xirsys.net';
+
+  if (!xirsysIdent || !xirsysSecret || !xirsysChannel) {
+    return res.status(503).json({ error: 'Xirsys TURN belum dikonfigurasi.' });
   }
 
   try {
+    const basicAuth = Buffer.from(`${xirsysIdent}:${xirsysSecret}`).toString('base64');
     const response = await fetch(
-      `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(turnKeyId)}/credentials/generate-ice-servers`,
+      `${xirsysPath.replace(/\\/$/, '')}/_turn/${encodeURIComponent(xirsysChannel)}?webrtc=1&expire=3600`,
       {
-        method: 'POST',
+        method: 'PUT',
         headers: {
-          Authorization: `Bearer ${turnKeySecret}`,
+          Authorization: `Basic ${basicAuth}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ ttl: 86400 })
+        body: JSON.stringify({})
       }
     );
     const payload = await response.json();
-    if (!response.ok || !Array.isArray(payload.iceServers)) {
-      console.error('Cloudflare TURN credential request failed:', response.status);
+    if (!response.ok || payload.s !== 'ok' || !Array.isArray(payload.v?.iceServers)) {
+      console.error('Xirsys TURN credential request failed:', response.status);
       return res.status(502).json({ error: 'Gagal membuat kredensial TURN.' });
     }
-    const iceServers = payload.iceServers.map(server => ({
-      ...server,
-      urls: Array.isArray(server.urls)
-        ? server.urls.filter(url => !String(url).includes(':53'))
-        : server.urls
-    }));
+
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    return res.status(200).json({ iceServers });
+    return res.status(200).json({ iceServers: payload.v.iceServers });
   } catch (error) {
-    console.error('Cloudflare TURN request error:', error);
+    console.error('Xirsys TURN request error:', error);
     return res.status(502).json({ error: 'Layanan TURN sedang tidak tersedia.' });
   }
 }
