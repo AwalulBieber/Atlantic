@@ -5,7 +5,7 @@ import AtlanticImageCropper from "./AtlanticImageCropper";
 import { restoreE2EEIdentityFromBackup, verifyE2EEIdentityBackup, resetOwnE2EEIdentity, hasLocalE2EEIdentity } from "../e2ee";
 
 const DEFAULTS = {
-  bio: "", is_private: false, show_online_status: true,
+  bio: "", is_private: false, show_online_status: true, show_contacts: false,
   read_receipts_enabled: true, group_invite_policy: "everyone",
 };
 
@@ -41,7 +41,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       if (!user?.id) return;
       const [{ data: p, error: profileError }, { data: admin, error: adminError }] =
         await Promise.all([
-          supabase.from("profiles").select("id,username,display_name,avatar_url,bio,is_private,show_online_status,read_receipts_enabled,group_invite_policy,is_verified,e2ee_public_key").eq("id", user.id).maybeSingle(),
+          supabase.from("profiles").select("id,username,display_name,avatar_url,bio,is_private,show_online_status,show_contacts,read_receipts_enabled,group_invite_policy,is_verified,e2ee_public_key").eq("id", user.id).maybeSingle(),
           supabase.rpc("is_atlantic_admin")
         ]);
       if (!alive) return;
@@ -267,7 +267,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     const payload = {
       username, display_name: displayName,
       avatar_url: profile.avatar_url, bio,
-      is_private: profile.is_private, show_online_status: profile.show_online_status,
+      is_private: profile.is_private, show_online_status: profile.show_online_status, show_contacts: profile.show_contacts,
       read_receipts_enabled: profile.read_receipts_enabled,
       group_invite_policy: profile.group_invite_policy,
     };
@@ -411,6 +411,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           {tab === "privacy" && <>
             <label className="atl-switch-row"><span><b>Akun private</b><small>Sembunyikan profil dari daftar pemilihan anggota saat pengguna membuat grup baru.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
             <label className="atl-switch-row"><span><b>Tampilkan status online</b><small>Jika aktif, status online kamu dapat terlihat di header chat.</small></span><input type="checkbox" checked={!!profile.show_online_status} onChange={e => update("show_online_status", e.target.checked)}/></label>
+             <label className="atl-switch-row"><span><b>Bagikan daftar kontak</b><small>Izinkan orang lain melihat daftar kontakmu di profil publik. Nonaktif secara default dan tidak berlaku untuk akun private.</small></span><input type="checkbox" checked={!!profile.show_contacts} onChange={e => update("show_contacts", e.target.checked)}/></label>
             <label className="atl-switch-row"><span><b>Tanda dibaca</b><small>Izinkan tanda pesan telah dibaca.</small></span><input type="checkbox" checked={!!profile.read_receipts_enabled} onChange={e => update("read_receipts_enabled", e.target.checked)}/></label>
             <label>Siapa yang boleh mengundang ke grup<select value={profile.group_invite_policy || "everyone"} onChange={e => update("group_invite_policy", e.target.value)}><option value="everyone">Semua orang</option><option value="approval">Perlu persetujuan</option></select><small className="atl-settings-hint">Jika memilih Perlu persetujuan, kamu baru masuk grup setelah menerima undangan di menu Undangan grup.</small></label>
           </>}
