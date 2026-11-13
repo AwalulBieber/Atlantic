@@ -1019,6 +1019,16 @@ export default function App() {
         seenMessages.current.add(message.id);
         if (active?.conversation_id === message.conversation_id) return;
 
+        // Update the visible unread badge immediately; reconcile it with the
+        // authoritative Supabase summary after receipt bookkeeping completes.
+        const targetChat = chats.find(chat => chat.conversation_id === message.conversation_id);
+        if (targetChat) {
+          setUnread(current => ({
+            ...current,
+            [message.conversation_id]: (Number(current[message.conversation_id]) || 0) + 1
+          }));
+        }
+
         const { data: members, error: memberError } = await supabase
           .from('conversation_members').select('user_id')
           .eq('conversation_id', message.conversation_id);
@@ -1029,7 +1039,6 @@ export default function App() {
           .eq('id', message.sender_id).single();
         if (profileError || !person) return;
 
-        const targetChat = chats.find(chat => chat.conversation_id === message.conversation_id);
         await supabase.rpc('record_atlantic_message_receipts', {
           p_conversation_ids: null,
           p_message_ids: [message.id],
