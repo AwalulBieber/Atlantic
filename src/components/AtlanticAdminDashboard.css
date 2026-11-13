@@ -39,3 +39,5 @@ html[data-skin="cyberpunk"] .atl-admin-panel{background:#111a2d;color:#e7f8ff}
 html[data-skin="cyberpunk"] .atl-admin-header{background:#17233b;color:#e7f8ff}
 html[data-skin="cyberpunk"] .atl-admin-stats,html[data-skin="cyberpunk"] .atl-admin-tabs,html[data-skin="cyberpunk"] .atl-admin-footer{background:#0d1628;color:#e7f8ff}
 html[data-skin="cyberpunk"] .atl-admin-user-info span,html[data-skin="cyberpunk"] .atl-admin-user-info small,html[data-skin="cyberpunk"] .atl-admin-request-top span:not(.atl-admin-status),html[data-skin="cyberpunk"] .atl-admin-request>small{color:#9ab4ca}
+
+html[data-skin] .atl-admin-user-info b svg{color:#1677e8}
