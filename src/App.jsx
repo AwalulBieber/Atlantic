@@ -619,7 +619,14 @@ export default function App() {
     let replyMap = {};
     if (replyIds.length) {
       const { data: originals } = await supabase.from('messages').select('id,body,sender_id').in('id', replyIds);
-      replyMap = Object.fromEntries((originals || []).map(item => [item.id, item]));
+      const decodedOriginals = await Promise.all((originals || []).map(async item => {
+        if (e2eeKeyRef.current && typeof item.body === 'string' && item.body.startsWith('ATL-E2EE1:')) {
+          try { return { ...item, body: await decryptE2EEText(e2eeKeyRef.current, item.body), is_e2ee: true }; }
+          catch { return { ...item, body: '🔒 Pesan terenkripsi tidak dapat dibuka.', is_e2ee: true, decrypt_error: true }; }
+        }
+        return item;
+      }));
+      replyMap = Object.fromEntries(decodedOriginals.map(item => [item.id, item]));
     }
     const incomingIds = visibleMessages.filter(m => m.sender_id !== session.user.id).map(m => m.id);
     if (incomingIds.length) {
@@ -653,6 +660,10 @@ export default function App() {
         }
         if (incoming.reply_to) {
           const { data: original } = await supabase.from('messages').select('id,body,sender_id').eq('id', incoming.reply_to).maybeSingle();
+          if (original?.body && e2eeKeyRef.current && original.body.startsWith('ATL-E2EE1:')) {
+            try { original.body = await decryptE2EEText(e2eeKeyRef.current, original.body); original.is_e2ee = true; }
+            catch { original.body = '🔒 Pesan terenkripsi tidak dapat dibuka.'; original.decrypt_error = true; }
+          }
           incoming.replyPreview = original || null;
         }
         if (active.is_group) {
@@ -721,7 +732,10 @@ export default function App() {
         const targetChat = chats.find(chat => chat.conversation_id === message.conversation_id);
         await supabase.from('messages').update({ delivered_at: new Date().toISOString() }).eq('id', message.id).is('delivered_at', null);
         void refreshInboxSummaries();
-        setIncomingNotice({ person, body: message.body || 'Mengirim pesan', conversationId: message.conversation_id, isGroup: Boolean(targetChat?.is_group), groupTitle: targetChat?.title });
+        const notificationBody = typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')
+          ? '🔒 Pesan terenkripsi baru'
+          : (message.media_url ? 'Mengirim lampiran' : 'Mengirim pesan');
+        setIncomingNotice({ person, body: notificationBody, conversationId: message.conversation_id, isGroup: Boolean(targetChat?.is_group), groupTitle: targetChat?.title });
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
