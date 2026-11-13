@@ -203,11 +203,30 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   async function save(event) {
     event.preventDefault();
     if (!user?.id || !profile || busy) return;
+    const username = String(profile.username || "").trim().toLowerCase();
+    const displayName = String(profile.display_name || "").trim();
+    const bio = String(profile.bio || "").trim();
+    if (!/^[a-z0-9_]{3,30}$/.test(username)) {
+      setMessage("Username harus 3–30 karakter, hanya huruf kecil, angka, dan garis bawah.");
+      setTab("profile");
+      return;
+    }
+    if (!displayName || displayName.length > 60) {
+      setMessage("Nama tampilan wajib diisi dan maksimal 60 karakter.");
+      setTab("profile");
+      return;
+    }
+    if (bio.length > 160) {
+      setMessage("Bio maksimal 160 karakter.");
+      setTab("profile");
+      return;
+    }
     setBusy(true);
     setMessage("");
+    const normalizedProfile = { ...profile, username, display_name: displayName, bio };
     const payload = {
-      username: profile.username, display_name: profile.display_name,
-      avatar_url: profile.avatar_url, bio: profile.bio,
+      username, display_name: displayName,
+      avatar_url: profile.avatar_url, bio,
       is_private: profile.is_private, show_online_status: profile.show_online_status,
       read_receipts_enabled: profile.read_receipts_enabled,
       group_invite_policy: profile.group_invite_policy,
@@ -230,7 +249,8 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       setMessage(cleanupMessage);
       setSavedAvatarUrl(profile.avatar_url || "");
       setPendingAvatarPath(null);
-      onSaved?.(profile);
+      setProfile(normalizedProfile);
+      onSaved?.(normalizedProfile);
     }
   }
 
@@ -256,7 +276,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           {tab === "profile" && <>
             <div className="atl-admin-status">
               <div><strong>{profile.display_name || profile.username || "Pengguna Atlantic"}</strong><small>{profile.username ? "@" + profile.username : user?.email}</small></div>
-              {isAdmin ? <span className="atl-blue-verified">✓ Atlantic Verified</span> : profile.is_verified && <span className="atl-orange-verified">✓ Terverifikasi</span>}
+              {isAdmin && <span className="atl-blue-verified">✓ Atlantic Verified</span>}
             </div>
             <div className="atl-avatar-editor">
               <div className="atl-avatar-preview">
@@ -286,12 +306,8 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
                 <div><button type="button" onClick={async () => { const { error } = await supabase.rpc("review_atlantic_verification_request", { request_id: request.id, approve: true, admin_note: "Disetujui oleh admin Atlantic." }); if (error) setMessage("Gagal menyetujui: " + error.message); else { setMessage("Pengajuan disetujui."); setVerificationRequests(v => v.map(x => x.id === request.id ? { ...x, status: "approved" } : x)); } }}>Setujui</button><button type="button" className="atl-secondary" onClick={async () => { const { error } = await supabase.rpc("review_atlantic_verification_request", { request_id: request.id, approve: false, admin_note: "Belum memenuhi kriteria verifikasi." }); if (error) setMessage("Gagal menolak: " + error.message); else { setMessage("Pengajuan ditolak."); setVerificationRequests(v => v.map(x => x.id === request.id ? { ...x, status: "rejected" } : x)); } }}>Tolak</button></div>
               </article>)}
             </> : <>
-              <p>Ajukan verifikasi akun. Badge oranye akan muncul setelah pengajuan disetujui admin Atlantic.</p>
-              {profile.is_verified ? <span className="atl-orange-verified">✓ Akun kamu sudah terverifikasi</span> : <>
-                <label>Keterangan pengajuan<textarea value={verificationNote} onChange={e => setVerificationNote(e.target.value)} maxLength={500} rows={3} placeholder="Jelaskan alasan akun kamu perlu diverifikasi (opsional)."/></label>
-                <button type="button" disabled={verificationRequests.some(r => r.status === "pending")} onClick={async () => { const { error } = await supabase.from("atlantic_verification_requests").insert({ user_id: user.id, note: verificationNote.trim() }); if (error) setMessage(error.code === "23505" ? "Pengajuan kamu masih menunggu pemeriksaan." : "Gagal mengirim pengajuan: " + error.message); else { setMessage("Pengajuan verifikasi berhasil dikirim."); setVerificationRequests(v => [{ id: crypto.randomUUID(), user_id: user.id, note: verificationNote.trim(), status: "pending", requested_at: new Date().toISOString() }, ...v]); } }}>{verificationRequests.some(r => r.status === "pending") ? "Pengajuan sedang ditinjau" : "Kirim pengajuan verifikasi"}</button>
-              </>}
-              {verificationRequests.filter(r => r.status !== "pending").slice(0,3).map(r => <p className="atl-muted" key={r.id}>Pengajuan {r.status === "approved" ? "disetujui" : "ditolak"} · {new Date(r.requested_at).toLocaleDateString("id-ID")}{r.review_note ? " — " + r.review_note : ""}</p>)}
+              <p>Atlantic Verified adalah lencana resmi yang hanya dimiliki akun Admin Atlantic utama. Akun pengguna biasa tidak memperoleh badge verifikasi.</p>
+              <div className="atl-verification-policy"><span className="atl-policy-lock">✓</span><div><b>Status akun</b><small>Akun pengguna aktif tanpa lencana khusus. Admin utama memiliki centang biru Atlantic Verified.</small></div></div>
             </>}
           </section>}
           {tab === "admin" && isAdmin && <section className="atl-admin-dashboard">
