@@ -204,21 +204,22 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
   }
 
   const cacheId = conversationCacheId(conversationId, keyRow.key_id);
-  const cached = await readLocalKey(CONVERSATION_STORE, cacheId);
-  if (cached) return cached;
+  let conversationKey = await readLocalKey(CONVERSATION_STORE, cacheId);
 
-  const ownEnvelope = keyRow.shares?.[userId];
-  if (!ownEnvelope) {
-    throw new Error('Perangkat anggota chat belum menerima kunci percakapan. Minta anggota yang sudah bisa membuka chat untuk membagikan ulang kunci.');
+  if (!conversationKey) {
+    const ownEnvelope = keyRow.shares?.[userId];
+    if (!ownEnvelope) {
+      throw new Error('Perangkat anggota chat belum menerima kunci percakapan. Minta anggota yang sudah bisa membuka chat untuk membagikan ulang kunci.');
+    }
+    const senderProfile = profileMap.get(ownEnvelope.sender_id);
+    if (!senderProfile?.e2ee_public_key) {
+      throw new Error('Kunci publik pengirim amplop keamanan tidak ditemukan.');
+    }
+    conversationKey = await unwrapConversationKey(
+      ownEnvelope, identity, senderProfile.e2ee_public_key, conversationId, keyRow.key_id
+    );
+    await writeLocalKey(CONVERSATION_STORE, cacheId, conversationKey);
   }
-  const senderProfile = profileMap.get(ownEnvelope.sender_id);
-  if (!senderProfile?.e2ee_public_key) {
-    throw new Error('Kunci publik pengirim amplop keamanan tidak ditemukan.');
-  }
-  const conversationKey = await unwrapConversationKey(
-    ownEnvelope, identity, senderProfile.e2ee_public_key, conversationId, keyRow.key_id
-  );
-  await writeLocalKey(CONVERSATION_STORE, cacheId, conversationKey);
 
   // Existing members can securely add envelopes for newly joined members.
   const missingShares = ids.filter(id => !keyRow.shares?.[id]);
