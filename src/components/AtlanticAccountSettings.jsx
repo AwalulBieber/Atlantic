@@ -179,7 +179,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       setE2eeIdentityExists(true);
       setRecoveryBackupExists(true);
       setRecoveryBackupVersion(2);
-      setMessage("Identitas E2EE baru berhasil dibuat dan cadangan lama diarsipkan. Anggota lain perlu login agar perangkat mereka mendaftarkan kunci E2EE sebelum room dapat mengaktifkan enkripsi.");
+      setMessage("Identitas E2EE baru berhasil dibuat dan cadangan lama diarsipkan. Muat ulang Atlantic. Anggota lain juga perlu login agar perangkat mereka mendaftarkan kunci E2EE sebelum room dapat mengaktifkan enkripsi.");
     } catch (error) {
       setMessage(error.message || "Reset identitas E2EE gagal.");
     } finally {
