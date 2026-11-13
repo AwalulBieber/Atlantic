@@ -1032,7 +1032,7 @@ export default function App() {
             const chat = chats.find(entry => entry.conversation_id === item.conversation_id);
             if (!chat) return null;
             const sender = chat.is_group ? chat.members?.find(member => member.id === item.latest_sender_id) : chat.person;
-            const preview = item.latest_body || (item.latest_media_type?.startsWith('image/') ? 'Foto' : item.latest_media_type?.startsWith('video/') ? 'Video' : 'Lampiran');
+            const preview = typeof item.latest_body === 'string' && item.latest_body.startsWith('ATL-E2EE1:') ? '🔒 Pesan terenkripsi' : (item.latest_body || (item.latest_media_type?.startsWith('image/') ? 'Foto' : item.latest_media_type?.startsWith('video/') ? 'Video' : 'Lampiran'));
             return <button type="button" className="atl-inbox-summary-row" key={item.conversation_id} onClick={() => chat.is_group ? openGroupChat(chat) : openChat(chat.person)}>
               <span className="atl-inbox-summary-avatar">{chat.person.avatar_url ? <img src={chat.person.avatar_url} alt=""/> : chat.is_group ? <Users size={16}/> : initials(chat.person.display_name || chat.person.username)}</span>
               <span className="atl-inbox-summary-copy"><b>{chat.person.display_name || chat.person.username}</b><small>{chat.is_group && sender ? sender.display_name || sender.username || 'Anggota' : ''}{chat.is_group && sender ? ': ' : ''}{preview}</small></span>
