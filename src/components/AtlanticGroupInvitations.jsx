@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {supabase} from '../supabase';
-import {Users,Check,X,Clock3} from 'lucide-react';
+import {Users,Check,X,Clock3,RefreshCw} from 'lucide-react';
 
 export default function AtlanticGroupInvitations({user,onAccepted,onNotice}){
   const [items,setItems]=useState([]);
@@ -44,10 +44,10 @@ export default function AtlanticGroupInvitations({user,onAccepted,onNotice}){
   return <div className="atl-group-invites-widget">
     <button type="button" className="atl-group-invites-trigger" onClick={()=>{setOpen(true);load();}}><Users size={15}/> Undangan grup {items.length>0&&<b>{items.length}</b>}</button>
     {open&&<div className="atl-group-invites-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setOpen(false)}><section className="atl-group-invites-modal" role="dialog" aria-modal="true" aria-label="Undangan grup">
-      <header><b><Users size={18}/> Undangan grup</b><button type="button" onClick={()=>setOpen(false)} aria-label="Tutup"><X/></button></header>
+      <header><b><Users size={18}/> Undangan grup</b><div className="atl-group-invites-head-actions"><button type="button" onClick={load} aria-label="Muat ulang undangan"><RefreshCw size={16}/></button><button type="button" onClick={()=>setOpen(false)} aria-label="Tutup"><X/></button></div></header>
       {error&&<p className="atl-group-invites-error">{error}</p>}
       {!items.length?<p className="atl-group-invites-empty">Tidak ada undangan grup yang menunggu.</p>:items.map(item=><article key={item.id}>
-        <div className="atl-group-invites-avatar">{item.group.avatar_url?<span>G</span>:<Users size={20}/>}</div>
+        <div className="atl-group-invites-avatar">{item.inviter.avatar_url?<img src={item.inviter.avatar_url} alt=""/>:(item.inviter.display_name||item.inviter.username||'U').slice(0,1).toUpperCase()}</div>
         <div className="atl-group-invites-info"><b>{item.group.title||'Grup Atlantic'}</b><small>{item.inviter.display_name||item.inviter.username||'Pengguna'} mengundang kamu · {new Date(item.created_at).toLocaleDateString('id-ID')}</small></div>
         <div className="atl-group-invites-actions"><button type="button" disabled={!!busyId} onClick={()=>respond(item,'accepted')}><Check size={15}/> Gabung</button><button type="button" disabled={!!busyId} onClick={()=>respond(item,'rejected')}><X size={15}/> Tolak</button></div>
       </article>)}
