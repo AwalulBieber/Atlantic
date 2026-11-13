@@ -11,6 +11,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [stories,setStories]=useState([]);
   const [notes,setNotes]=useState([]);
   const [channels,setChannels]=useState([]);
+  const [joinedChannelIds,setJoinedChannelIds]=useState([]);
   const [selectedChannel,setSelectedChannel]=useState(null);
   const [posts,setPosts]=useState([]);
   const [calls,setCalls]=useState([]);
@@ -94,7 +95,10 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
         }));
         const counts=await Promise.all(hydrated.map(channel=>supabase.from('atlantic_channel_members').select('user_id',{count:'exact',head:true}).eq('channel_id',channel.id)));
         hydrated.forEach((channel,index)=>{channel.member_count=counts[index].count||0;});
-        setChannels(hydrated);await loadPeople((data||[]).map(channel=>channel.owner_id));
+        setChannels(hydrated);
+        const {data:memberships}=await supabase.from('atlantic_channel_members').select('channel_id').eq('user_id',user.id);
+        setJoinedChannelIds((memberships||[]).map(item=>item.channel_id));
+        await loadPeople((data||[]).map(channel=>channel.owner_id));
       }
     } else if(tab==='calls') {
       const {data,error:e}=await supabase.from('atlantic_call_sessions').select('id,caller_id,callee_id,call_type,status,started_at,ended_at').or('caller_id.eq.'+user.id+',callee_id.eq.'+user.id).order('started_at',{ascending:false}).limit(40);
@@ -238,7 +242,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     const ready={...data,avatar_url:avatarPath?avatarPath:null,avatar_path:avatarPath,member_count:1};
     if(avatarPath)ready.avatar_url=avatarSigned;
     setChannelName('');setChannelDescription('');setChannelAvatarFile(null);setChannelAvatarPreview('');
-    setShowCreate(false);setChannels(v=>[ready,...v]);setSelectedChannel(ready);
+    setShowCreate(false);setChannels(v=>[ready,...v]);setJoinedChannelIds(v=>[...new Set([...v,ready.id])]);setSelectedChannel(ready);
     setBusy(false);
   }
 
@@ -248,6 +252,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
     if(!existing){const {error:e}=await supabase.from('atlantic_channel_members').insert({channel_id:channel.id,user_id:user.id,role:'member'});if(e){setError(e.message);return;}}
     let readyChannel={...channel,avatar_path:channel.avatar_url||null};
     if(channel.avatar_url){const {data:signed,error:signedError}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(channel.avatar_url,3600);if(signedError)setError('Foto saluran: '+signedError.message);else readyChannel.avatar_url=signed?.signedUrl||null;}
+    setJoinedChannelIds(v=>[...new Set([...v,channel.id])]);
     setSelectedChannel(readyChannel);loadPosts(channel.id);
   }
 
@@ -372,7 +377,14 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
         <div className="atl-channel-posts">{posts.map(p=><article key={p.id}><div className="atl-channel-post-author"><span>{people[p.author_id]?.avatar_url?<img src={people[p.author_id].avatar_url} alt=""/>:(people[p.author_id]?.display_name||people[p.author_id]?.username||'A').slice(0,1).toUpperCase()}</span><b>{people[p.author_id]?.display_name||people[p.author_id]?.username||'Pengguna Atlantic'} {people[p.author_id]?.is_verified&&<BadgeCheck size={13}/>}</b></div>{p.media_url&&(p.media_type?.startsWith('image/')?<img className="atl-channel-media" src={p.media_url} alt={p.media_name||'Media saluran'}/>:p.media_type?.startsWith('video/')?<video className="atl-channel-media" src={p.media_url} controls playsInline/>:<a href={p.media_url} target="_blank" rel="noreferrer">📎 {p.media_name||'Lampiran'}</a>)}{p.body&&<p>{p.body}</p>}<small>{dateLabel(p.created_at)}</small>{(p.author_id===user.id||selectedChannel.owner_id===user.id)&&<button type="button" className="atl-channel-delete-post" onClick={()=>deleteChannelPost(p)} disabled={busy}>Hapus postingan</button>}</article>)}{!posts.length&&<div className="atl-community-empty">Belum ada postingan di saluran ini.</div>}</div>
         <form className="atl-community-compose" onSubmit={publishPost}><input ref={channelMediaInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" hidden onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(file.size>50*1024*1024){setError('Ukuran media maksimal 50 MB.');return;}setChannelMediaFile(file);}}/><button type="button" onClick={()=>channelMediaInput.current?.click()} aria-label="Lampirkan media"><ImagePlus size={18}/></button><input value={body} onChange={e=>setBody(e.target.value)} placeholder="Tulis postingan…" maxLength={2000}/><button disabled={busy||(!body.trim()&&!channelMediaFile)}><Send size={18}/></button></form>{channelMediaFile&&<small className="atl-channel-attachment">Lampiran: {channelMediaFile.name} <button type="button" onClick={()=>setChannelMediaFile(null)}>Hapus</button></small>}
         {channelSettingsOpen&&<div className="atl-community-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setChannelSettingsOpen(false)}><section className="atl-community-modal atl-channel-settings-modal"><header><b>Pengaturan Saluran</b><button type="button" onClick={()=>setChannelSettingsOpen(false)}><X/></button></header><form onSubmit={saveChannelSettings}><label>Nama saluran<input value={channelName} onChange={e=>setChannelName(e.target.value)} maxLength={60} required/></label><label>Deskripsi<textarea value={channelDescription} onChange={e=>setChannelDescription(e.target.value)} maxLength={180}/></label><input type="file" accept="image/jpeg,image/png,image/webp" hidden id="atl-channel-avatar-input" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(file.size>5*1024*1024){setError('Foto saluran maksimal 5 MB.');return;}setChannelCropFile(file);}}/><label className="atl-channel-avatar-picker" htmlFor="atl-channel-avatar-input"><ImagePlus size={16}/> Ganti foto saluran</label>{channelAvatarPreview&&<img className="atl-channel-avatar-preview" src={channelAvatarPreview} alt="Pratinjau foto saluran"/>}<button className="atl-community-submit" disabled={busy||channelName.trim().length<2}>Simpan perubahan</button></form></section></div>}
-      </div>:<div className="atl-channel-grid">{channels.map(c=><article className="atl-channel-card" key={c.id}><div className="atl-channel-card-head"><div className="atl-channel-mark">{c.avatar_url?<img src={c.avatar_url} alt=""/>:<Radio/>}</div><span className="atl-channel-card-meta"><b>{c.name}</b><small>{c.member_count} anggota</small></span></div><p>{c.description||'Saluran komunitas Atlantic'}</p><small className="atl-channel-owner">Oleh {people[c.owner_id]?.display_name||people[c.owner_id]?.username||'Pengguna Atlantic'} {people[c.owner_id]?.is_verified&&<BadgeCheck size={13}/>} · {dateLabel(c.created_at)}</small><button onClick={()=>joinChannel(c)}><Users size={15}/> Gabung & buka</button></article>)}{!channels.length&&<div className="atl-community-empty">Belum ada saluran publik. Buat saluran pertama.</div>}</div>}
+      </div>:<div className="atl-channel-home">
+        <div className="atl-channel-home-toolbar">
+          <div><span className="eyebrow">JELAJAHI ATLANTIC</span><h2>Temukan saluran</h2><p>Ikuti kabar dari kreator dan komunitas yang kamu suka.</p></div>
+          <button type="button" onClick={()=>setShowCreate(true)}><Plus size={17}/> Buat saluran</button>
+        </div>
+        <label className="atl-channel-home-search"><Search size={17}/><input value={communitySearch} onChange={e=>setCommunitySearch(e.target.value)} placeholder="Cari saluran…"/></label>
+        {(()=>{const matches=channels.filter(c=>!searchTerm||String(c.name||'').toLowerCase().includes(searchTerm)||String(c.description||'').toLowerCase().includes(searchTerm));const followed=matches.filter(c=>joinedChannelIds.includes(c.id));const discover=matches.filter(c=>!joinedChannelIds.includes(c.id));const channelRow=c=><article className="atl-channel-wa-row" key={c.id}><button type="button" className="atl-channel-wa-main" onClick={()=>joinChannel(c)}><span className="atl-channel-wa-avatar">{c.avatar_url?<img src={c.avatar_url} alt=""/>:<Radio size={22}/>}</span><span className="atl-channel-wa-copy"><b>{c.name} {people[c.owner_id]?.is_verified&&<BadgeCheck size={14}/>}</b><small>{c.description||'Saluran komunitas Atlantic'}</small><small className="atl-channel-wa-meta">{c.member_count} pengikut · {people[c.owner_id]?.display_name||people[c.owner_id]?.username||'Kreator Atlantic'}</small></span></button><button type="button" className={joinedChannelIds.includes(c.id)?'is-following':''} onClick={()=>joinChannel(c)}>{joinedChannelIds.includes(c.id)?'Buka':'Ikuti'}</button></article>;return <><section className="atl-channel-wa-section"><header><div><h3>Saluran yang diikuti</h3><p>Update terbaru dari saluran pilihanmu</p></div><span>{followed.length}</span></header>{followed.length?followed.map(channelRow):<div className="atl-channel-home-empty">Saluran yang kamu ikuti akan muncul di sini.</div>}</section><section className="atl-channel-wa-section"><header><div><h3>Temukan saluran</h3><p>Rekomendasi komunitas untuk kamu ikuti</p></div><span>{discover.length}</span></header>{discover.length?discover.map(channelRow):<div className="atl-channel-home-empty">{channels.length?'Tidak ada saluran yang cocok.':'Belum ada saluran publik. Jadilah yang pertama membuat saluran.'}</div>}</section></>;})()}
+      </div>}
     </>}
     {tab==='calls'&&<div className="atl-community-section"><h2><Phone size={18}/> Riwayat panggilan</h2><p>Riwayat panggilan audio dan video langsung Atlantic.</p>
       <div className="atl-call-list">{calls.map(c=><article key={c.id}><div className="atl-call-icon"><Phone size={17}/></div><div><b>{c.caller_id===user.id?'Keluar ke':'Masuk dari'} {people[c.caller_id===user.id?c.callee_id:c.caller_id]?.display_name||people[c.caller_id===user.id?c.callee_id:c.caller_id]?.username||'Pengguna Atlantic'} · {c.call_type==='video'?'Video':'Audio'}</b><small>{dateLabel(c.started_at)} · {callStatusLabel(c.status)}</small></div></article>)}{!calls.length&&<div className="atl-community-empty">Belum ada riwayat panggilan.</div>}</div>
