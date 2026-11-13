@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ensureConversationE2EE, encryptE2EEText, decryptE2EEText } from './e2ee';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
@@ -92,6 +93,8 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [e2eeStatus, setE2eeStatus] = useState({ state: 'loading', error: '' });
+  const e2eeKeyRef = useRef(null);
   const [draft, setDraft] = useState('');
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState('');
@@ -567,6 +570,18 @@ export default function App() {
   }
   useEffect(() => () => { if (attachmentPreview) URL.revokeObjectURL(attachmentPreview); }, [attachmentPreview]);
 
+  useEffect(() => {
+    let cancelled = false;
+    e2eeKeyRef.current = null;
+    if (!active || !session?.user?.id) { setE2eeStatus({ state: 'loading', error: '' }); return; }
+    setE2eeStatus({ state: 'loading', error: '' });
+    const memberIds = active.is_group ? (active.members || []).map(member => member.id).filter(Boolean) : [active.person?.id].filter(Boolean);
+    ensureConversationE2EE(supabase, active.conversation_id, memberIds, session.user.id)
+      .then(key => { if (!cancelled) { e2eeKeyRef.current = key; setE2eeStatus({ state: 'active', error: '' }); } })
+      .catch(error => { if (!cancelled) { e2eeKeyRef.current = null; setE2eeStatus({ state: 'unavailable', error: error.message || 'Kunci E2EE belum siap.' }); } });
+    return () => { cancelled = true; e2eeKeyRef.current = null; };
+  }, [active?.conversation_id, session?.user?.id]);
+
   async function loadMessages(id) {
     // Persist read state per user, including when read receipts are disabled.
     const { error: markReadError } = await supabase.rpc('mark_atlantic_conversation_read', { p_conversation_id: id });
@@ -588,9 +603,14 @@ export default function App() {
     const hiddenIds = new Set((hiddenStates || []).map(row => row.message_id));
     const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id));
     const messagesWithMedia = await Promise.all(visibleMessages.map(async message => {
-      if (!message.media_url) return message;
-      const { data: signed } = await supabase.storage.from('atlantic-chat-media').createSignedUrl(message.media_url, 3600);
-      return { ...message, media_url: signed?.signedUrl || null };
+      let next = message;
+      if (e2eeKeyRef.current && typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')) {
+        try { next = { ...next, body: await decryptE2EEText(e2eeKeyRef.current, message.body), is_e2ee: true }; }
+        catch { next = { ...next, body: '🔒 Tidak dapat membuka pesan ini di perangkat ini.', is_e2ee: true, decrypt_error: true }; }
+      }
+      if (!next.media_url) return next;
+      const { data: signed } = await supabase.storage.from('atlantic-chat-media').createSignedUrl(next.media_url, 3600);
+      return { ...next, media_url: signed?.signedUrl || null };
     }));
     const senderIds = [...new Set((data || []).map(message => message.sender_id).filter(Boolean))];
     const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', senderIds) : { data: [] };
@@ -623,6 +643,10 @@ export default function App() {
         filter: `conversation_id=eq.${active.conversation_id}`
       }, async payload => {
         const incoming = payload.new;
+        if (e2eeKeyRef.current && typeof incoming.body === 'string' && incoming.body.startsWith('ATL-E2EE1:')) {
+          try { incoming.body = await decryptE2EEText(e2eeKeyRef.current, incoming.body); incoming.is_e2ee = true; }
+          catch { incoming.body = '🔒 Tidak dapat membuka pesan ini di perangkat ini.'; incoming.decrypt_error = true; }
+        }
         if (incoming.reply_to) {
           const { data: original } = await supabase.from('messages').select('id,body,sender_id').eq('id', incoming.reply_to).maybeSingle();
           incoming.replyPreview = original || null;
@@ -741,7 +765,7 @@ export default function App() {
     navigator.geolocation.getCurrentPosition(async position => {
       const { latitude, longitude } = position.coords;
       const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:`${label}: ${mapUrl}` });
+      let encryptedLocation; try { if (!e2eeKeyRef.current) throw new Error('Kunci E2EE belum siap.'); encryptedLocation = await encryptE2EEText(e2eeKeyRef.current, `${label}: ${mapUrl}`); } catch (encryptionError) { setNotice(encryptionError.message); return; } const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedLocation });
       if (error) setNotice('Lokasi gagal dikirim: ' + error.message);
       else setShowAttachmentMenu(false);
     }, error => setNotice(error.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk Atlantic.' : 'Lokasi gagal didapatkan.'), { enableHighAccuracy:true, timeout:12000, maximumAge:10000 });
@@ -751,6 +775,8 @@ export default function App() {
     e.preventDefault();
     const body = draft.trim();
     if ((!body && !attachmentFile) || !active || sending) return;
+    if (e2eeStatus.state !== 'active' || !e2eeKeyRef.current) { setNotice(e2eeStatus.error || 'Menyiapkan kunci enkripsi. Coba lagi sebentar.'); return; }
+    if (attachmentFile) { setNotice('Lampiran belum mendukung enkripsi end-to-end. Kirim teks saja untuk chat terenkripsi.'); return; }
     setSending(true); setDraft('');
     let mediaPath = null;
     if (attachmentFile) {
@@ -761,7 +787,10 @@ export default function App() {
     }
     if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
     typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
-    const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body, media_url:mediaPath, media_type:attachmentFile?.type || null, media_name:attachmentFile?.name || null, reply_to:replyTarget?.id || null });
+    let encryptedBody = '';
+    try { encryptedBody = body ? await encryptE2EEText(e2eeKeyRef.current, body) : ''; }
+    catch (encryptionError) { setDraft(body); setNotice('Pesan gagal dienkripsi: ' + encryptionError.message); setSending(false); return; }
+    const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedBody, media_url:mediaPath, media_type:attachmentFile?.type || null, media_name:attachmentFile?.name || null, reply_to:replyTarget?.id || null });
     if (error) { if (mediaPath) await supabase.storage.from('atlantic-chat-media').remove([mediaPath]); setDraft(body); setNotice('Pesan gagal dikirim: ' + error.message); }
     else { setReplyTarget(null); setAttachmentFile(null); setAttachmentPreview(''); }
     setSending(false);
@@ -972,6 +1001,9 @@ export default function App() {
               </div>}
             </header>
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
+            <div className={`atl-e2ee-banner ${e2eeStatus.state === 'active' ? 'is-secure' : 'is-pending'}`} role="status">
+              <Lock size={15}/><span>{e2eeStatus.state === 'active' ? 'Pesan teks dienkripsi end-to-end. Kunci privat tersimpan di perangkat anggota chat.' : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
+            </div>
             <div className="messages">
               {messages.map((m, messageIndex) => (
                 <div
