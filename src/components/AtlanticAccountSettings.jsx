@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import "./AtlanticAccountSettings.css";
 import AtlanticImageCropper from "./AtlanticImageCropper";
-import { restoreE2EEIdentityFromBackup, verifyE2EEIdentityBackup } from "../e2ee";
+import { restoreE2EEIdentityFromBackup, verifyE2EEIdentityBackup, resetOwnE2EEIdentity, hasLocalE2EEIdentity } from "../e2ee";
 
 const DEFAULTS = {
   bio: "", is_private: false, show_online_status: true,
@@ -30,7 +30,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryBackupExists, setRecoveryBackupExists] = useState(false);
   const [recoveryBackupVersion, setRecoveryBackupVersion] = useState(null);
-  const [e2eeIdentityExists, setE2eeIdentityExists] = useState(false);
+  const [e2eeIdentityExists, setE2eeIdentityExists] = useState(false);\n  const [resetAccountPassword, setResetAccountPassword] = useState("");\n  const [hasLocalIdentity, setHasLocalIdentity] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
         setProfile({ ...DEFAULTS, ...(p || {}) });
         setSavedAvatarUrl(p?.avatar_url || "");
       }
-      setE2eeIdentityExists(Boolean(p?.e2ee_public_key));
+      setE2eeIdentityExists(Boolean(p?.e2ee_public_key));\n      try { setHasLocalIdentity(await hasLocalE2EEIdentity(user.id)); } catch { setHasLocalIdentity(false); }
       const { data: recoveryRow } = await supabase.from("profile_e2ee_recovery_backups").select("backup").eq("user_id", user.id).maybeSingle();
       setRecoveryBackupExists(Boolean(recoveryRow?.backup));
       setRecoveryBackupVersion(Number(recoveryRow?.backup?.version) || null);
@@ -147,6 +147,34 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       setMessage(result.alreadyRestored ? "Kunci E2EE sudah tersedia di perangkat ini." : "Kunci E2EE berhasil dipulihkan di perangkat ini. Riwayat terenkripsi dapat dibuka kembali jika perangkat masih memiliki akses ke akun dan data chat.");
     } catch (error) { setMessage(error.message || "Pemulihan E2EE gagal."); }
     finally { setRecoveryBusy(false); }
+  }
+
+
+  async function resetLostE2EEIdentity() {
+    if (!user?.id || recoveryBusy) return;
+    if (resetAccountPassword.length < 8) {
+      setMessage("Masukkan kata sandi akun (minimal 8 karakter).");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Reset identitas E2EE akun ini? Pesan lama yang terenkripsi dengan kunci lama mungkin tidak bisa dibuka lagi. Cadangan lama akan tetap diarsipkan."
+    );
+    if (!confirmed) return;
+    setRecoveryBusy(true);
+    setMessage("");
+    try {
+      await resetOwnE2EEIdentity(supabase, user.id, resetAccountPassword);
+      setResetAccountPassword("");
+      setHasLocalIdentity(true);
+      setE2eeIdentityExists(true);
+      setRecoveryBackupExists(true);
+      setRecoveryBackupVersion(2);
+      setMessage("Identitas E2EE baru berhasil dibuat dan cadangan lama diarsipkan. Anggota lain perlu login agar perangkat mereka mendaftarkan kunci E2EE sebelum room dapat mengaktifkan enkripsi.");
+    } catch (error) {
+      setMessage(error.message || "Reset identitas E2EE gagal.");
+    } finally {
+      setRecoveryBusy(false);
+    }
   }
 
   function update(key, value) {
@@ -358,6 +386,16 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
               <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>
               <button type="button" disabled={recoveryBusy} onClick={verifyRecoveryBackup}>{recoveryBusy ? "Memeriksa…" : "Verifikasi kunci & cadangan"}</button>
             </>}
+            {recoveryBackupVersion === 1 && e2eeIdentityExists && !hasLocalIdentity && (
+              <div className="atl-e2ee-recovery-reset">
+                <b>Perangkat lama tidak tersedia?</b>
+                <p>Reset membuat identitas baru. Pesan lama yang terenkripsi mungkin tidak dapat dibuka lagi. Cadangan lama tetap disimpan sebagai arsip.</p>
+                <label>Kata sandi akun untuk membuat cadangan baru
+                  <input type="password" autoComplete="current-password" value={resetAccountPassword} onChange={e => setResetAccountPassword(e.target.value)} placeholder="Masukkan kata sandi akun" />
+                </label>
+                <button type="button" disabled={recoveryBusy || resetAccountPassword.length < 8} onClick={resetLostE2EEIdentity}>{recoveryBusy ? "Menyiapkan identitas baru…" : "Reset identitas E2EE"}</button>
+              </div>
+            )}
             <small className="atl-settings-hint">Server hanya menyimpan kunci publik dan cadangan terenkripsi. Jangan hapus data browser pada perangkat yang masih menyimpan identitas E2EE lama.</small>
           </section>}
           {tab === "privacy" && <>
