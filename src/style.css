@@ -1521,3 +1521,32 @@ html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32
   .atl-poll-card{padding:8px}
 }
 
+
+
+/* Instagram-like focused message state for long-press actions */
+.messages.has-message-focus{isolation:isolate}
+.atl-message-focus-backdrop{
+  position:fixed;inset:0;z-index:24;width:100%;height:100%;
+  padding:0;border:0;border-radius:0;background:rgba(12,14,20,.13);
+  -webkit-backdrop-filter:blur(5px) saturate(.78);
+  backdrop-filter:blur(5px) saturate(.78);
+  cursor:default;animation:atlMessageFocusIn .14s ease both;
+}
+.bubble-row.message-focused{z-index:25;isolation:isolate}
+.bubble-row.message-focused>.bubble{
+  position:relative;z-index:26;
+  filter:none!important;
+  transform:scale(1.025);
+  box-shadow:0 0 0 2px rgba(255,255,255,.9),0 12px 34px rgba(0,0,0,.25),4px 4px 0 var(--ink);
+}
+.bubble-row.message-focused .atl-message-action-menu{
+  z-index:27;top:calc(100% + 12px);bottom:auto;
+  animation:atlMessageMenuIn .16s cubic-bezier(.2,.8,.2,1) both;
+}
+.bubble-row.message-focused .atl-message-action-menu{left:0;right:auto}
+.bubble-row.message-focused.mine .atl-message-action-menu{left:auto;right:0}
+@keyframes atlMessageFocusIn{from{opacity:0}to{opacity:1}}
+@keyframes atlMessageMenuIn{from{opacity:0;transform:translateY(-5px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){
+  .atl-message-focus-backdrop,.bubble-row.message-focused>.bubble,.bubble-row.message-focused .atl-message-action-menu{animation:none;transition:none}
+}
