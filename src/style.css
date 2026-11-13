@@ -1469,3 +1469,11 @@ html[data-animations="off"] *,html[data-animations="off"] *::before,html[data-an
 .message-status.is-delivered{color:#64748b;background:rgba(100,116,139,.12)}
 .message-status.is-sent{color:#8b95a3}
 html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32;border-color:#00e5ff;color:#00e5ff}
+
+
+/* Channel encryption status: explicitly distinguish channels from E2EE chats. */
+.atl-channel-e2ee-notice{display:flex;align-items:flex-start;gap:9px;width:min(100% - 28px,1000px);box-sizing:border-box;margin:10px auto;padding:10px 13px;border:1px solid #d97706;border-radius:10px;background:rgba(245,158,11,.10);color:var(--ink);font-size:12px;line-height:1.4}
+.atl-channel-e2ee-notice>svg{flex:0 0 auto;margin-top:1px;color:#b45309}
+.atl-channel-e2ee-notice span{display:grid;gap:3px}
+.atl-channel-e2ee-notice b{font-weight:850}
+.atl-channel-e2ee-notice small{color:var(--muted);font-size:11px}
