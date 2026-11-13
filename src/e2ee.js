@@ -354,3 +354,10 @@ export async function getConversationE2EEKeyById(supabase, conversationId, keyId
   await writeLocalKey(CONVERSATION_STORE, cacheId, key);
   return key;
 }
+
+export async function getE2EEFingerprint(publicJwk) {
+  if (!publicJwk?.x || !publicJwk?.y) throw new Error('Kunci publik tidak valid.');
+  const canonical = JSON.stringify({ crv: publicJwk.crv, kty: publicJwk.kty, x: publicJwk.x, y: publicJwk.y });
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(canonical)));
+  return Array.from(digest.slice(0, 20)).map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(':');
+}
