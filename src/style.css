@@ -1004,3 +1004,5 @@ html[data-theme="dark"] .atl-chat-day-separator {
   background: #392d16;
   border-color: #6b5326;
 }
+
+.atl-e2ee-fingerprints{display:block;margin-top:5px;font-size:10px;line-height:1.45;overflow-wrap:anywhere;opacity:.78}
