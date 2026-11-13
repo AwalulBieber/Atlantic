@@ -272,3 +272,30 @@ export async function decryptE2EEText(key, value) {
 export function isE2EEText(value) {
   return typeof value === 'string' && value.startsWith(PREFIX);
 }
+
+export async function encryptE2EEBytes(key, value) {
+  const bytes = value instanceof Uint8Array ? value : new Uint8Array(await value.arrayBuffer());
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes);
+  return { iv: bytesToBase64(iv), ciphertext: new Uint8Array(ciphertext) };
+}
+
+export async function decryptE2EEBytes(key, envelope) {
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToBytes(envelope.iv) }, key, envelope.ciphertext
+  );
+  return new Uint8Array(plaintext);
+}
+
+export async function encryptE2EEMessage(key, payload) {
+  return encryptE2EEText(key, JSON.stringify({ version: 1, ...payload }));
+}
+
+export async function decryptE2EEMessage(key, value) {
+  const plaintext = await decryptE2EEText(key, value);
+  try {
+    const parsed = JSON.parse(plaintext);
+    if (parsed && parsed.version === 1) return parsed;
+  } catch { /* Legacy ATL-E2EE1 text message. */ }
+  return { version: 0, text: plaintext };
+}
