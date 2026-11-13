@@ -30,7 +30,9 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryBackupExists, setRecoveryBackupExists] = useState(false);
   const [recoveryBackupVersion, setRecoveryBackupVersion] = useState(null);
-  const [e2eeIdentityExists, setE2eeIdentityExists] = useState(false);\n  const [resetAccountPassword, setResetAccountPassword] = useState("");\n  const [hasLocalIdentity, setHasLocalIdentity] = useState(false);
+  const [e2eeIdentityExists, setE2eeIdentityExists] = useState(false);
+  const [resetAccountPassword, setResetAccountPassword] = useState("");
+  const [hasLocalIdentity, setHasLocalIdentity] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -48,7 +50,8 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
         setProfile({ ...DEFAULTS, ...(p || {}) });
         setSavedAvatarUrl(p?.avatar_url || "");
       }
-      setE2eeIdentityExists(Boolean(p?.e2ee_public_key));\n      try { setHasLocalIdentity(await hasLocalE2EEIdentity(user.id)); } catch { setHasLocalIdentity(false); }
+      setE2eeIdentityExists(Boolean(p?.e2ee_public_key));
+      try { setHasLocalIdentity(await hasLocalE2EEIdentity(user.id)); } catch { setHasLocalIdentity(false); }
       const { data: recoveryRow } = await supabase.from("profile_e2ee_recovery_backups").select("backup").eq("user_id", user.id).maybeSingle();
       setRecoveryBackupExists(Boolean(recoveryRow?.backup));
       setRecoveryBackupVersion(Number(recoveryRow?.backup?.version) || null);
