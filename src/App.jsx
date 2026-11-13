@@ -592,10 +592,10 @@ export default function App() {
     let cancelled = false;
     async function loadFingerprints() {
       if (!active || e2eeStatus.state !== 'active' || !session?.user?.id) { setE2eeFingerprints([]); return; }
-      const memberIds = active.is_group
-        ? (active.members || []).map(member => member.id)
-        : [active.person?.id];
-      const ids = [...new Set([session.user.id, ...memberIds].filter(Boolean))];
+      const { data: liveMembers } = await supabase.from('conversation_members')
+        .select('user_id').eq('conversation_id', active.conversation_id);
+      const memberIds = (liveMembers || []).map(member => member.user_id);
+      const ids = [...new Set([session.user.id, ...memberIds, ...(active.is_group ? (active.members || []).map(member => member.id) : [active.person?.id])].filter(Boolean))];
       const { data, error } = await supabase.from('profiles')
         .select('id,username,display_name,e2ee_public_key').in('id', ids);
       if (error || cancelled) return;
