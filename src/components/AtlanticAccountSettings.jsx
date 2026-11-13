@@ -122,7 +122,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
 
   async function restoreRecoveryBackup() {
     if (!user?.id || recoveryBusy) return;
-    if (recoveryPassphrase.length < 12) { setMessage("Masukkan passphrase pemulihan minimal 12 karakter."); return; }
+    if (recoveryPassphrase.length < 6) { setMessage("Masukkan kata sandi akun atau passphrase cadangan yang benar."); return; }
     setRecoveryBusy(true); setMessage("");
     try {
       const result = await restoreE2EEIdentityFromBackup(supabase, user.id, recoveryPassphrase);
