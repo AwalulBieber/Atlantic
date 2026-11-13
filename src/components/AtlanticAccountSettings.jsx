@@ -330,7 +330,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
                 {dashboard.recentUsers.filter(person => ((person.display_name || "") + " " + (person.username || "")).toLowerCase().includes(userSearch.toLowerCase())).map(person => <article key={person.id}>
                   <div className="atl-admin-user-avatar">{person.avatar_url ? <img src={person.avatar_url} alt=""/> : (person.display_name || person.username || "A").slice(0,1).toUpperCase()}</div>
                   <div><b>{person.display_name || person.username || "Pengguna Atlantic"}</b><small>{person.username ? "@" + person.username : "Tanpa username"} · Bergabung {person.created_at ? new Date(person.created_at).toLocaleDateString("id-ID") : "—"}</small></div>
-                  {person.is_verified && <span className="atl-orange-verified">✓</span>}
+                  {person.is_verified && <span className="atl-blue-verified">✓ Atlantic Verified</span>}
                 </article>)}
                 {dashboard.recentUsers.filter(person => ((person.display_name || "") + " " + (person.username || "")).toLowerCase().includes(userSearch.toLowerCase())).length === 0 && <p className="atl-muted">Pengguna tidak ditemukan.</p>}
               </div>
