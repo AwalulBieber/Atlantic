@@ -153,6 +153,9 @@ export default function App() {
   const [communityCreateRequest, setCommunityCreateRequest] = useState(0);
   const [replyTarget, setReplyTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [chatActionTarget, setChatActionTarget] = useState(null);
+  const chatLongPressTimer = useRef(null);
+  const chatLongPressTriggered = useRef(false);
   const [swipeState, setSwipeState] = useState({ id: null, offset: 0 });
   const [swipeFeedbackId, setSwipeFeedbackId] = useState(null);
   const touchStartX = useRef(0);
@@ -687,6 +690,28 @@ export default function App() {
     setShowSaved(false);
     await loadMessages(message.conversation_id);
     setTimeout(() => document.getElementById(`message-${message.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 180);
+  }
+
+  async function removeChat(conversation) {
+    const confirmed = await openAtlanticDialog({
+      title: 'Hapus chat?',
+      message: 'Chat ini akan dihapus dari daftar kamu. Riwayat dan pesan anggota lain tidak akan dihapus.',
+      confirmLabel: 'Hapus chat',
+      cancelLabel: 'Batal'
+    });
+    if (!confirmed) return;
+    const { error } = await supabase.rpc('hide_atlantic_conversation', { p_conversation_id: conversation.conversation_id });
+    if (error) { setNotice('Chat gagal dihapus: ' + error.message); return; }
+    setChats(current => current.filter(item => item.conversation_id !== conversation.conversation_id));
+    setArchivedIds(current => current.filter(id => id !== conversation.conversation_id));
+    setUnread(current => { const next = { ...current }; delete next[conversation.conversation_id]; return next; });
+    if (active?.conversation_id === conversation.conversation_id) {
+      setActive(null);
+      setMessages([]);
+      setMobileChat(false);
+    }
+    setChatActionTarget(null);
+    setNotice('Chat berhasil dihapus dari daftar kamu.');
   }
 
   async function toggleArchive(conversationId) {
@@ -1398,7 +1423,23 @@ export default function App() {
     <div className="person-row" key={c.conversation_id}>
       <button
         className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
-        onClick={() => c.is_saved_chat ? openSavedChat(c) : c.is_group ? openGroupChat(c) : openChat(c.person)}
+        onContextMenu={event => { event.preventDefault(); if (!c.is_saved_chat) setChatActionTarget(c.conversation_id); }}
+        onTouchStart={() => {
+          chatLongPressTriggered.current = false;
+          if (chatLongPressTimer.current) clearTimeout(chatLongPressTimer.current);
+          if (!c.is_saved_chat) chatLongPressTimer.current = setTimeout(() => {
+            chatLongPressTriggered.current = true;
+            setChatActionTarget(c.conversation_id);
+            if (navigator.vibrate) navigator.vibrate(18);
+          }, 550);
+        }}
+        onTouchEnd={() => { if (chatLongPressTimer.current) clearTimeout(chatLongPressTimer.current); chatLongPressTimer.current = null; }}
+        onTouchMove={() => { if (chatLongPressTimer.current) clearTimeout(chatLongPressTimer.current); chatLongPressTimer.current = null; }}
+        onClick={() => {
+          if (chatLongPressTriggered.current) { chatLongPressTriggered.current = false; return; }
+          setChatActionTarget(null);
+          c.is_saved_chat ? openSavedChat(c) : c.is_group ? openGroupChat(c) : openChat(c.person);
+        }}
       >
         <div className={`avatar ${c.is_saved_chat ? 'saved-chat-avatar' : ''}`}>
           {c.is_saved_chat ? <Bookmark size={19}/> : c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : c.is_group ? <Users size={19}/> : initials(c.person.display_name || c.person.username)}
@@ -1420,6 +1461,7 @@ export default function App() {
           {(unread[c.conversation_id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.conversation_id] || 0) + ' pesan belum dibaca'}>{(unread[c.conversation_id] || 0) > 99 ? '99+' : unread[c.conversation_id]}</span>}
         </div>
       </button>
+      {chatActionTarget === c.conversation_id && <div className="chat-row-action-menu"><button type="button" onClick={() => removeChat(c)}><Trash2 size={15}/> Hapus chat</button><button type="button" onClick={() => setChatActionTarget(null)}>Batal</button></div>}
       <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
     </div>
   ))}
