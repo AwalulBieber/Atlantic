@@ -61,6 +61,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   },[targetId,targetType,user?.id,canCreate,pollId,e2eeKey,e2eeKeyId]);
 
   useEffect(()=>{
+    if(createOnly)return;
     load();
     const channel=supabase.channel('atlantic-polls-'+targetType+'-'+targetId+'-'+(pollId||'all'));
     const voteFilter=pollId?{filter:'poll_id=eq.'+pollId}:{};
@@ -71,7 +72,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_polls',...pollFilter},()=>load())
       .subscribe();
     return()=>{supabase.removeChannel(channel);};
-  },[load,targetId,targetType,pollId]);
+  },[load,targetId,targetType,pollId,createOnly]);
 
   const createPoll=async(e)=>{
     e.preventDefault();
