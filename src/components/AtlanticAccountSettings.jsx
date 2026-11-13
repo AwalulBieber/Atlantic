@@ -155,7 +155,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
 
   async function resetLostE2EEIdentity() {
     if (!user?.id || recoveryBusy) return;
-    if (resetAccountPassword.length < 8) {
+    if (resetAccountPassword.length < 6) {
       setMessage("Masukkan kata sandi akun (minimal 8 karakter).");
       return;
     }
