@@ -228,7 +228,7 @@ async function createOrLoadE2EEIdentity(supabase, userId, password) {
 
   const { error: backupError } = await supabase
     .from('profile_e2ee_recovery_backups')
-    .upsert({ user_id: userId, backup }, { onConflict: 'user_id' });
+    .insert({ user_id: userId, backup });
   if (backupError) {
     await supabase.from('profiles').update({ e2ee_public_key: null })
       .eq('id', userId).eq('e2ee_public_key', publicJwk);
