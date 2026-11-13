@@ -29,6 +29,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [recoveryPassphrase, setRecoveryPassphrase] = useState("");
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryBackupExists, setRecoveryBackupExists] = useState(false);
+  const [recoveryBackupVersion, setRecoveryBackupVersion] = useState(null);
   const [e2eeIdentityExists, setE2eeIdentityExists] = useState(false);
   const fileRef = useRef(null);
 
@@ -48,8 +49,9 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
         setSavedAvatarUrl(p?.avatar_url || "");
       }
       setE2eeIdentityExists(Boolean(p?.e2ee_public_key));
-      const { data: recoveryRow } = await supabase.from("profile_e2ee_recovery_backups").select("user_id").eq("user_id", user.id).maybeSingle();
-      setRecoveryBackupExists(Boolean(recoveryRow));
+      const { data: recoveryRow } = await supabase.from("profile_e2ee_recovery_backups").select("backup").eq("user_id", user.id).maybeSingle();
+      setRecoveryBackupExists(Boolean(recoveryRow?.backup));
+      setRecoveryBackupVersion(Number(recoveryRow?.backup?.version) || null);
       const adminMode = (!adminError && admin === true) || user.email?.toLowerCase() === 'awalulhakim94@gmail.com';
       setIsAdmin(adminMode);
       const { data: requests, error: requestError } = await supabase.from("atlantic_verification_requests").select("id,user_id,note,status,requested_at,review_note").order("requested_at", { ascending: false }).limit(adminMode ? 100 : 10);
@@ -122,7 +124,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
 
   async function verifyRecoveryBackup() {
     if (!user?.id || recoveryBusy) return;
-    if (recoveryPassphrase.length < 6) { setMessage("Masukkan kata sandi akun yang benar."); return; }
+    if (recoveryPassphrase.length < 6) { setMessage(recoveryBackupVersion === 1 ? "Masukkan passphrase pemulihan lama." : "Masukkan kata sandi akun."); return; }
     setRecoveryBusy(true); setMessage("");
     try {
       const result = await verifyE2EEIdentityBackup(supabase, user.id, recoveryPassphrase);
@@ -136,7 +138,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
 
   async function restoreRecoveryBackup() {
     if (!user?.id || recoveryBusy) return;
-    if (recoveryPassphrase.length < 6) { setMessage("Masukkan kata sandi akun atau passphrase cadangan yang benar."); return; }
+    if (recoveryPassphrase.length < 6) { setMessage(recoveryBackupVersion === 1 ? "Masukkan passphrase pemulihan lama." : "Masukkan kata sandi akun."); return; }
     setRecoveryBusy(true); setMessage("");
     try {
       const result = await restoreE2EEIdentityFromBackup(supabase, user.id, recoveryPassphrase);
@@ -349,10 +351,10 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           </section>}
           {tab === "security" && <section className="atl-e2ee-recovery-panel">
             <h3>Keamanan & pemulihan E2EE</h3>
-            <p>Atlantic membuat identitas E2EE otomatis saat login. Cadangan private key dienkripsi dengan kata sandi akun sebelum disimpan; server tidak menerima private key dalam bentuk terbuka.</p>
-            <div className="atl-e2ee-recovery-status"><b>{recoveryBackupExists ? "Cadangan pemulihan tersedia" : e2eeIdentityExists ? "Identitas E2EE terdaftar" : "Menyiapkan identitas E2EE otomatis"}</b><small>{recoveryBackupExists ? "Di perangkat baru, login dengan kata sandi akun yang sama agar kunci dipulihkan otomatis. Jika kata sandi akun diubah, cadangan perlu diperbarui dari perangkat yang masih menyimpan kunci." : e2eeIdentityExists ? "Identitas lama ini belum memiliki cadangan otomatis. Perangkat ini masih menyimpan kunci utama; jangan hapus data browser atau keluar sebelum proses migrasi kunci lama tersedia." : "Identitas dan cadangan terenkripsi akan dibuat otomatis setelah login menggunakan kata sandi akun."}</small></div>
+            <p>Pengguna baru mendapatkan cadangan E2EE otomatis yang dienkripsi dengan kata sandi akun. Server tidak menerima private key dalam bentuk terbuka.</p>
+            <div className="atl-e2ee-recovery-status"><b>{recoveryBackupExists ? "Cadangan pemulihan tersedia" : e2eeIdentityExists ? "Identitas E2EE terdaftar" : "Menyiapkan identitas E2EE otomatis"}</b><small>{recoveryBackupExists ? (recoveryBackupVersion === 1 ? "Cadangan lama: pemulihan memerlukan passphrase khusus yang dibuat saat cadangan dibuat. Kata sandi akun tidak dapat menggantikannya." : "Cadangan otomatis: di perangkat baru, login dengan kata sandi akun yang sama untuk memulihkan kunci.") : e2eeIdentityExists ? "Identitas ini belum memiliki cadangan otomatis. Jangan hapus data browser pada perangkat yang masih menyimpan kunci." : "Identitas dan cadangan terenkripsi akan dibuat otomatis setelah login."}</small></div>
             {recoveryBackupExists && <>
-              <label>Kata sandi akun / passphrase cadangan lama<input type="password" autoComplete="current-password" minLength={6} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder="Kata sandi akun" /></label>
+              <label>{recoveryBackupVersion === 1 ? "Passphrase pemulihan lama" : "Kata sandi akun"}<input type="password" autoComplete="current-password" minLength={6} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder={recoveryBackupVersion === 1 ? "Passphrase yang dibuat saat backup lama" : "Kata sandi akun"} /></label>
               <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>
               <button type="button" disabled={recoveryBusy} onClick={verifyRecoveryBackup}>{recoveryBusy ? "Memeriksa…" : "Verifikasi kunci & cadangan"}</button>
             </>}
