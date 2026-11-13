@@ -1214,14 +1214,24 @@ export default function App() {
   }
 
   async function logout() {
-    await supabase.auth.signOut();
-    setMessages([]);
-    setActive(null);
-    setMobileChat(false);
-    setUnread({});
-    setIncomingNotice(null);
-    setAccountSettingsOpen(false);
-    seenMessages.current.clear();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setNotice('Gagal keluar dari Atlantic: ' + error.message);
+        return;
+      }
+      setMessages([]);
+      setActive(null);
+      setMobileChat(false);
+      setUnread({});
+      setIncomingNotice(null);
+      setAccountSettingsOpen(false);
+      setSettingsOpen(false);
+      setAdminDashboardOpen(false);
+      seenMessages.current.clear();
+    } catch (error) {
+      setNotice('Gagal keluar dari Atlantic: ' + (error?.message || 'Periksa koneksi internet lalu coba lagi.'));
+    }
   }
 
   if (!configReady) {
