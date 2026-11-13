@@ -156,7 +156,10 @@ async function createOrLoadE2EEIdentity(supabase, userId, password) {
         !backup.salt || !backup.iv || !backup.ciphertext ||
         Number(backup.iterations) < 100000 || Number(backup.iterations) > 1000000 ||
         !backup.publicJwk?.x || !backup.publicJwk?.y) {
-      throw new Error('Akun ini belum memiliki cadangan kunci otomatis. Perangkat lama masih menyimpan kunci utama; jangan hapus data perangkat tersebut.');
+      throw new Error('Cadangan kunci E2EE tidak ditemukan atau formatnya tidak didukung. Jangan hapus data perangkat lama.');
+    }
+    if (backup.version === 1) {
+      throw new Error('Cadangan E2EE akun ini memakai passphrase pemulihan lama. Pulihkan dari Pengaturan dengan passphrase tersebut atau gunakan perangkat yang masih menyimpan kunci. Kata sandi akun tidak dapat membuka cadangan lama.');
     }
     if (canonicalPublicJwk(profile.e2ee_public_key) !== canonicalPublicJwk(backup.publicJwk)) {
       throw new Error('Kunci publik cadangan tidak cocok dengan identitas akun. Pemulihan dihentikan.');
@@ -676,7 +679,9 @@ export async function verifyE2EEIdentityBackup(supabase, userId, password) {
       wrappingKey, base64ToBytes(backup.ciphertext)
     );
   } catch {
-    throw new Error('Kata sandi akun tidak cocok dengan cadangan E2EE.');
+    throw new Error(backup.version === 1
+      ? 'Passphrase pemulihan khusus yang digunakan saat cadangan lama dibuat tidak cocok.'
+      : 'Kata sandi akun tidak cocok dengan cadangan E2EE.');
   }
   let backupPrivate;
   try {
