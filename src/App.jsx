@@ -7,6 +7,7 @@ import AtlanticCallManager from './components/AtlanticCallManager';
 import AtlanticAdminDashboard from './components/AtlanticAdminDashboard';
 import AtlanticContacts from './components/AtlanticContacts';
 import AtlanticGroupInfo from './components/AtlanticGroupInfo';
+import AtlanticProfileExplorer from './components/AtlanticProfileExplorer';
 import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
 import AtlanticPolls from './components/AtlanticPolls';
 import {
@@ -136,6 +137,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [profileExplorerUserId, setProfileExplorerUserId] = useState(null);
   const [adminDashboardOpen, setAdminDashboardOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
@@ -327,6 +329,11 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [session?.user?.id, myProfile?.show_online_status]);
+
+  function openProfileExplorer(target) {
+    if (!target?.id || target.id === session?.user?.id || target.is_group || target.is_saved_chat) return;
+    setProfileExplorerUserId(target.id);
+  }
 
   async function loadMyProfile() {
     if (!session?.user?.id) return;
@@ -1400,7 +1407,7 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              <div className={`avatar ${active.is_saved_chat ? 'saved-chat-avatar' : ''}`}>{active.is_saved_chat ? <Bookmark size={21}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</div>
+              <button type="button" className={`avatar profile-avatar-trigger ${active.is_saved_chat ? 'saved-chat-avatar' : ''}`} onClick={() => openProfileExplorer(active.person)} disabled={active.is_group || active.is_saved_chat} aria-label="Lihat profil akun">{active.is_saved_chat ? <Bookmark size={21}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</button>
               <div className="chat-person" onClick={() => active.is_group && setGroupInfoOpen(true)} role={active.is_group ? "button" : undefined} tabIndex={active.is_group ? 0 : undefined}>
                 <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : (active.person.is_admin || active.person.is_verified) && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span>}</b>
                 <small>{active.is_saved_chat ? 'Cloud Pribadi · Terenkripsi E2E' : otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
@@ -1727,6 +1734,8 @@ export default function App() {
         intent={callIntent}
         onIntentHandled={() => setCallIntent(null)}
       />
+
+      {profileExplorerUserId && <AtlanticProfileExplorer userId={profileExplorerUserId} onClose={() => setProfileExplorerUserId(null)} />}
 
       {accountSettingsOpen && (
         <AtlanticAccountSettings
