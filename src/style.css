@@ -1350,3 +1350,8 @@ html[data-theme="dark"] .atl-channel-directory-actions button{background:#22252d
 @media(max-width:600px){.chat-filter-strip{gap:7px;padding:0 14px 14px}.chat-filter-strip>button,.chat-filter-more{min-height:36px;padding:6px 13px;font-size:12px}.person-row{margin:0 -8px;padding:0 8px}.person-row .person{min-height:82px;padding:10px 8px;gap:12px}.person-row .person .avatar{width:58px;height:58px;flex-basis:58px}.person-row .person-info b{font-size:15px}.person-row .person-info .person-preview{font-size:12px}.person-row .person-meta>small{font-size:11px}}
 html[data-theme="dark"] .chat-filter-strip>button,html[data-theme="dark"] .chat-filter-more{background:var(--surface,#242832);color:var(--text,#f4f4f4)}
 html[data-theme="dark"] .chat-filter-strip>button.active{background:var(--accent,#9b5de5);color:#fff}
+@media(max-width:600px){
+ .sidebar>.topbar,.sidebar>.me{display:none}
+ .sidebar>.search{margin-top:12px}
+ .chat-filter-menu{max-width:calc(100vw - 36px)}
+}
