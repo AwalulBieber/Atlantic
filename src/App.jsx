@@ -479,10 +479,10 @@ export default function App() {
       const title = conversation.title || 'Grup Atlantic';
       let groupAvatarUrl=null;
       if(conversation.avatar_url){const {data:signed}=await supabase.storage.from('atlantic-chat-media').createSignedUrl(conversation.avatar_url,3600);groupAvatarUrl=signed?.signedUrl||null;}
-      return { conversation_id: conversation.id, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_path:conversation.avatar_url, avatar_url:groupAvatarUrl, pinned_message_id:conversation.pinned_message_id, message_policy:conversation.message_policy, add_member_policy:conversation.add_member_policy, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, avatar_url:groupAvatarUrl, is_group: true, is_verified: conversation.is_verified } };
+      return { conversation_id: conversation.id, created_by: conversation.created_by, is_group: true, title, is_verified: conversation.is_verified, description: conversation.description, avatar_path:conversation.avatar_url, avatar_url:groupAvatarUrl, pinned_message_id:conversation.pinned_message_id, message_policy:conversation.message_policy, add_member_policy:conversation.add_member_policy, members: groupProfiles, person: { id: conversation.id, display_name: title, username: title, avatar_url:groupAvatarUrl, is_group: true, is_verified: conversation.is_verified } };
     }
     const other = conversationMembers.map(member => peopleById.get(member.user_id)).find(Boolean);
-    return other ? { conversation_id: conversation.id, person: other, is_group: false } : null;
+    return other ? { conversation_id: conversation.id, created_by: conversation.created_by, person: other, is_group: false } : null;
   }));
   const validChatRows=chatRows.filter(Boolean);
   setChats(validChatRows);
