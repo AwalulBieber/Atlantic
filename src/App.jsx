@@ -329,6 +329,8 @@ export default function App() {
   }
 
   async function loadProfiles() {
+  const { data: savedConversationId, error: savedConversationError } = await supabase.rpc('get_or_create_saved_messages_conversation');
+  if (savedConversationError) setNotice('Pesan Tersimpan gagal disiapkan: ' + savedConversationError.message);
   const { data: mine, error } = await supabase
     .from('conversation_members')
     .select('conversation_id')
@@ -358,7 +360,7 @@ export default function App() {
       .in('conversation_id', ids)
       .neq('user_id', session.user.id),
     supabase.from('conversations')
-      .select('id,title,is_group,created_by,description,avatar_url,is_verified,pinned_message_id,message_policy,add_member_policy')
+      .select('id,title,is_group,is_saved_chat,created_by,description,avatar_url,is_verified,pinned_message_id,message_policy,add_member_policy')
       .in('id', ids)
   ]);
 
@@ -403,6 +405,10 @@ export default function App() {
   const peopleById = new Map(peopleWithBadges.map(person => [person.id, person]));
   const chatRows = await Promise.all((conversations || []).map(async conversation => {
     const conversationMembers = membersByConversation.get(conversation.id) || [];
+    if (conversation.is_saved_chat) {
+      const savedPerson = { id: session.user.id, display_name: 'Pesan Tersimpan', username: 'Cloud Pribadi', is_saved_chat: true };
+      return { conversation_id: conversation.id, person: savedPerson, is_group: false, is_saved_chat: true, title: 'Pesan Tersimpan' };
+    }
     if (conversation.is_group) {
       const groupProfiles = [{ ...(myProfile || {}), id: session.user.id }, ...conversationMembers.map(member => peopleById.get(member.user_id)).filter(Boolean)];
       const title = conversation.title || 'Grup Atlantic';
@@ -498,6 +504,16 @@ export default function App() {
     await loadMessages(conversationId);
     await loadProfiles();
     setGroupBusy(false);
+  }
+
+  async function openSavedChat(chat) {
+    setNotice('');
+    setUnread(old => { const next = { ...old }; delete next[chat.conversation_id]; return next; });
+    setIncomingNotice(null);
+    setActive({ conversation_id: chat.conversation_id, person: chat.person, is_group: false, is_saved_chat: true, title: 'Pesan Tersimpan', members: [{ id: session.user.id }] });
+    setReplyTarget(null);
+    setMobileChat(true);
+    await loadMessages(chat.conversation_id);
   }
 
   async function openGroupChat(group) {
@@ -1114,7 +1130,7 @@ export default function App() {
     <div className="person-row" key={c.conversation_id}>
       <button
         className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
-        onClick={() => c.is_group ? openGroupChat(c) : openChat(c.person)}
+        onClick={() => c.is_saved_chat ? openSavedChat(c) : c.is_group ? openGroupChat(c) : openChat(c.person)}
       >
         <div className="avatar">
           {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : c.is_group ? <Users size={19}/> : initials(c.person.display_name || c.person.username)}
@@ -1152,12 +1168,12 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              <div className="avatar">{active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</div>
+              <div className={`avatar ${active.is_saved_chat ? 'saved-chat-avatar' : ''}`}>{active.is_saved_chat ? <Bookmark size={21}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person" onClick={() => active.is_group && setGroupInfoOpen(true)} role={active.is_group ? "button" : undefined} tabIndex={active.is_group ? 0 : undefined}>
                 <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
-                <small>{otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
+                <small>{active.is_saved_chat ? 'Cloud Pribadi · Terenkripsi E2E' : otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
               </div>
-              {!active.is_group && <div className="chat-head-actions">
+              {!active.is_group && !active.is_saved_chat && <div className="chat-head-actions">
                 <button type="button" className="icon-btn" onClick={() => requestCall('audio')} title="Undang panggilan suara" aria-label="Undang panggilan suara"><Phone size={18}/></button>
                 <button type="button" className="icon-btn" onClick={() => requestCall('video')} title="Undang panggilan video" aria-label="Undang panggilan video"><Video size={18}/></button>
               </div>}
@@ -1204,8 +1220,8 @@ export default function App() {
               ))}
               {!messages.length && (
                 <div className="empty-chat">
-                  <MessageCircle size={34} /><b>Mulai percakapan</b>
-                  <span>{active.is_group ? `Kirim pesan pertama ke ${active.title}.` : `Kirim pesan pertama ke ${active.person.display_name || active.person.username}.`}</span>
+                  {active.is_saved_chat ? <Bookmark size={34}/> : <MessageCircle size={34}/>}<b>{active.is_saved_chat ? 'Ruang pribadi kamu' : 'Mulai percakapan'}</b>
+                  <span>{active.is_saved_chat ? 'Simpan catatan, foto, video, voice note, dan teruskan pesan dari ruang chat mana pun ke sini.' : active.is_group ? `Kirim pesan pertama ke ${active.title}.` : `Kirim pesan pertama ke ${active.person.display_name || active.person.username}.`}</span>
                 </div>
               )}
               <div ref={bottomRef} />
