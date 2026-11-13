@@ -73,3 +73,15 @@
 .atl-avatar-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}
 .atl-avatar-buttons button{border:2px solid currentColor;border-radius:8px;padding:8px 11px;background:var(--accent,#ffd84d);font-weight:800;box-shadow:2px 2px 0 currentColor}
 .atl-avatar-buttons .atl-avatar-remove{background:transparent;color:#d33}
+
+
+.atl-e2ee-recovery-panel{display:grid;gap:12px}
+.atl-e2ee-recovery-panel h3{margin:0;font-size:17px}
+.atl-e2ee-recovery-panel>p{margin:0;font-size:12px;line-height:1.55;opacity:.82}
+.atl-e2ee-recovery-panel label{display:grid;gap:6px;font-size:12px;font-weight:850}
+.atl-e2ee-recovery-panel input{width:100%;box-sizing:border-box;padding:11px;border:1.5px solid #777;border-radius:9px;background:transparent;color:inherit;font:inherit}
+.atl-e2ee-recovery-panel>button{justify-self:start;padding:10px 13px;border:2px solid #171717;border-radius:8px;background:var(--accent,#ffd84d);color:#171717;font-weight:900;box-shadow:2px 2px 0 #171717}
+.atl-e2ee-recovery-panel>button:disabled{opacity:.6}
+.atl-e2ee-recovery-status{display:grid;gap:4px;padding:12px;border:1.5px solid currentColor;border-radius:10px;background:rgba(120,130,150,.08)}
+.atl-e2ee-recovery-status b{font-size:13px}
+.atl-e2ee-recovery-status small,.atl-e2ee-recovery-panel>.atl-settings-hint{font-size:11px;line-height:1.5;opacity:.72}
