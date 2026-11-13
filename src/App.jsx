@@ -1414,6 +1414,7 @@ export default function App() {
             <div className={`messages ${messageFocusActive && messageActionTarget ? 'has-message-focus' : ''}`}>
               {messageActionTarget && <button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/>}
               {messages.map((m, messageIndex) => (
+                <React.Fragment key={m.id}>
                 <div
                   className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${messageFocusActive && messageActionTarget === m.id ? 'message-focused' : ''} ${messageActionTarget === m.id ? 'message-menu-open' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
                   key={m.id}
@@ -1490,6 +1491,7 @@ export default function App() {
                     <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={savedMessages.some(item => item.message_id === m.id) ? 'message-save-btn is-saved' : 'message-save-btn'} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={m.read_at ? 'message-status is-read' : m.delivered_at ? 'message-status is-delivered' : 'message-status is-sent'} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim ke perangkat penerima' : 'Terkirim dari perangkat ini'} aria-label={m.read_at ? 'Pesan dibaca' : m.delivered_at ? 'Pesan diterima' : 'Pesan dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-menu-trigger" onClick={() => { setMessageActionTarget(current => current === m.id ? null : m.id); setMessageFocusActive(false); }} aria-label="Menu pesan" aria-expanded={messageActionTarget === m.id}><MoreHorizontal size={16}/></button></div>
                   </div>
                 </div>
+                </React.Fragment>
               ))}
               {otherTyping && messages.length > 0 && (
                 <div className="atl-typing-row" aria-live="polite">
