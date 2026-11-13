@@ -1132,11 +1132,11 @@ export default function App() {
         className={`person ${active?.conversation_id === c.conversation_id ? 'selected' : ''}`}
         onClick={() => c.is_saved_chat ? openSavedChat(c) : c.is_group ? openGroupChat(c) : openChat(c.person)}
       >
-        <div className="avatar">
-          {c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : c.is_group ? <Users size={19}/> : initials(c.person.display_name || c.person.username)}
+        <div className={`avatar ${c.is_saved_chat ? 'saved-chat-avatar' : ''}`}>
+          {c.is_saved_chat ? <Bookmark size={19}/> : c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : c.is_group ? <Users size={19}/> : initials(c.person.display_name || c.person.username)}
         </div>
         <div className="person-info">
-          <b>{c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
+          <b>{c.is_saved_chat ? 'Pesan Tersimpan' : c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
           <small className="person-preview">{(() => {
             const latest = latestMessages[c.conversation_id];
             if (!latest) return 'Belum ada pesan';
