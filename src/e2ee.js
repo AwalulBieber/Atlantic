@@ -178,7 +178,7 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
 
   let { data: keyRow, error: keyError } = await supabase
     .from('conversation_e2ee_keys')
-    .select('conversation_id,key_id,shares,created_by')
+    .select('conversation_id,key_id,shares,created_by,member_ids')
     .eq('conversation_id', conversationId)
     .maybeSingle();
   if (keyError) throw new Error('Kunci percakapan gagal dimuat: ' + keyError.message);
@@ -196,6 +196,7 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
       conversation_id: conversationId,
       key_id: keyId,
       shares,
+      member_ids: ids,
       created_by: userId
     });
     if (!insertError) {
@@ -231,21 +232,40 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
     await writeLocalKey(CONVERSATION_STORE, cacheId, conversationKey);
   }
 
-  // Existing members can securely add envelopes for newly joined members.
+  // Membership changes create a fresh epoch key. Removed members retain only
+  // their old local key and therefore cannot decrypt messages sent after rotation.
+  const previousMembers = [...(keyRow.member_ids || [])].sort();
+  const currentMembers = [...ids].sort();
+  const membershipChanged = previousMembers.length !== currentMembers.length ||
+    previousMembers.some((id, index) => id !== currentMembers[index]);
   const missingShares = ids.filter(id => !keyRow.shares?.[id]);
-  if (missingShares.length) {
-    const rawKey = await crypto.subtle.exportKey('raw', conversationKey);
-    const updatedShares = { ...(keyRow.shares || {}) };
-    for (const recipientId of missingShares) {
-      updatedShares[recipientId] = await wrapConversationKey(
-        rawKey, identity, profileMap.get(recipientId), conversationId, keyRow.key_id
+  if (membershipChanged || missingShares.length) {
+    const nextKeyId = crypto.randomUUID();
+    const nextRawKey = crypto.getRandomValues(new Uint8Array(32));
+    const nextShares = {};
+    for (const recipientId of ids) {
+      nextShares[recipientId] = await wrapConversationKey(
+        nextRawKey, identity, profileMap.get(recipientId), conversationId, nextKeyId
       );
     }
-    const { error: shareError } = await supabase
+    const { data: rotated, error: rotateError } = await supabase
       .from('conversation_e2ee_keys')
-      .update({ shares: updatedShares, updated_at: new Date().toISOString() })
-      .eq('conversation_id', conversationId);
-    if (shareError) throw new Error('Kunci belum bisa dibagikan ke semua anggota: ' + shareError.message);
+      .update({
+        key_id: nextKeyId,
+        shares: nextShares,
+        member_ids: ids,
+        updated_at: new Date().toISOString()
+      })
+      .eq('conversation_id', conversationId)
+      .eq('key_id', keyRow.key_id)
+      .select('conversation_id')
+      .maybeSingle();
+    if (rotateError || !rotated) {
+      throw new Error('Rotasi kunci grup gagal atau sedang dilakukan perangkat lain. Buka ulang chat untuk mencoba lagi.');
+    }
+    const nextKey = await crypto.subtle.importKey('raw', nextRawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    await writeLocalKey(CONVERSATION_STORE, conversationCacheId(conversationId, nextKeyId), nextKey);
+    return nextKey;
   }
 
   return conversationKey;
