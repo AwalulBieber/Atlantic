@@ -310,7 +310,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   }
 
   async function createChannelInviteLink(){
-    if(!selectedChannel||selectedChannel.owner_id!==user.id||channelInviteBusy)return;
+    if(!selectedChannel||!(selectedChannel.owner_id===user.id||['owner','admin'].includes(selectedChannel.member_role))||channelInviteBusy)return;
     setChannelInviteBusy(true);setError('');
     const token=crypto.randomUUID().replace(/-/g,'')+crypto.randomUUID().replace(/-/g,'');
     const maxUses=channelInviteMaxUses.trim()?Number(channelInviteMaxUses):null;
