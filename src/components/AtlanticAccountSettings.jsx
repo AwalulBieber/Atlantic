@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import "./AtlanticAccountSettings.css";
 import AtlanticImageCropper from "./AtlanticImageCropper";
-import { createE2EERecoveryBackup, restoreE2EEIdentityFromBackup } from "../e2ee";
+import { restoreE2EEIdentityFromBackup } from "../e2ee";
 
 const DEFAULTS = {
   bio: "", is_private: false, show_online_status: true,
@@ -27,7 +27,6 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [dashboardError, setDashboardError] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [recoveryPassphrase, setRecoveryPassphrase] = useState("");
-  const [recoveryConfirm, setRecoveryConfirm] = useState("");
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryBackupExists, setRecoveryBackupExists] = useState(false);
   const [e2eeIdentityExists, setE2eeIdentityExists] = useState(false);
@@ -119,20 +118,6 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       setGroupVerificationRequests(current=>current.filter(item=>item.id!==request.id));
       setMessage(approve ? "Grup berhasil diverifikasi." : "Pengajuan verifikasi grup ditolak.");
     }
-  }
-
-  async function createRecoveryBackup() {
-    if (!user?.id || recoveryBusy) return;
-    if (recoveryPassphrase.length < 12) { setMessage("Passphrase pemulihan minimal 12 karakter."); return; }
-    if (recoveryPassphrase !== recoveryConfirm) { setMessage("Konfirmasi passphrase tidak cocok."); return; }
-    setRecoveryBusy(true); setMessage("");
-    try {
-      await createE2EERecoveryBackup(supabase, user.id, recoveryPassphrase);
-      setRecoveryBackupExists(true); setE2eeIdentityExists(true);
-      setRecoveryPassphrase(""); setRecoveryConfirm("");
-      setMessage("Cadangan E2EE berhasil dibuat. Simpan passphrase di tempat aman; Atlantic tidak menyimpannya dan tidak dapat memulihkannya jika hilang.");
-    } catch (error) { setMessage(error.message || "Cadangan pemulihan gagal dibuat."); }
-    finally { setRecoveryBusy(false); }
   }
 
   async function restoreRecoveryBackup() {
@@ -334,14 +319,13 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           </section>}
           {tab === "security" && <section className="atl-e2ee-recovery-panel">
             <h3>Keamanan & pemulihan E2EE</h3>
-            <p>Private key dibuat di perangkat dan tidak dikirim ke server. Cadangan di bawah dienkripsi dengan passphrase pilihanmu sebelum disimpan. Server hanya menyimpan ciphertext.</p>
-            <div className="atl-e2ee-recovery-status"><b>{recoveryBackupExists ? "Cadangan pemulihan tersedia" : e2eeIdentityExists ? "Identitas E2EE sudah terdaftar" : "E2EE belum disiapkan"}</b><small>{recoveryBackupExists ? "Kamu dapat memulihkan identitas di perangkat baru menggunakan passphrase." : e2eeIdentityExists ? "Identitas lama tidak dapat diekspor secara retroaktif karena private key bersifat non-extractable." : "Buat cadangan sebelum membuka chat terenkripsi di perangkat ini."}</small></div>
-            <label>Passphrase pemulihan<input type="password" autoComplete="new-password" minLength={12} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder="Minimal 12 karakter" /></label>
-            {!recoveryBackupExists && !e2eeIdentityExists && <label>Ulangi passphrase<input type="password" autoComplete="new-password" minLength={12} value={recoveryConfirm} onChange={e => setRecoveryConfirm(e.target.value)} placeholder="Ulangi passphrase" /></label>}
-            {!recoveryBackupExists && !e2eeIdentityExists && <button type="button" disabled={recoveryBusy} onClick={createRecoveryBackup}>{recoveryBusy ? "Menyiapkan…" : "Buat cadangan dan aktifkan E2EE"}</button>}
-            {recoveryBackupExists && <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>}
-            {e2eeIdentityExists && !recoveryBackupExists && <p className="atl-settings-hint">Jangan hapus data browser atau perangkat yang masih memiliki kunci ini. Untuk akun ini, pemulihan baru tidak dapat dibuat tanpa akses ke private key lama.</p>}
-            <small className="atl-settings-hint">Gunakan passphrase unik yang kuat dan simpan di password manager. Jika passphrase hilang, Atlantic tidak dapat membuka cadangan. Cadangan tidak memulihkan pesan atau lampiran yang sudah dihapus dari server.</small>
+            <p>Atlantic membuat identitas E2EE otomatis saat kamu masuk. Private key disimpan hanya di perangkat ini dan tidak dikirim ke server.</p>
+            <div className="atl-e2ee-recovery-status"><b>{recoveryBackupExists ? "Cadangan pemulihan tersedia" : e2eeIdentityExists ? "Identitas E2EE terdaftar" : "Menyiapkan identitas E2EE otomatis"}</b><small>{recoveryBackupExists ? "Kamu dapat memulihkan identitas di perangkat baru menggunakan passphrase cadangan." : e2eeIdentityExists ? "Kunci perangkat ini tidak memiliki cadangan pemulihan. Jangan hapus data browser atau pindah perangkat sebelum tersedia fitur transfer kunci." : "Identitas akan dibuat otomatis saat sesi akun aktif. Tidak perlu membuat kunci secara manual."}</small></div>
+            {recoveryBackupExists && <>
+              <label>Passphrase pemulihan<input type="password" autoComplete="current-password" minLength={12} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder="Passphrase cadangan" /></label>
+              <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>
+            </>}
+            <small className="atl-settings-hint">Server hanya menyimpan kunci publik dan, jika tersedia, cadangan terenkripsi. Jangan hapus data browser pada perangkat yang menyimpan private key.</small>
           </section>}
           {tab === "privacy" && <>
             <label className="atl-switch-row"><span><b>Akun private</b><small>Sembunyikan profil dari daftar pemilihan anggota saat pengguna membuat grup baru.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
