@@ -512,9 +512,13 @@ export default function App() {
     setIncomingNotice(null);
     setActive({ conversation_id: chat.conversation_id, person: chat.person, is_group: false, is_saved_chat: true, title: 'Pesan Tersimpan', members: [{ id: session.user.id }] });
     setShowSaved(false);
+    setShowArchived(false);
     setReplyTarget(null);
+    setDraft('');
+    setAttachmentFile(null);
+    setAttachmentPreview('');
     setMobileChat(true);
-    await loadMessages(chat.conversation_id);
+    // The active-chat effect loads messages after this conversation's E2EE key is ready.
   }
 
   async function openGroupChat(group) {
