@@ -639,11 +639,14 @@ export default function App() {
     const replyIds = [...new Set(visibleMessages.map(m => m.reply_to).filter(Boolean))];
     let replyMap = {};
     if (replyIds.length) {
-      const { data: originals } = await supabase.from('messages').select('id,body,sender_id').in('id', replyIds);
+      const { data: originals } = await supabase.from('messages').select('id,body,sender_id,e2ee_key_id').in('id', replyIds);
       const decodedOriginals = await Promise.all((originals || []).map(async item => {
         if (e2eeKeyRef.current && typeof item.body === 'string' && item.body.startsWith('ATL-E2EE1:')) {
           try {
-            const payload = await decryptE2EEMessage(e2eeKeyRef.current, item.body);
+            const replyKey = item.e2ee_key_id && item.e2ee_key_id !== e2eeKeyIdRef.current
+              ? await getConversationE2EEKeyById(supabase, active.conversation_id, item.e2ee_key_id, session.user.id)
+              : e2eeKeyRef.current;
+            const payload = await decryptE2EEMessage(replyKey, item.body);
             return { ...item, body: payload.text || '', is_e2ee: true };
           } catch { return { ...item, body: '🔒 Pesan terenkripsi tidak dapat dibuka.', is_e2ee: true, decrypt_error: true }; }
         }
@@ -703,9 +706,15 @@ export default function App() {
           incoming.media_url = signed?.signedUrl || null;
         }
         if (incoming.reply_to) {
-          const { data: original } = await supabase.from('messages').select('id,body,sender_id').eq('id', incoming.reply_to).maybeSingle();
+          const { data: original } = await supabase.from('messages').select('id,body,sender_id,e2ee_key_id').eq('id', incoming.reply_to).maybeSingle();
           if (original?.body && e2eeKeyRef.current && original.body.startsWith('ATL-E2EE1:')) {
-            try { const payload = await decryptE2EEMessage(e2eeKeyRef.current, original.body); original.body = payload.text || ''; original.is_e2ee = true; }
+            try {
+              const replyKey = original.e2ee_key_id && original.e2ee_key_id !== e2eeKeyIdRef.current
+                ? await getConversationE2EEKeyById(supabase, active.conversation_id, original.e2ee_key_id, session.user.id)
+                : e2eeKeyRef.current;
+              const payload = await decryptE2EEMessage(replyKey, original.body);
+              original.body = payload.text || ''; original.is_e2ee = true;
+            }
             catch { original.body = '🔒 Pesan terenkripsi tidak dapat dibuka.'; original.decrypt_error = true; }
           }
           incoming.replyPreview = original || null;
@@ -827,7 +836,14 @@ export default function App() {
     navigator.geolocation.getCurrentPosition(async position => {
       const { latitude, longitude } = position.coords;
       const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-      let encryptedLocation; try { if (!e2eeKeyRef.current) throw new Error('Kunci E2EE belum siap.'); encryptedLocation = await encryptE2EEText(e2eeKeyRef.current, `${label}: ${mapUrl}`); } catch (encryptionError) { setNotice(encryptionError.message); return; } const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedLocation });
+      let encryptedLocation;
+      try {
+        const freshKey = await ensureConversationE2EE(supabase, active.conversation_id, active.members?.map(member => member.id) || [active.person?.id], session.user.id);
+        e2eeKeyRef.current = freshKey;
+        e2eeKeyIdRef.current = await getCurrentConversationE2EEKeyId(supabase, active.conversation_id);
+        encryptedLocation = await encryptE2EEMessage(freshKey, { text: `${label}: ${mapUrl}` });
+      } catch (encryptionError) { setNotice(encryptionError.message); return; }
+      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedLocation, e2ee_key_id:e2eeKeyIdRef.current });
       if (error) setNotice('Lokasi gagal dikirim: ' + error.message);
       else setShowAttachmentMenu(false);
     }, error => setNotice(error.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk Atlantic.' : 'Lokasi gagal didapatkan.'), { enableHighAccuracy:true, timeout:12000, maximumAge:10000 });
@@ -839,6 +855,12 @@ export default function App() {
     if ((!body && !attachmentFile) || !active || sending) return;
     if (e2eeStatus.state !== 'active' || !e2eeKeyRef.current) { setNotice(e2eeStatus.error || 'Menyiapkan kunci enkripsi. Coba lagi sebentar.'); return; }
     setSending(true); setDraft('');
+    try {
+      e2eeKeyRef.current = await ensureConversationE2EE(supabase, active.conversation_id, active.members?.map(member => member.id) || [active.person?.id], session.user.id);
+      e2eeKeyIdRef.current = await getCurrentConversationE2EEKeyId(supabase, active.conversation_id);
+    } catch (keyError) {
+      setDraft(body); setNotice(keyError.message || 'Rotasi kunci E2EE belum selesai.'); setSending(false); return;
+    }
     let mediaPath = null;
     let attachmentEnvelope = null;
     try {
@@ -853,7 +875,7 @@ export default function App() {
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
       typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
       const encryptedBody = await encryptE2EEMessage(e2eeKeyRef.current, { text: body, attachment: attachmentEnvelope });
-      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedBody, media_url:mediaPath, media_type:mediaPath ? 'application/octet-stream' : null, media_name:null, reply_to:replyTarget?.id || null });
+      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedBody, e2ee_key_id:e2eeKeyIdRef.current, media_url:mediaPath, media_type:mediaPath ? 'application/octet-stream' : null, media_name:null, reply_to:replyTarget?.id || null });
       if (error) throw new Error('Pesan gagal dikirim: ' + error.message);
       setReplyTarget(null); setAttachmentFile(null); setAttachmentPreview('');
     } catch (sendError) {
