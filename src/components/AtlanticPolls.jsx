@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
-import { encryptE2EEText, decryptE2EEText, encryptE2EEMessage } from '../e2ee';
+import { encryptE2EEText, decryptE2EEText, encryptE2EEMessage, ensureConversationE2EE, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById } from '../e2ee';
 import { BarChart3, Plus, X, Check, Lock, Clock3, Users } from 'lucide-react';
 
-export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, e2eeKey = null }) {
+export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, e2eeKey = null, e2eeKeyId = null }) {
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
@@ -24,10 +24,16 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     const {data:rows,error:pollError}=await pollQuery;
     if(pollError){setError(pollError.message);return;}
     const pollIds=(rows||[]).map(p=>p.id);
+    const pollKeys = new Map();
     const visiblePolls = await Promise.all((rows||[]).map(async poll => {
       if (!e2eeKey) return poll;
-      try { return { ...poll, question: await decryptE2EEText(e2eeKey, poll.question), is_e2ee: true }; }
-      catch { return { ...poll, question: '🔒 Polling terenkripsi tidak dapat dibuka.', decrypt_error: true, is_e2ee: true }; }
+      try {
+        const pollKey = poll.e2ee_key_id && poll.e2ee_key_id !== e2eeKeyId
+          ? await getConversationE2EEKeyById(supabase, targetId, poll.e2ee_key_id, user.id)
+          : e2eeKey;
+        pollKeys.set(poll.id, pollKey);
+        return { ...poll, question: await decryptE2EEText(pollKey, poll.question), is_e2ee: true };
+      } catch { return { ...poll, question: '🔒 Polling terenkripsi tidak dapat dibuka.', decrypt_error: true, is_e2ee: true }; }
     }));
     setPolls(visiblePolls);
     if(!pollIds.length){setOptions([]);setVotes([]);setProfiles({});return;}
@@ -38,8 +44,10 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     if(optionError||voteError){setError(optionError?.message||voteError?.message||'Gagal memuat hasil polling.');return;}
     const visibleOptions = await Promise.all((optionRows||[]).map(async option => {
       if (!e2eeKey) return option;
-      try { return { ...option, label: await decryptE2EEText(e2eeKey, option.label), is_e2ee: true }; }
-      catch { return { ...option, label: '🔒 Pilihan terkunci', decrypt_error: true, is_e2ee: true }; }
+      try {
+        const optionKey = pollKeys.get(option.poll_id) || e2eeKey;
+        return { ...option, label: await decryptE2EEText(optionKey, option.label), is_e2ee: true };
+      } catch { return { ...option, label: '🔒 Pilihan terkunci', decrypt_error: true, is_e2ee: true }; }
     }));
     setOptions(visibleOptions);setVotes(voteRows||[]);
     const ids=[...new Set((voteRows||[]).map(v=>v.user_id))];
@@ -47,7 +55,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const {data:people}=await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids);
       setProfiles(Object.fromEntries((people||[]).map(p=>[p.id,p])));
     }else setProfiles({});
-  },[targetId,targetType,user?.id,canCreate,pollId,e2eeKey]);
+  },[targetId,targetType,user?.id,canCreate,pollId,e2eeKey,e2eeKeyId]);
 
   useEffect(()=>{
     load();
@@ -65,12 +73,16 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     if(new Set(clean.map(v=>v.toLocaleLowerCase())).size!==clean.length){setError('Pilihan polling tidak boleh duplikat.');return;}
     setBusy(true);setError('');
     const expiresAt=expiry==='never'?null:new Date(Date.now()+Number(expiry)*86400000).toISOString();
+    let activeKey = e2eeKey;
+    let activeKeyId = e2eeKeyId;
     let storedQuestion = question.trim();
     let storedOptions = clean;
     try {
-      if (e2eeKey) {
-        storedQuestion = await encryptE2EEText(e2eeKey, storedQuestion);
-        storedOptions = await Promise.all(clean.map(option => encryptE2EEText(e2eeKey, option)));
+      if (e2eeKey && targetType === 'group') {
+        activeKey = await ensureConversationE2EE(supabase, targetId, [], user.id);
+        activeKeyId = await getCurrentConversationE2EEKeyId(supabase, targetId);
+        storedQuestion = await encryptE2EEText(activeKey, storedQuestion);
+        storedOptions = await Promise.all(clean.map(option => encryptE2EEText(activeKey, option)));
       }
     } catch (encryptionError) { setError('Polling gagal dienkripsi: ' + encryptionError.message); setBusy(false); return; }
     const {error:e1}=await supabase.rpc('create_atlantic_poll',{p_type:targetType,p_target:targetId,p_question:storedQuestion,p_options:storedOptions,p_expires_at:expiresAt});
@@ -79,9 +91,13 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const {data:created,error:fetchError}=await supabase.from('atlantic_polls').select('id').eq('target_type',targetType).eq('target_id',targetId).eq('created_by',user.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
       if(fetchError||!created?.id){setError(fetchError?.message||'Polling dibuat, tetapi pesan polling gagal disiapkan.');}
       else{
+        if (activeKey && activeKeyId) {
+          const { error: keyBindError } = await supabase.rpc('set_atlantic_poll_e2ee_key', { p_poll_id: created.id, p_key_id: activeKeyId });
+          if (keyBindError) { setError('Polling dibuat tetapi pengaitan kunci E2EE gagal: ' + keyBindError.message); setBusy(false); return; }
+        }
         const pollMarker = `[[ATLANTIC_POLL:${created.id}]]`;
-        const storedMarker = e2eeKey ? await encryptE2EEMessage(e2eeKey, { text: pollMarker }) : pollMarker;
-        const {error:messageError}=await supabase.from('messages').insert({conversation_id:targetId,sender_id:user.id,body:storedMarker});
+        const storedMarker = activeKey ? await encryptE2EEMessage(activeKey, { text: pollMarker }) : pollMarker;
+        const {error:messageError}=await supabase.from('messages').insert({conversation_id:targetId,sender_id:user.id,body:storedMarker,e2ee_key_id:activeKeyId});
         if(messageError)setError('Polling dibuat, tetapi gagal dikirim ke chat: '+messageError.message);
         else{setQuestion('');setChoices(['','']);setExpiry('never');setShowCreate(false);onNotice?.('Polling berhasil dikirim ke chat.');onCreated?.();await load();}
       }
