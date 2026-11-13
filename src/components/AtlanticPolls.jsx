@@ -3,7 +3,7 @@ import { supabase } from '../supabase';
 import { encryptE2EEText, decryptE2EEText, encryptE2EEMessage, ensureConversationE2EE, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById } from '../e2ee';
 import { BarChart3, Plus, X, Check, Lock, Clock3, Users } from 'lucide-react';
 
-export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, e2eeKey = null, e2eeKeyId = null }) {
+export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, e2eeKey = null, e2eeKeyId = null, onKeyReady }) {
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
@@ -81,6 +81,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       if (e2eeKey && targetType === 'group') {
         activeKey = await ensureConversationE2EE(supabase, targetId, [], user.id);
         activeKeyId = await getCurrentConversationE2EEKeyId(supabase, targetId);
+        onKeyReady?.(activeKey, activeKeyId);
         storedQuestion = await encryptE2EEText(activeKey, storedQuestion);
         storedOptions = await Promise.all(clean.map(option => encryptE2EEText(activeKey, option)));
       }
