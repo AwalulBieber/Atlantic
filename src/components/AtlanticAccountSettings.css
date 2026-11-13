@@ -89,3 +89,16 @@
 .atl-verification-policy{display:flex;align-items:flex-start;gap:11px;padding:13px;border:1.5px solid currentColor;border-radius:12px;background:rgba(120,130,150,.08)}
 .atl-verification-policy>div{display:grid;gap:4px}.atl-verification-policy b{font-size:13px}.atl-verification-policy small{font-size:11px;line-height:1.5;opacity:.72}
 .atl-policy-lock{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border-radius:50%;background:#1677e8;color:#fff;font-weight:950}
+
+/* Follow the selected Atlantic theme */
+html[data-skin] .atl-settings{background:var(--surface-strong,#fff);color:var(--ink,#171717);border-color:var(--line-color,#171717);box-shadow:var(--hard-shadow,8px 8px 0 #111)}
+html[data-skin] .atl-settings-head{background:var(--accent);color:var(--ink);border-color:var(--line-color)}
+html[data-skin] .atl-settings-tabs{background:var(--surface);border-color:var(--line-color)}
+html[data-skin] .atl-settings-tabs button{background:var(--surface-strong);color:var(--ink);border-color:var(--line-color);box-shadow:var(--hard-shadow)}
+html[data-skin] .atl-settings-tabs button.active{background:var(--accent);color:#171717}
+html[data-skin] .atl-settings-body input:not([type=checkbox]),html[data-skin] .atl-settings-body textarea,html[data-skin] .atl-settings-body select{background:var(--surface-strong);color:var(--ink);border-color:var(--line-color)}
+html[data-skin] .atl-switch-row,html[data-skin] .atl-admin-status,html[data-skin] .atl-verification-policy{background:var(--surface);border-color:var(--line-color)}
+html[data-skin="cyberpunk"] .atl-settings{--panel:#111a2d;color:#e7f8ff}
+html[data-skin="cyberpunk"] .atl-settings-head{color:#e7f8ff}
+html[data-skin="cyberpunk"] .atl-settings-tabs button{color:#e7f8ff}
+html[data-skin="cyberpunk"] .atl-settings-tabs button.active{color:#07111f}
