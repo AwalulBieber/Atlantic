@@ -113,15 +113,13 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   };
 
   const vote=async(pollId,optionId)=>{
-    if(busy)return;
     const previousVotes=votes;
     const optimisticVote={id:'optimistic-'+pollId,user_id:user?.id,poll_id:pollId,option_id:optionId,created_at:new Date().toISOString()};
     setVotes(current=>[...current.filter(item=>!(item.poll_id===pollId&&item.user_id===user?.id)),optimisticVote]);
-    setBusy(true);setError('');
+    setError('');
     const {error:e}=await supabase.rpc('cast_atlantic_poll_vote',{p_poll_id:pollId,p_option_id:optionId});
-    if(e){setVotes(previousVotes);setError(e.message);}
+    if(e){setVotes(previousVotes);setError(e.message);load();}
     else { load(); }
-    setBusy(false);
   };
 
   const closePoll=async(poll)=>{
@@ -177,7 +175,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
           const voters=pollVotes.filter(v=>v.option_id===option.id);
           const pct=total?Math.round(voters.length/total*100):0;
           return <div className={'atl-poll-option'+(selected?' is-selected':'')} key={option.id}>
-            <button type="button" disabled={closed||busy} onClick={()=>vote(poll.id,option.id)}><span className="atl-poll-option-label">{selected&&<Check size={14}/>} {option.label}</span><b>{voters.length} · {pct}%</b></button>
+            <button type="button" disabled={closed} onClick={()=>vote(poll.id,option.id)}><span className="atl-poll-option-label">{selected&&<Check size={14}/>} {option.label}</span><b>{voters.length} · {pct}%</b></button>
             <div className="atl-poll-progress"><span style={{width:pct+'%'}}/></div>
             <div className="atl-poll-voters"><Users size={12}/>{voters.length?voters.map(v=>profiles[v.user_id]?.display_name||profiles[v.user_id]?.username||'Pengguna Atlantic').join(', '):'Belum ada yang memilih'}</div>
           </div>;
