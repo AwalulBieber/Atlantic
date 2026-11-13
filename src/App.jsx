@@ -60,9 +60,17 @@ function inboxDate(value) {
 }
 
 const DEFAULT_SETTINGS = {
-  theme: 'light', accent: 'yellow', font: 'ios',
+  theme: 'atlantic', accent: 'yellow', font: 'ios',
   textSize: 'medium', fps: '60', animations: true
 };
+
+const THEME_OPTIONS = [
+  { value: 'atlantic', label: 'Atlantic Hybrid', description: 'Liquid Glass × Neobrutalism', preview: 'hybrid' },
+  { value: 'neo', label: 'Pure Neobrutalism', description: 'Tegas, kontras, dan berani', preview: 'neo' },
+  { value: 'glass', label: 'Liquid Glass', description: 'Transparan, blur, dan elegan', preview: 'glass' },
+  { value: 'minimal', label: 'Minimalist', description: 'Bersih, ringan, dan sederhana', preview: 'minimal' },
+  { value: 'cyberpunk', label: 'Cyberpunk', description: 'Gelap dengan aksen neon', preview: 'cyberpunk' }
+];
 
 const FONT_OPTIONS = [
   { value: 'ios', label: 'iOS / SF Pro' },
@@ -157,9 +165,11 @@ export default function App() {
 
   const [settings, setSettings] = useState(() => {
     try {
+      const stored = JSON.parse(localStorage.getItem('atlantic-settings') || '{}');
       return {
         ...DEFAULT_SETTINGS,
-        ...JSON.parse(localStorage.getItem('atlantic-settings') || '{}')
+        ...stored,
+        theme: THEME_OPTIONS.some(option => option.value === stored.theme) ? stored.theme : 'atlantic'
       };
     } catch {
       return DEFAULT_SETTINGS;
@@ -171,7 +181,9 @@ export default function App() {
       localStorage.setItem('atlantic-settings', JSON.stringify(settings));
     } catch {}
     const root = document.documentElement;
-    root.dataset.theme = settings.theme;
+    const selectedTheme = THEME_OPTIONS.some(option => option.value === settings.theme) ? settings.theme : 'atlantic';
+    root.dataset.theme = selectedTheme === 'cyberpunk' ? 'dark' : 'light';
+    root.dataset.skin = selectedTheme;
     root.dataset.font = settings.font;
     root.dataset.textSize = settings.textSize;
     root.dataset.fps = settings.fps;
@@ -1279,7 +1291,7 @@ export default function App() {
         <div className="me">
           <div className="avatar">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : initials(myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email)}</div>
           <div>
-            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={16}/></span> : myProfile?.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={16}/></span>}</b>
+            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={16}/></span>}</b>
             <small><i className="online-dot" /> Online</small>
           </div>
         </div>
@@ -1321,7 +1333,7 @@ export default function App() {
           {c.is_saved_chat ? <Bookmark size={19}/> : c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : c.is_group ? <Users size={19}/> : initials(c.person.display_name || c.person.username)}
         </div>
         <div className="person-info">
-          <b>{c.is_saved_chat ? 'Pesan Tersimpan' : c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
+          <b>{c.is_saved_chat ? 'Pesan Tersimpan' : c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span>}</b>
           <small className="person-preview">{(() => {
             const latest = latestMessages[c.conversation_id];
             if (!latest) return 'Belum ada pesan';
@@ -1354,7 +1366,7 @@ export default function App() {
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
               <div className={`avatar ${active.is_saved_chat ? 'saved-chat-avatar' : ''}`}>{active.is_saved_chat ? <Bookmark size={21}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person" onClick={() => active.is_group && setGroupInfoOpen(true)} role={active.is_group ? "button" : undefined} tabIndex={active.is_group ? 0 : undefined}>
-                <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={15}/></span>}</b>
+                <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span>}</b>
                 <small>{active.is_saved_chat ? 'Cloud Pribadi · Terenkripsi E2E' : otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
               </div>
               {!active.is_group && !active.is_saved_chat && <div className="chat-head-actions">
@@ -1499,10 +1511,18 @@ export default function App() {
               {settingsTab === 'appearance' && <>
                 <div className="setting-group">
                   <h3>Tema</h3><p>Pilih suasana tampilan Atlantic.</p>
-                  <div className="choice-row">
-                    {[['light', 'Light'], ['dark', 'Dark'], ['system', 'System']].map(([v, l]) => (
-                      <button key={v} className={settings.theme === v ? 'choice selected' : 'choice'} onClick={() => updateSetting('theme', v)}>
-                        {settings.theme === v && <Check size={15} />} {l}
+                  <div className="theme-choice-grid">
+                    {THEME_OPTIONS.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        className={`theme-choice theme-preview-${option.preview}${settings.theme === option.value ? ' selected' : ''}`}
+                        onClick={() => updateSetting('theme', option.value)}
+                        aria-pressed={settings.theme === option.value}
+                      >
+                        <span className="theme-preview-art" aria-hidden="true"><i/><i/><i/></span>
+                        <span className="theme-choice-copy"><b>{option.label}</b><small>{option.description}</small></span>
+                        {settings.theme === option.value && <Check size={17}/>}
                       </button>
                     ))}
                   </div>
