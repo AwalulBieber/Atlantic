@@ -580,7 +580,8 @@ export async function restoreE2EEIdentityFromBackup(supabase, userId, passphrase
   if (backupError) throw new Error('Cadangan pemulihan gagal dimuat: ' + backupError.message);
   const backup = row?.backup;
   if (!backup || ![1, 2].includes(backup.version) || backup.kdf !== 'PBKDF2-SHA256' ||
-      Number(backup.iterations) < 100000 ||
+      !Number.isInteger(Number(backup.iterations)) ||
+      Number(backup.iterations) < 100000 || Number(backup.iterations) > 1000000 ||
       !backup.salt || !backup.iv || !backup.ciphertext ||
       !backup.publicJwk?.x || !backup.publicJwk?.y) {
     throw new Error('Cadangan pemulihan tidak ditemukan atau formatnya tidak didukung.');
@@ -601,9 +602,17 @@ export async function restoreE2EEIdentityFromBackup(supabase, userId, passphrase
   } catch {
     throw new Error('Passphrase pemulihan salah atau cadangan rusak.');
   }
-  const privateKey = await crypto.subtle.importKey(
-    'pkcs8', privatePkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
-  );
+  let privateKey;
+  try {
+    privateKey = await crypto.subtle.importKey(
+      'pkcs8', privatePkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+    );
+  } finally {
+    new Uint8Array(privatePkcs8).fill(0);
+  }
+  if (!await verifyPrivateKeyMatchesPublic(privateKey, backup.publicJwk)) {
+    throw new Error('Private key cadangan tidak cocok dengan kunci publik akun. Pemulihan dibatalkan.');
+  }
   await writeLocalKey(IDENTITY_STORE, userId, {
     privateKey,
     publicJwk: backup.publicJwk
