@@ -12,3 +12,15 @@
 
 .atl-admin-user-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}.atl-admin-user-actions button{border:1.5px solid #171717;border-radius:7px;background:#fff;padding:6px 8px;font-size:10px;font-weight:850}.atl-admin-user-actions button.block{background:#ffb4b4}.atl-admin-user-actions button.unblock{background:#b8f36b}.atl-admin-user-actions button:disabled{opacity:.5}
 @media(max-width:640px){.atl-admin-user{flex-wrap:wrap}.atl-admin-user-info{min-width:calc(100% - 65px)}.atl-admin-user-actions{width:100%;justify-content:flex-start;padding-left:51px}.atl-admin-user-actions button{flex:1}}
+
+.atl-admin-channel-list{display:grid;gap:9px}
+.atl-admin-channel{display:flex;align-items:center;gap:10px;padding:12px;border:2px solid #171717;border-radius:11px;background:#fff;box-shadow:3px 3px 0 #171717}
+.atl-admin-channel-icon{width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;border:2px solid #171717;border-radius:10px;background:#7bd5ff}
+.atl-admin-channel-info{display:grid;gap:4px;min-width:0;flex:1}
+.atl-admin-channel-info b{font-size:13px;overflow-wrap:anywhere}
+.atl-admin-channel-info small{font-size:11px;color:#666;overflow-wrap:anywhere}
+.atl-admin-channel-info span{font-size:10px;color:#777;line-height:1.4}
+.atl-admin-channel>button{display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 9px;border:1.5px solid #171717;border-radius:8px;background:#ffb4b4;color:#171717;font-size:10px;font-weight:900;white-space:nowrap}
+.atl-admin-channel>button.show{background:#b8f36b}
+.atl-admin-channel>button:disabled{opacity:.5}
+@media(max-width:640px){.atl-admin-channel{flex-wrap:wrap}.atl-admin-channel-info{min-width:calc(100% - 54px)}.atl-admin-channel>button{flex:1}.atl-admin-channel>.atl-admin-status{margin-left:50px}}
