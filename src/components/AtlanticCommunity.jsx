@@ -320,7 +320,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
 
   async function deleteChannelPost(post) {
     if(!selectedChannel||busy)return;
-    const canDelete=post.author_id===user.id||selectedChannel.owner_id===user.id;
+    const canDelete=selectedChannel.owner_id===user.id||['owner','admin'].includes(selectedChannel.member_role);
     if(!canDelete)return;
     const confirmed=await onDialog?.({type:'confirm',title:'Hapus postingan?',message:'Postingan ini akan dihapus dari saluran.',confirmLabel:'Hapus'}); if(!confirmed)return;
     setBusy(true);setError('');
