@@ -692,15 +692,18 @@ export default function App() {
     setTimeout(() => document.getElementById(`message-${message.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 180);
   }
 
-  async function removeChat(conversation) {
+  async function removeChat(conversation, forEveryone = false) {
     const confirmed = await openAtlanticDialog({
-      title: 'Hapus chat?',
-      message: 'Chat ini akan dihapus dari daftar kamu. Riwayat dan pesan anggota lain tidak akan dihapus.',
-      confirmLabel: 'Hapus chat',
+      title: forEveryone ? 'Hapus untuk semua orang?' : 'Hapus untuk saya?',
+      message: forEveryone
+        ? 'Seluruh percakapan dan riwayat pesannya akan dihapus untuk semua anggota. Tindakan ini tidak bisa dibatalkan.'
+        : 'Chat hanya akan dihapus dari daftar kamu. Anggota lain tetap memiliki riwayat percakapannya.',
+      confirmLabel: forEveryone ? 'Hapus untuk semua' : 'Hapus untuk saya',
       cancelLabel: 'Batal'
     });
     if (!confirmed) return;
-    const { error } = await supabase.rpc('hide_atlantic_conversation', { p_conversation_id: conversation.conversation_id });
+    const rpcName = forEveryone ? 'delete_atlantic_conversation_for_everyone' : 'hide_atlantic_conversation';
+    const { error } = await supabase.rpc(rpcName, { p_conversation_id: conversation.conversation_id });
     if (error) { setNotice('Chat gagal dihapus: ' + error.message); return; }
     setChats(current => current.filter(item => item.conversation_id !== conversation.conversation_id));
     setArchivedIds(current => current.filter(id => id !== conversation.conversation_id));
@@ -711,7 +714,7 @@ export default function App() {
       setMobileChat(false);
     }
     setChatActionTarget(null);
-    setNotice('Chat berhasil dihapus dari daftar kamu.');
+    setNotice(forEveryone ? 'Percakapan berhasil dihapus untuk semua anggota.' : 'Chat berhasil dihapus dari daftar kamu.');
   }
 
   async function toggleArchive(conversationId) {
@@ -1461,7 +1464,7 @@ export default function App() {
           {(unread[c.conversation_id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.conversation_id] || 0) + ' pesan belum dibaca'}>{(unread[c.conversation_id] || 0) > 99 ? '99+' : unread[c.conversation_id]}</span>}
         </div>
       </button>
-      {chatActionTarget === c.conversation_id && <div className="chat-row-action-menu"><button type="button" onClick={() => removeChat(c)}><Trash2 size={15}/> Hapus chat</button><button type="button" onClick={() => setChatActionTarget(null)}>Batal</button></div>}
+      {chatActionTarget === c.conversation_id && <div className="chat-row-action-menu"><button type="button" onClick={() => removeChat(c, false)}><Trash2 size={15}/> Hapus untuk saya</button>{c.created_by === session?.user?.id && <button type="button" onClick={() => removeChat(c, true)}><Trash2 size={15}/> Hapus untuk semua orang</button>}<button type="button" onClick={() => setChatActionTarget(null)}>Batal</button></div>}
       <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
     </div>
   ))}
