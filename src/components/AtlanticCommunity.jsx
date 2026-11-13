@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 import AtlanticImageCropper from './AtlanticImageCropper';
 import AtlanticPolls from './AtlanticPolls';
-import { Clock3, Plus, Send, Radio, Phone, ImagePlus, NotebookPen, X, Users, RefreshCw, Search, BadgeCheck, BarChart3, MoreVertical, Bookmark, Star, ListChecks } from 'lucide-react';
+import { Clock3, Plus, Send, Radio, Phone, ImagePlus, NotebookPen, X, Users, RefreshCw, Search, BadgeCheck, BarChart3, MoreVertical, Bookmark, Star, ListChecks, Lock } from 'lucide-react';
 
 const dateLabel = value => new Date(value).toLocaleString('id-ID', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 const callStatusLabel = status => ({ requested:'Memanggil', accepted:'Diterima', declined:'Ditolak', missed:'Tak terjawab', ended:'Selesai', cancelled:'Dibatalkan' }[status] || status);
