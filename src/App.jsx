@@ -1345,7 +1345,6 @@ export default function App() {
     <p className="empty">{showSaved ? 'Belum ada pesan tersimpan' : showArchived ? 'Belum ada chat yang diarsipkan' : 'Belum ada percakapan'}</p>
   )}
 </div>
-        <footer className="side-foot">ATLANTIC WEB <span>•</span> V1.1</footer>
       </aside>
 
       <section className={`chat-panel ${mobileChat ? 'show-mobile' : ''}`}>
