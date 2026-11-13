@@ -166,6 +166,13 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
     setRecoveryBusy(true);
     setMessage("");
     try {
+      const { data: verifiedSession, error: passwordError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: resetAccountPassword
+      });
+      if (passwordError || verifiedSession?.user?.id !== user.id) {
+        throw new Error("Kata sandi akun tidak cocok. Identitas lama tidak diubah.");
+      }
       await resetOwnE2EEIdentity(supabase, user.id, resetAccountPassword);
       setResetAccountPassword("");
       setHasLocalIdentity(true);
