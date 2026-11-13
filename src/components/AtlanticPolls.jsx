@@ -78,7 +78,8 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     let storedQuestion = question.trim();
     let storedOptions = clean;
     try {
-      if (e2eeKey && targetType === 'group') {
+      if (targetType === 'group') {
+        if (!e2eeKey) throw new Error('E2EE grup belum aktif. Polling tidak dikirim agar pertanyaan dan pilihan tidak tersimpan sebagai teks biasa.');
         activeKey = await ensureConversationE2EE(supabase, targetId, [], user.id);
         activeKeyId = await getCurrentConversationE2EEKeyId(supabase, targetId);
         onKeyReady?.(activeKey, activeKeyId);
