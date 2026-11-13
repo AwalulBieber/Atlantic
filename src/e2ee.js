@@ -1,0 +1,263 @@
+const DB_NAME = 'atlantic-e2ee';
+const DB_VERSION = 1;
+const IDENTITY_STORE = 'identities';
+const CONVERSATION_STORE = 'conversation-keys';
+const PREFIX = 'ATL-E2EE1:';
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function openKeyDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!globalThis.indexedDB) {
+      reject(new Error('Penyimpanan kunci aman tidak tersedia di browser ini.'));
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IDENTITY_STORE)) db.createObjectStore(IDENTITY_STORE);
+      if (!db.objectStoreNames.contains(CONVERSATION_STORE)) db.createObjectStore(CONVERSATION_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('Database kunci gagal dibuka.'));
+  });
+}
+
+async function readLocalKey(storeName, key) {
+  const db = await openKeyDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db.transaction(storeName, 'readonly').objectStore(storeName).get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function writeLocalKey(storeName, key, value) {
+  const db = await openKeyDatabase();
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeName, 'readwrite');
+      transaction.objectStore(storeName).put(value, key);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Penyimpanan kunci dibatalkan.'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function conversationCacheId(conversationId, keyId) {
+  return conversationId + ':' + keyId;
+}
+
+async function deriveWrappingKey(privateKey, publicJwk, conversationId, keyId) {
+  const publicKey = await crypto.subtle.importKey(
+    'jwk', publicJwk, { name: 'ECDH', namedCurve: 'P-256' }, false, []
+  );
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: 'ECDH', public: publicKey }, privateKey, 256
+  );
+  const material = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: encoder.encode(conversationId + ':' + keyId),
+      info: encoder.encode('Atlantic conversation key envelope v1')
+    },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function wrapConversationKey(rawKey, identity, recipient, conversationId, keyId) {
+  const wrappingKey = await deriveWrappingKey(
+    identity.privateKey, recipient.e2ee_public_key, conversationId, keyId
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrappingKey, rawKey);
+  return {
+    sender_id: identity.userId,
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext))
+  };
+}
+
+async function unwrapConversationKey(envelope, identity, senderPublicKey, conversationId, keyId) {
+  const wrappingKey = await deriveWrappingKey(
+    identity.privateKey, senderPublicKey, conversationId, keyId
+  );
+  const rawKey = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToBytes(envelope.iv) },
+    wrappingKey,
+    base64ToBytes(envelope.ciphertext)
+  );
+  return crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+export async function ensureE2EEIdentity(supabase, userId) {
+  const local = await readLocalKey(IDENTITY_STORE, userId);
+  const { data: profile, error } = await supabase
+    .from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle();
+  if (error) throw new Error('Kunci publik gagal dimuat: ' + error.message);
+
+  if (local) {
+    if (!profile?.e2ee_public_key ||
+        JSON.stringify(profile.e2ee_public_key) !== JSON.stringify(local.publicJwk)) {
+      throw new Error('Kunci perangkat dan kunci akun tidak cocok. Jangan kirim pesan terenkripsi dari perangkat ini sebelum pemulihan kunci dilakukan.');
+    }
+    return { userId, privateKey: local.privateKey, publicJwk: local.publicJwk };
+  }
+
+  if (profile?.e2ee_public_key) {
+    throw new Error('Kunci privat akun ini tersimpan di perangkat lain. Fitur E2EE perlu pemindahan kunci perangkat sebelum bisa digunakan di sini.');
+  }
+
+  const pair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+  );
+  const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
+  await writeLocalKey(IDENTITY_STORE, userId, { privateKey: pair.privateKey, publicJwk });
+  const { data: updated, error: updateError } = await supabase
+    .from('profiles')
+    .update({ e2ee_public_key: publicJwk })
+    .eq('id', userId)
+    .is('e2ee_public_key', null)
+    .select('id')
+    .maybeSingle();
+  if (updateError || !updated) {
+    throw new Error('Kunci publik gagal didaftarkan. Muat ulang chat dan coba lagi.');
+  }
+  return { userId, privateKey: pair.privateKey, publicJwk };
+}
+
+export async function ensureConversationE2EE(supabase, conversationId, memberIds, userId) {
+  const identity = await ensureE2EEIdentity(supabase, userId);
+  const ids = [...new Set([userId, ...(memberIds || [])].filter(Boolean))];
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles').select('id,e2ee_public_key').in('id', ids);
+  if (profileError) throw new Error('Kunci anggota chat gagal dimuat: ' + profileError.message);
+  const profileMap = new Map((profiles || []).map(profile => [profile.id, profile]));
+  const missingPublicKeys = ids.filter(id => !profileMap.get(id)?.e2ee_public_key);
+  if (missingPublicKeys.length) {
+    throw new Error('Menunggu anggota chat mendaftarkan kunci keamanan di perangkatnya. E2EE belum aktif untuk chat ini.');
+  }
+
+  let { data: keyRow, error: keyError } = await supabase
+    .from('conversation_e2ee_keys')
+    .select('conversation_id,key_id,shares,created_by')
+    .eq('conversation_id', conversationId)
+    .maybeSingle();
+  if (keyError) throw new Error('Kunci percakapan gagal dimuat: ' + keyError.message);
+
+  if (!keyRow) {
+    const keyId = crypto.randomUUID();
+    const rawKey = crypto.getRandomValues(new Uint8Array(32));
+    const shares = {};
+    for (const recipientId of ids) {
+      shares[recipientId] = await wrapConversationKey(
+        rawKey, identity, profileMap.get(recipientId), conversationId, keyId
+      );
+    }
+    const { error: insertError } = await supabase.from('conversation_e2ee_keys').insert({
+      conversation_id: conversationId,
+      key_id: keyId,
+      shares,
+      created_by: userId
+    });
+    if (!insertError) {
+      const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+      await writeLocalKey(CONVERSATION_STORE, conversationCacheId(conversationId, keyId), key);
+      return key;
+    }
+    // A concurrent member may have initialized this conversation first.
+    const { data: racedRow, error: racedError } = await supabase
+      .from('conversation_e2ee_keys')
+      .select('conversation_id,key_id,shares,created_by')
+      .eq('conversation_id', conversationId)
+      .maybeSingle();
+    if (racedError || !racedRow) throw new Error('Kunci percakapan gagal dibuat: ' + insertError.message);
+    keyRow = racedRow;
+  }
+
+  const cacheId = conversationCacheId(conversationId, keyRow.key_id);
+  const cached = await readLocalKey(CONVERSATION_STORE, cacheId);
+  if (cached) return cached;
+
+  const ownEnvelope = keyRow.shares?.[userId];
+  if (!ownEnvelope) {
+    throw new Error('Perangkat anggota chat belum menerima kunci percakapan. Minta anggota yang sudah bisa membuka chat untuk membagikan ulang kunci.');
+  }
+  const senderProfile = profileMap.get(ownEnvelope.sender_id);
+  if (!senderProfile?.e2ee_public_key) {
+    throw new Error('Kunci publik pengirim amplop keamanan tidak ditemukan.');
+  }
+  const conversationKey = await unwrapConversationKey(
+    ownEnvelope, identity, senderProfile.e2ee_public_key, conversationId, keyRow.key_id
+  );
+  await writeLocalKey(CONVERSATION_STORE, cacheId, conversationKey);
+
+  // Existing members can securely add envelopes for newly joined members.
+  const missingShares = ids.filter(id => !keyRow.shares?.[id]);
+  if (missingShares.length) {
+    const rawKey = await crypto.subtle.exportKey('raw', conversationKey);
+    const updatedShares = { ...(keyRow.shares || {}) };
+    for (const recipientId of missingShares) {
+      updatedShares[recipientId] = await wrapConversationKey(
+        rawKey, identity, profileMap.get(recipientId), conversationId, keyRow.key_id
+      );
+    }
+    const { error: shareError } = await supabase
+      .from('conversation_e2ee_keys')
+      .update({ shares: updatedShares, updated_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId);
+    if (shareError) throw new Error('Kunci belum bisa dibagikan ke semua anggota: ' + shareError.message);
+  }
+
+  return conversationKey;
+}
+
+export async function encryptE2EEText(key, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, encoder.encode(text)
+  );
+  return PREFIX + bytesToBase64(iv) + ':' + bytesToBase64(new Uint8Array(ciphertext));
+}
+
+export async function decryptE2EEText(key, value) {
+  if (typeof value !== 'string' || !value.startsWith(PREFIX)) return value;
+  const [iv, ciphertext] = value.slice(PREFIX.length).split(':');
+  if (!iv || !ciphertext) throw new Error('Format pesan terenkripsi tidak valid.');
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToBytes(iv) }, key, base64ToBytes(ciphertext)
+  );
+  return decoder.decode(plaintext);
+}
+
+export function isE2EEText(value) {
+  return typeof value === 'string' && value.startsWith(PREFIX);
+}
