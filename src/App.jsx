@@ -156,6 +156,8 @@ export default function App() {
   const typingChannelRef = useRef(null);
   const typingStopTimer = useRef(null);
   const typingIndicatorTimer = useRef(null);
+  const typingLastSentAt = useRef(0);
+  const typingActiveRef = useRef(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
 
@@ -1000,12 +1002,26 @@ export default function App() {
   function updateDraft(value) {
     setDraft(value);
     const channel = typingChannelRef.current;
-    if (!channel) return;
+    if (!channel || !session?.user?.id) return;
+    const isTyping = Boolean(value.trim());
     if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
-    channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: Boolean(value.trim()) } });
-    if (value.trim()) typingStopTimer.current = setTimeout(() => {
+    if (!isTyping) {
+      if (typingActiveRef.current) channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
+      typingActiveRef.current = false;
+      typingLastSentAt.current = 0;
+      return;
+    }
+    const now = Date.now();
+    if (!typingActiveRef.current || now - typingLastSentAt.current > 800) {
+      channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: true } });
+      typingLastSentAt.current = now;
+      typingActiveRef.current = true;
+    }
+    typingStopTimer.current = setTimeout(() => {
       channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
-    }, 1400);
+      typingActiveRef.current = false;
+      typingLastSentAt.current = 0;
+    }, 1800);
   }
 
   function pickChatAttachment(accept) {
@@ -1057,6 +1073,8 @@ export default function App() {
       }
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
       typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
+      typingActiveRef.current = false;
+      typingLastSentAt.current = 0;
       const encryptedBody = await encryptE2EEMessage(e2eeKeyRef.current, { text: body, attachment: attachmentEnvelope });
       const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedBody, e2ee_key_id:e2eeKeyIdRef.current, media_url:mediaPath, media_type:mediaPath ? 'application/octet-stream' : null, media_name:null, reply_to:replyTarget?.id || null });
       if (error) throw new Error('Pesan gagal dikirim: ' + error.message);
