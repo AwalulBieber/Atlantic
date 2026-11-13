@@ -202,7 +202,11 @@ export default function App() {
     let cancelled = false;
     if (!session?.user?.id) return;
     ensureE2EEIdentity(supabase, session.user.id).catch(error => {
-      if (!cancelled) console.warn('Atlantic automatic E2EE setup:', error.message);
+      if (!cancelled) {
+        const message = error?.message || 'Terjadi kesalahan yang tidak diketahui.';
+        console.warn('Atlantic automatic E2EE setup:', message);
+        setNotice('Penyiapan keamanan otomatis gagal: ' + message);
+      }
     });
     return () => { cancelled = true; };
   }, [session?.user?.id]);
