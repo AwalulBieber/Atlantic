@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ensureConversationE2EE, encryptE2EEText, decryptE2EEText, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById } from './e2ee';
+import { ensureConversationE2EE, encryptE2EEText, decryptE2EEText, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById, getE2EEFingerprint } from './e2ee';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
@@ -96,6 +96,7 @@ export default function App() {
   const [e2eeStatus, setE2eeStatus] = useState({ state: 'loading', error: '' });
   const e2eeKeyRef = useRef(null);
   const e2eeKeyIdRef = useRef(null);
+  const [e2eeFingerprints, setE2eeFingerprints] = useState([]);
   const [draft, setDraft] = useState('');
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState('');
@@ -586,6 +587,27 @@ export default function App() {
       .catch(error => { if (!cancelled) { e2eeKeyRef.current = null; setE2eeStatus({ state: 'unavailable', error: error.message || 'Kunci E2EE belum siap.' }); } });
     return () => { cancelled = true; e2eeKeyRef.current = null; };
   }, [active?.conversation_id, session?.user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadFingerprints() {
+      if (!active || e2eeStatus.state !== 'active' || !session?.user?.id) { setE2eeFingerprints([]); return; }
+      const memberIds = active.is_group
+        ? (active.members || []).map(member => member.id)
+        : [active.person?.id];
+      const ids = [...new Set([session.user.id, ...memberIds].filter(Boolean))];
+      const { data, error } = await supabase.from('profiles')
+        .select('id,username,display_name,e2ee_public_key').in('id', ids);
+      if (error || cancelled) return;
+      const results = await Promise.all((data || []).map(async profile => {
+        try { return { id: profile.id, name: profile.id === session.user.id ? 'Perangkat kamu' : (profile.display_name || profile.username || 'Anggota'), fingerprint: await getE2EEFingerprint(profile.e2ee_public_key) }; }
+        catch { return null; }
+      }));
+      if (!cancelled) setE2eeFingerprints(results.filter(Boolean));
+    }
+    loadFingerprints();
+    return () => { cancelled = true; };
+  }, [active?.conversation_id, e2eeStatus.state, session?.user?.id]);
 
   async function loadMessages(id) {
     // Persist read state per user, including when read receipts are disabled.
@@ -1094,7 +1116,7 @@ export default function App() {
             </header>
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
             <div className={`atl-e2ee-banner ${e2eeStatus.state === 'active' ? 'is-secure' : 'is-pending'}`} role="status">
-              <Lock size={15}/><span>{e2eeStatus.state === 'active' ? 'Pesan baru, lampiran, dan polling grup dienkripsi end-to-end. Kunci privat tersimpan di perangkat ini.' : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
+              <Lock size={15}/><span>{e2eeStatus.state === 'active' ? <>Pesan baru, lampiran, dan polling grup dienkripsi end-to-end. Kunci privat tersimpan di perangkat ini.{e2eeFingerprints.length > 0 && <small className="atl-e2ee-fingerprints">Kode verifikasi kunci (cocokkan langsung dengan anggota): {e2eeFingerprints.map(item => item.name + ' — ' + item.fingerprint).join(' · ')}</small>}</> : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
             </div>
             <div className="messages">
               {messages.map((m, messageIndex) => (
