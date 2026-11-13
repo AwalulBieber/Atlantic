@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
-import { UserPlus, Check, X, Search, Users, Clock3, Trash2 } from 'lucide-react';
+import { UserPlus, Check, X, Search, Users, Clock3, Trash2, BadgeCheck } from 'lucide-react';
 
 export default function AtlanticContacts({ user, onClose, onOpenChat, onDialog }) {
   const [query,setQuery]=useState('');
@@ -109,7 +109,7 @@ export default function AtlanticContacts({ user, onClose, onOpenChat, onDialog }
   }
   function personRow(id){
     const p=personById[id]||{};
-    return <><span className="atl-contact-avatar">{p.avatar_url?<img src={p.avatar_url} alt=""/>:(p.display_name||p.username||'A').slice(0,1).toUpperCase()}</span><span className="atl-contact-person"><b>{p.display_name||p.username||'Pengguna Atlantic'}{p.is_verified&&<small className="atl-contact-verified"> ✓</small>}</b><small>@{p.username||'atlantic'}</small></span></>;
+    return <><span className="atl-contact-avatar">{p.avatar_url?<img src={p.avatar_url} alt=""/>:(p.display_name||p.username||'A').slice(0,1).toUpperCase()}</span><span className="atl-contact-person"><b>{p.display_name||p.username||'Pengguna Atlantic'}{p.is_verified&&<BadgeCheck className="atl-contact-verified" size={14} aria-label="Atlantic Verified"/>}</b><small>@{p.username||'atlantic'}</small></span></>;
   }
 
   return <div className="atl-contacts-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose?.()}>
