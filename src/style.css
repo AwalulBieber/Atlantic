@@ -1358,27 +1358,27 @@ html[data-theme="dark"] .chat-filter-strip>button.active{background:var(--accent
 
 /* Atlantic five-theme system */
 html[data-skin="atlantic"] {
-  --paper:#edf3f8; --ink:#17212b; --surface:rgba(255,255,255,.78);
+  --paper:#edf3f8; --ink:#17212b; --surface:rgba(255,255,255,.78); --line-color:rgba(23,33,43,.72);
   --surface-strong:#fff; --muted:#64748b; --line:1.5px solid rgba(23,33,43,.72);
   --hard-shadow:0 12px 34px rgba(25,45,68,.12);
 }
 html[data-skin="neo"] {
-  --paper:#f7f4e9; --ink:#171717; --surface:#fffdf5;
+  --paper:#f7f4e9; --ink:#171717; --surface:#fffdf5; --line-color:#171717;
   --surface-strong:#fff; --muted:#555; --line:3px solid #171717;
   --hard-shadow:5px 5px 0 #171717;
 }
 html[data-skin="glass"] {
-  --paper:#eaf1fb; --ink:#1d2b42; --surface:rgba(255,255,255,.48);
+  --paper:#eaf1fb; --ink:#1d2b42; --surface:rgba(255,255,255,.48); --line-color:rgba(255,255,255,.78);
   --surface-strong:rgba(255,255,255,.78); --muted:#63748d;
   --line:1px solid rgba(255,255,255,.78); --hard-shadow:0 16px 42px rgba(39,67,110,.14);
 }
 html[data-skin="minimal"] {
-  --paper:#f8fafc; --ink:#202938; --surface:#fff;
+  --paper:#f8fafc; --ink:#202938; --surface:#fff; --line-color:#e2e8f0;
   --surface-strong:#fff; --muted:#718096; --line:1px solid #e2e8f0;
   --hard-shadow:0 4px 16px rgba(15,23,42,.06);
 }
 html[data-skin="cyberpunk"] {
-  --paper:#090d1b; --ink:#e7f8ff; --surface:#111a2d;
+  --paper:#090d1b; --ink:#e7f8ff; --surface:#111a2d; --line-color:rgba(0,245,255,.55);
   --surface-strong:#17233b; --muted:#9ab4ca; --line:1px solid rgba(0,245,255,.55);
   --hard-shadow:0 0 22px rgba(0,245,255,.12);
 }
@@ -1389,13 +1389,13 @@ html[data-skin="cyberpunk"] body,html[data-skin="cyberpunk"] .app-shell {backgro
 html[data-skin="atlantic"] .sidebar,html[data-skin="glass"] .sidebar,html[data-skin="minimal"] .sidebar,html[data-skin="cyberpunk"] .sidebar,
 html[data-skin="atlantic"] .auth-card,html[data-skin="glass"] .auth-card,html[data-skin="minimal"] .auth-card,html[data-skin="cyberpunk"] .auth-card,
 html[data-skin="atlantic"] .settings-modal,html[data-skin="glass"] .settings-modal,html[data-skin="minimal"] .settings-modal,html[data-skin="cyberpunk"] .settings-modal {
-  background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:var(--hard-shadow);
+  background:var(--surface);color:var(--ink);border-color:var(--line-color);box-shadow:var(--hard-shadow);
 }
 html[data-skin="atlantic"] .topbar,html[data-skin="atlantic"] .chat-head,
 html[data-skin="glass"] .topbar,html[data-skin="glass"] .chat-head,
 html[data-skin="minimal"] .topbar,html[data-skin="minimal"] .chat-head,
 html[data-skin="cyberpunk"] .topbar,html[data-skin="cyberpunk"] .chat-head {
-  background:var(--surface-strong);color:var(--ink);border-color:var(--line);backdrop-filter:blur(22px) saturate(165%);
+  background:var(--surface-strong);color:var(--ink);border-color:var(--line-color);backdrop-filter:blur(22px) saturate(165%);
 }
 html[data-skin="atlantic"] .chat-panel,html[data-skin="glass"] .chat-panel,html[data-skin="minimal"] .chat-panel,html[data-skin="cyberpunk"] .chat-panel {background:var(--paper);color:var(--ink)}
 html[data-skin="atlantic"] .messages,html[data-skin="glass"] .messages,html[data-skin="minimal"] .messages,html[data-skin="cyberpunk"] .messages {background-color:var(--paper);background-image:none}
@@ -1406,7 +1406,7 @@ html[data-skin="atlantic"] .mine .bubble,html[data-skin="glass"] .mine .bubble,h
 html[data-skin="cyberpunk"] .bubble {background:#121d32;color:#e7f8ff;border-color:#00e5ff;box-shadow:0 0 16px #00e5ff20}
 html[data-skin="cyberpunk"] .mine .bubble {background:#242044;border-color:#ff4fd8;box-shadow:0 0 16px #ff4fd820}
 html[data-skin="atlantic"] .composer,html[data-skin="glass"] .composer,html[data-skin="minimal"] .composer,html[data-skin="cyberpunk"] .composer {
-  background:var(--surface);border-color:var(--line);backdrop-filter:blur(24px) saturate(180%)
+  background:var(--surface);border-color:var(--line-color);backdrop-filter:blur(24px) saturate(180%)
 }
 html[data-skin="atlantic"] .composer input,html[data-skin="glass"] .composer input,html[data-skin="minimal"] .composer input,html[data-skin="cyberpunk"] .composer input,
 html[data-skin="atlantic"] .search,html[data-skin="glass"] .search,html[data-skin="minimal"] .search,html[data-skin="cyberpunk"] .search {
@@ -1415,7 +1415,7 @@ html[data-skin="atlantic"] .search,html[data-skin="glass"] .search,html[data-ski
 html[data-skin="atlantic"] .person:hover,html[data-skin="atlantic"] .person.selected,
 html[data-skin="glass"] .person:hover,html[data-skin="glass"] .person.selected,
 html[data-skin="minimal"] .person:hover,html[data-skin="minimal"] .person.selected {
-  background:color-mix(in srgb,var(--accent) 24%,var(--surface-strong));border-color:var(--line);box-shadow:var(--hard-shadow)
+  background:color-mix(in srgb,var(--accent) 24%,var(--surface-strong));border-color:var(--line-color);box-shadow:var(--hard-shadow)
 }
 html[data-skin="cyberpunk"] .person:hover,html[data-skin="cyberpunk"] .person.selected {background:#172c43;border-color:#00e5ff;box-shadow:0 0 18px #00e5ff30}
 html[data-skin="atlantic"] .bottom-nav,html[data-skin="glass"] .bottom-nav {background:rgba(255,255,255,.62);border-color:rgba(255,255,255,.85);box-shadow:0 14px 40px rgba(20,45,80,.16),inset 0 1px 0 #fff}
