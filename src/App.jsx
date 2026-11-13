@@ -13,7 +13,7 @@ import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck,
-  Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock, Forward
+  Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock, Forward, MoreHorizontal, Languages, Pin, Copy, Info, Pencil
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -118,6 +118,9 @@ export default function App() {
   const attachmentInputRef = useRef(null);
   const [sending, setSending] = useState(false);
   const [forwardingMessageId, setForwardingMessageId] = useState(null);
+  const [messageReactions, setMessageReactions] = useState([]);
+  const [messageActionTarget, setMessageActionTarget] = useState(null);
+  const [messageInfoTarget, setMessageInfoTarget] = useState(null);
   const [mobileChat, setMobileChat] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
@@ -544,6 +547,52 @@ export default function App() {
     setSavedBusy(false);
   }
 
+
+  async function toggleMessageReaction(message, emoji) {
+    if (!message?.id || !session?.user?.id) return;
+    const existing = messageReactions.find(row => row.message_id === message.id && row.user_id === session.user.id);
+    if (existing?.emoji === emoji) {
+      const { error } = await supabase.from('message_reactions').delete().eq('id', existing.id).eq('user_id', session.user.id);
+      if (error) { setNotice('Reaksi gagal dihapus: ' + error.message); return; }
+      setMessageReactions(rows => rows.filter(row => row.id !== existing.id));
+    } else {
+      const { data, error } = await supabase.from('message_reactions').upsert({ message_id: message.id, user_id: session.user.id, emoji }, { onConflict: 'message_id,user_id' }).select('id,message_id,user_id,emoji,created_at').single();
+      if (error) { setNotice('Reaksi gagal dikirim: ' + error.message); return; }
+      setMessageReactions(rows => [...rows.filter(row => !(row.message_id === message.id && row.user_id === session.user.id)), data]);
+    }
+    setMessageActionTarget(null);
+  }
+
+  async function copyMessage(message) {
+    try { await navigator.clipboard.writeText(message.body || ''); setNotice('Pesan berhasil disalin.'); }
+    catch { setNotice('Clipboard tidak tersedia di browser ini.'); }
+    setMessageActionTarget(null);
+  }
+
+  function translateMessage(message) {
+    if (!message?.body) { setNotice('Tidak ada teks untuk diterjemahkan.'); return; }
+    window.open('https://translate.google.com/?sl=auto&tl=id&text=' + encodeURIComponent(message.body) + '&op=translate', '_blank', 'noopener,noreferrer');
+    setMessageActionTarget(null);
+  }
+
+  async function pinMessage(message) {
+    if (!active?.is_group) { setNotice('Penyematan pesan saat ini tersedia untuk grup.'); return; }
+    const nextId = active.pinned_message_id === message.id ? null : message.id;
+    const { error } = await supabase.from('conversations').update({ pinned_message_id: nextId }).eq('id', active.conversation_id);
+    if (error) { setNotice('Pesan gagal disematkan. Pastikan kamu admin grup. ' + error.message); return; }
+    setActive(current => current ? { ...current, pinned_message_id: nextId } : current);
+    setChats(rows => rows.map(chat => chat.conversation_id === active.conversation_id ? { ...chat, pinned_message_id: nextId } : chat));
+    setNotice(nextId ? 'Pesan berhasil disematkan.' : 'Sematan pesan dilepas.');
+    setMessageActionTarget(null);
+  }
+
+  function editMessage(message) {
+    setMessageActionTarget(null);
+    setNotice(message.sender_id === session.user.id
+      ? 'Edit belum tersedia karena pesan Atlantic dibuat immutable untuk menjaga integritas E2EE. Kirim pesan koreksi baru ya.'
+      : 'Kamu hanya bisa mengedit pesan milik sendiri.');
+  }
+
   async function toggleSavedMessage(message) {
     const existing = savedMessages.find(item => item.message_id === message.id);
     if (existing) {
@@ -748,6 +797,9 @@ export default function App() {
         p_mark_read: myProfile?.read_receipts_enabled !== false
       });
     }
+    const { data: reactionRows, error: reactionError } = messageIds.length ? await supabase.from('message_reactions').select('id,message_id,user_id,emoji,created_at').in('message_id', messageIds) : { data: [], error: null };
+    if (reactionError) console.warn('Atlantic message reactions:', reactionError.message);
+    setMessageReactions(reactionRows || []);
     setMessages(messagesWithMedia.map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body, senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
     void refreshInboxSummaries();
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
@@ -836,6 +888,14 @@ export default function App() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
         const deleted = payload.old;
         if (deleted?.id) setMessages(old => old.filter(m => m.id !== deleted.id).map(m => m.reply_to === deleted.id ? { ...m, reply_to: null, replyPreview: null } : m));
+      })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'message_reactions'
+      }, payload => {
+        const row = payload.new?.id ? payload.new : payload.old;
+        if (!row?.message_id || !messages.some(message => message.id === row.message_id)) return;
+        if (payload.eventType === 'DELETE') setMessageReactions(rows => rows.filter(item => item.id !== row.id));
+        else setMessageReactions(rows => [...rows.filter(item => item.id !== row.id && !(item.message_id === row.message_id && item.user_id === row.user_id)), payload.new]);
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'message_user_states',
@@ -1308,7 +1368,30 @@ export default function App() {
                     {active.is_group && <b className="group-sender-name">{m.senderProfile?.display_name || m.senderProfile?.username || (m.sender_id === session.user.id ? 'Kamu' : 'Anggota grup')}</b>}
                     {m.media_url && (m.media_type?.startsWith('image/') ? <img className="atl-message-media" src={m.media_url} alt={m.media_name || 'Foto'} loading="lazy"/> : m.media_type?.startsWith('video/') ? <video className="atl-message-media" src={m.media_url} controls playsInline preload="metadata"/> : <a className="atl-message-file" href={m.media_url} target="_blank" rel="noreferrer">📎 {m.media_name || 'Buka lampiran'}</a>)}
                     {m.body?.startsWith('[[ATLANTIC_POLL:') && active.is_group ? <AtlanticPolls targetType="group" targetId={active.conversation_id} pollId={m.body.match(/^\[\[ATLANTIC_POLL:([0-9a-f-]+)\]\]$/i)?.[1]} user={session.user} canCreate={false} inline e2eeKey={e2eeKeyRef.current} e2eeKeyId={e2eeKeyIdRef.current} onKeyReady={(key, keyId) => { e2eeKeyRef.current = key; e2eeKeyIdRef.current = keyId; }}/> : m.body && <div>{m.body}</div>}
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}{!active.is_saved_chat && <button type="button" className="message-reply-btn" onClick={() => forwardToSavedMessages(m)} aria-label="Teruskan ke Pesan Tersimpan" title={forwardingMessageId === m.id ? "Meneruskan…" : "Teruskan ke Pesan Tersimpan"} disabled={forwardingMessageId === m.id}><Forward size={13}/></button>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button><button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button></div>
+                    {(() => {
+                      const reactions = messageReactions.filter(row => row.message_id === m.id);
+                      const grouped = Object.values(reactions.reduce((acc, row) => {
+                        acc[row.emoji] = acc[row.emoji] || { emoji: row.emoji, count: 0, mine: false };
+                        acc[row.emoji].count += 1;
+                        if (row.user_id === session.user.id) acc[row.emoji].mine = true;
+                        return acc;
+                      }, {}));
+                      return grouped.length ? <div className="atl-message-reactions">{grouped.map(item => <button type="button" key={item.emoji} className={item.mine ? 'is-mine' : ''} onClick={() => toggleMessageReaction(m, item.emoji)} title={item.count + ' reaksi'}><span>{item.emoji}</span><b>{item.count}</b></button>)}</div> : null;
+                    })()}
+                    {messageActionTarget === m.id && <div className="atl-message-action-menu" role="menu" aria-label="Aksi pesan">
+                      <div className="atl-reaction-picker" aria-label="Pilih reaksi">{['👍','❤️','😂','😮','😢','🙏','🔥','👏'].map(emoji => <button type="button" key={emoji} onClick={() => toggleMessageReaction(m, emoji)} aria-label={'Reaksi ' + emoji}>{emoji}</button>)}</div>
+                      <button type="button" role="menuitem" onClick={() => { setReplyTarget(m); setMessageActionTarget(null); }}><Reply/>Balas</button>
+                      <button type="button" role="menuitem" onClick={() => pinMessage(m)}><Pin/>{active.pinned_message_id === m.id ? 'Lepas sematan' : 'Sematkan'}</button>
+                      <button type="button" role="menuitem" onClick={() => { toggleSavedMessage(m); setMessageActionTarget(null); }}><Bookmark/>Beri bintang</button>
+                      <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><Forward/>Teruskan</button>
+                      <button type="button" role="menuitem" onClick={() => copyMessage(m)}><Copy/>Salin</button>
+                      <button type="button" role="menuitem" onClick={() => translateMessage(m)}><Languages/>Terjemahkan</button>
+                      <button type="button" role="menuitem" onClick={() => editMessage(m)} disabled={m.sender_id !== session.user.id || Boolean(m.media_url)}><Pencil/>Edit</button>
+                      <button type="button" role="menuitem" onClick={() => { setMessageInfoTarget(m); setMessageActionTarget(null); }}><Info/>Info</button>
+                      <button type="button" role="menuitem" onClick={() => { setDeleteTarget(m); setMessageActionTarget(null); }}><Trash2/>Hapus</button>
+                      <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><BookmarkCheck/>Simpan ke Cloud</button>
+                    </div>}
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={savedMessages.some(item => item.message_id === m.id) ? 'message-save-btn is-saved' : 'message-save-btn'} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={m.read_at ? 'message-status is-read' : 'message-status'} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-menu-trigger" onClick={() => setMessageActionTarget(current => current === m.id ? null : m.id)} aria-label="Menu pesan" aria-expanded={messageActionTarget === m.id}><MoreHorizontal size={16}/></button></div>
                   </div>
                 </div>
               ))}
@@ -1350,6 +1433,7 @@ export default function App() {
 
       {notice && <button className="toast" onClick={() => setNotice('')}>{notice}　×</button>}
       {atlanticDialog && <div className="atl-dialog-backdrop" onMouseDown={event => { if(event.target===event.currentTarget) closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false); }}><section className="atl-dialog-card" role="dialog" aria-modal="true" aria-labelledby="atl-dialog-title"><span className="atl-dialog-eyebrow">ATLANTIC / CONFIRMATION</span><h2 id="atl-dialog-title">{atlanticDialog.title || 'Konfirmasi'}</h2><p>{atlanticDialog.message}</p>{atlanticDialog.type==='prompt' && <textarea autoFocus value={atlanticDialogValue} onChange={event=>setAtlanticDialogValue(event.target.value)} placeholder={atlanticDialog.placeholder || 'Tulis di sini…'} maxLength={atlanticDialog.maxLength || 1000}/>}<footer><button type="button" className="atl-dialog-cancel" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false)}>{atlanticDialog.cancelLabel || 'Batal'}</button><button type="button" className="atl-dialog-confirm" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?atlanticDialogValue:true)}>{atlanticDialog.confirmLabel || 'Lanjutkan'}</button></footer></section></div>}
+      {messageInfoTarget && <div className="atl-message-info-backdrop" onClick={() => setMessageInfoTarget(null)}><section className="atl-message-info-card" role="dialog" aria-modal="true" aria-label="Info pesan" onClick={event => event.stopPropagation()}><header><b>Info pesan</b><button type="button" onClick={() => setMessageInfoTarget(null)} aria-label="Tutup">×</button></header><dl><dt>Pengirim</dt><dd>{messageInfoTarget.sender_id === session.user.id ? 'Kamu' : (messageInfoTarget.senderProfile?.display_name || messageInfoTarget.senderProfile?.username || 'Anggota')}</dd><dt>Dikirim</dt><dd>{new Date(messageInfoTarget.created_at).toLocaleString('id-ID')}</dd><dt>Status</dt><dd>{messageInfoTarget.read_at ? 'Dibaca' : messageInfoTarget.delivered_at ? 'Terkirim' : 'Dikirim'}</dd><dt>Enkripsi</dt><dd>{messageInfoTarget.is_e2ee ? 'End-to-end encrypted' : 'Pesan lama / belum terenkripsi'}</dd><dt>Lampiran</dt><dd>{messageInfoTarget.media_name || (messageInfoTarget.media_url ? 'Ada lampiran' : 'Tidak ada')}</dd></dl></section></div>}
       {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={() => confirmDeleteMessage('me')}>UNTUK SAYA</button>{deleteTarget.sender_id === session.user.id && <button type="button" onClick={() => confirmDeleteMessage('everyone')}>UNTUK SEMUA</button>}</div></section></div>}
       {incomingNotice && (
         <button className="toast incoming-message-toast" onClick={() => {
