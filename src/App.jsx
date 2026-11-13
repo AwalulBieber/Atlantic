@@ -489,7 +489,7 @@ export default function App() {
     const ids = [...new Set((conversationIds || []).filter(Boolean))];
     if (!ids.length) return;
     const { data, error } = await supabase.from('messages')
-      .select('id,conversation_id,sender_id,body,created_at,media_url,media_type')
+      .select('id,conversation_id,sender_id,body,created_at,media_url,media_type,e2ee_key_id')
       .in('conversation_id', ids)
       .order('created_at', { ascending: false })
       .limit(1000);
@@ -501,7 +501,20 @@ export default function App() {
     for (const message of data || []) {
       if (!latest[message.conversation_id]) latest[message.conversation_id] = message;
     }
-    setLatestMessages(current => ({ ...current, ...latest }));
+    const decodedLatest = await Promise.all(Object.entries(latest).map(async ([conversationId, message]) => {
+      if (typeof message.body !== 'string' || !message.body.startsWith('ATL-E2EE1:')) return [conversationId, message];
+      try {
+        const messageKey = e2eeKeyRef.current && message.e2ee_key_id === e2eeKeyIdRef.current
+          ? e2eeKeyRef.current
+          : await getConversationE2EEKeyById(supabase, conversationId, message.e2ee_key_id, session.user.id);
+        const payload = await decryptE2EEMessage(messageKey, message.body);
+        return [conversationId, { ...message, body: payload.text || '', is_e2ee: true, e2eeAttachment: payload.attachment || null }];
+      } catch (decryptError) {
+        console.warn('Atlantic preview decrypt:', conversationId, decryptError?.message || decryptError);
+        return [conversationId, { ...message, body: '', is_e2ee: true, decrypt_error: true }];
+      }
+    }));
+    setLatestMessages(current => ({ ...current, ...Object.fromEntries(decodedLatest) }));
   }
 
   async function loadGroupUsers() {
@@ -1380,9 +1393,9 @@ export default function App() {
           <small className="person-preview">{(() => {
             const latest = latestMessages[c.conversation_id];
             if (!latest) return 'Belum ada pesan';
-            let preview = typeof latest.body === 'string' && latest.body.startsWith('ATL-E2EE1:') ? '🔒 Pesan terenkripsi' : latest.body;
+            let preview = latest.body;
             if (typeof preview === 'string' && preview.startsWith('[[ATLANTIC_POLL:')) preview = '📊 Polling';
-            if (!preview) preview = latest.media_type?.startsWith('image/') ? '📷 Foto' : latest.media_type?.startsWith('video/') ? '🎥 Video' : latest.media_url ? '📎 Lampiran' : 'Pesan';
+            if (!preview) preview = latest.e2eeAttachment?.type?.startsWith('image/') || latest.media_type?.startsWith('image/') ? '📷 Foto' : latest.e2eeAttachment?.type?.startsWith('video/') || latest.media_type?.startsWith('video/') ? '🎥 Video' : latest.media_url || latest.e2eeAttachment ? '📎 Lampiran' : latest.decrypt_error ? '🔒 Tidak dapat membuka pesan' : 'Pesan';
             const sender = c.is_group && latest.sender_id !== session.user.id ? c.members?.find(member => member.id === latest.sender_id) : null;
             return <>{latest.sender_id === session.user.id ? 'Kamu: ' : sender ? (sender.display_name || sender.username) + ': ' : ''}{preview}</>;
           })()}</small>
