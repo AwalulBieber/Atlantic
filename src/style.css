@@ -965,3 +965,42 @@ html[data-theme="dark"] .atl-chat-day-separator {
   border-color: #f4f1e8;
   box-shadow: 2px 2px 0 #f4f1e8;
 }
+
+
+/* End-to-end encryption status banner */
+.atl-e2ee-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  margin: 8px 14px 4px;
+  border: 1px solid var(--border, #d8d8d8);
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+.atl-e2ee-banner svg { flex: 0 0 auto; }
+.atl-e2ee-banner.is-secure {
+  color: #276b43;
+  background: #eaf7ee;
+  border-color: #b9dfc5;
+}
+.atl-e2ee-banner.is-pending {
+  color: #805b17;
+  background: #fff7e5;
+  border-color: #ead7a7;
+}
+[data-theme="dark"] .atl-e2ee-banner.is-secure,
+.dark .atl-e2ee-banner.is-secure {
+  color: #a9e7bb;
+  background: #173323;
+  border-color: #315b40;
+}
+[data-theme="dark"] .atl-e2ee-banner.is-pending,
+.dark .atl-e2ee-banner.is-pending {
+  color: #f0d18d;
+  background: #392d16;
+  border-color: #6b5326;
+}
