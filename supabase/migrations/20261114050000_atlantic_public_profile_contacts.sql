@@ -20,6 +20,7 @@ as $$
     and owner.show_contacts is true
     and auth.uid() is not null
     and not public.is_atlantic_user_pair_blocked(auth.uid(), target_user)
+    and not public.is_atlantic_user_pair_blocked(auth.uid(), p.id)
   order by lower(coalesce(p.display_name, p.username));
 $$;
 
