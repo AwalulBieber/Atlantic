@@ -1020,3 +1020,10 @@ html[data-theme="dark"] .atl-chat-day-separator {
 .person-meta .atl-unread-badge{min-width:19px;height:19px;padding:0 5px;background:#20c76a;color:#fff;border:0;box-shadow:none;font-size:10px}
 .person-row .person.selected .person-preview,.person-row .person:hover .person-preview{color:inherit;opacity:.78}
 @media(max-width:600px){.person-row .person{padding:10px 8px;gap:9px}.person-info b{font-size:13px}.person-info .person-preview{font-size:11px}.person-meta>small{font-size:10px}}
+
+
+/* Dedicated private Saved Messages conversation */
+.saved-chat-avatar{display:grid;place-items:center;background:#a78bfa!important;color:#171717;border:2px solid #171717;box-shadow:2px 2px 0 #171717}
+.saved-chat-avatar svg{stroke-width:2.5}
+.saved-message-open:focus-visible,.saved-message-remove:focus-visible{outline:3px solid #1685d8;outline-offset:2px}
+html[data-theme="dark"] .saved-chat-avatar{background:#a78bfa!important;color:#171717}
