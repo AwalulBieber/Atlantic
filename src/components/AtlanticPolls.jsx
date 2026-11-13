@@ -7,6 +7,9 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
+  const [reactions,setReactions]=useState([]);
+  const [reactionPollId,setReactionPollId]=useState(null);
+  const reactionPressTimer=React.useRef(null);
   const [profiles,setProfiles]=useState({});
   const [question,setQuestion]=useState('');
   const [choices,setChoices]=useState(['','']);
@@ -36,12 +39,14 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       } catch { return { ...poll, question: '🔒 Polling terenkripsi tidak dapat dibuka.', decrypt_error: true, is_e2ee: true }; }
     }));
     setPolls(visiblePolls);
-    if(!pollIds.length){setOptions([]);setVotes([]);setProfiles({});return;}
-    const [{data:optionRows,error:optionError},{data:voteRows,error:voteError}]=await Promise.all([
+    if(!pollIds.length){setOptions([]);setVotes([]);setReactions([]);setProfiles({});return;}
+    const [{data:optionRows,error:optionError},{data:voteRows,error:voteError},{data:reactionRows,error:reactionError}]=await Promise.all([
       supabase.from('atlantic_poll_options').select('id,poll_id,label,position').in('poll_id',pollIds).order('position'),
-      supabase.from('atlantic_poll_votes').select('id,poll_id,option_id,user_id,created_at').in('poll_id',pollIds)
+      supabase.from('atlantic_poll_votes').select('id,poll_id,option_id,user_id,created_at').in('poll_id',pollIds),
+      supabase.from('atlantic_poll_reactions').select('id,poll_id,user_id,emoji').in('poll_id',pollIds)
     ]);
-    if(optionError||voteError){setError(optionError?.message||voteError?.message||'Gagal memuat hasil polling.');return;}
+    if(optionError||voteError||reactionError){setError(optionError?.message||voteError?.message||reactionError?.message||'Gagal memuat hasil polling.');return;}
+    setReactions(reactionRows||[]);
     const visibleOptions = await Promise.all((optionRows||[]).map(async option => {
       if (!e2eeKey) return targetType === 'group' ? { ...option, label: '🔒 Pilihan terkunci', decrypt_error: true, is_e2ee: true } : option;
       try {
@@ -65,6 +70,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     const pollFilter=pollId?{filter:'id=eq.'+pollId}:{};
     channel
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_votes',...voteFilter},()=>load())
+      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_reactions'},()=>load())
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_polls',...pollFilter},()=>load())
       .subscribe();
     return()=>{supabase.removeChannel(channel);};
@@ -122,6 +128,15 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     else { load(); }
   };
 
+  const toggleReaction=async(poll,emoji)=>{
+    const existing=reactions.find(item=>item.poll_id===poll.id&&item.user_id===user?.id&&item.emoji===emoji);
+    const result=existing
+      ? await supabase.from('atlantic_poll_reactions').delete().eq('id',existing.id).eq('user_id',user.id)
+      : await supabase.from('atlantic_poll_reactions').insert({poll_id:poll.id,user_id:user.id,emoji});
+    if(result.error)setError('Reaksi gagal disimpan: '+result.error.message);
+    else await load();
+  };
+
   const closePoll=async(poll)=>{
     if(busy)return;
     setBusy(true);setError('');
@@ -168,7 +183,12 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const expired=poll.expires_at&&new Date(poll.expires_at).getTime()<=Date.now();
       const closed=Boolean(poll.closed_at||expired);
       const canClose=targetType==='channel'?canCreate:(poll.created_by===user?.id||canModerate);
-      return <article className="atl-poll-card" key={poll.id}>
+      return <article className="atl-poll-card" key={poll.id}
+        onContextMenu={e=>{e.preventDefault();setReactionPollId(poll.id);}}
+        onTouchStart={()=>{if(reactionPressTimer.current)clearTimeout(reactionPressTimer.current);reactionPressTimer.current=setTimeout(()=>{setReactionPollId(poll.id);if(navigator.vibrate)navigator.vibrate(18);},520);}}
+        onTouchMove={()=>{if(reactionPressTimer.current)clearTimeout(reactionPressTimer.current);}}
+        onTouchEnd={()=>{if(reactionPressTimer.current)clearTimeout(reactionPressTimer.current);}}
+        onTouchCancel={()=>{if(reactionPressTimer.current)clearTimeout(reactionPressTimer.current);}}>
         <header><div><span className="atl-poll-tag"><BarChart3 size={12}/> {targetType==='group'?'POLLING GRUP':'POLLING SALURAN'}</span><h3>{poll.question}</h3><small>{new Date(poll.created_at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · {formatExpiry(poll.expires_at)}</small></div><div className="atl-poll-card-actions">{canClose&&!closed&&<button type="button" className="atl-poll-close" onClick={()=>closePoll(poll)} disabled={busy}>Tutup</button>}{(targetType==='channel'?canCreate:(poll.created_by===user?.id||canModerate))&&<button type="button" className="atl-poll-delete" onClick={()=>deletePoll(poll)} disabled={busy}>Hapus</button>}</div></header>
         <div className="atl-poll-options">{opts.map(option=>{
           const selected=pollVotes.some(v=>v.option_id===option.id&&v.user_id===user?.id);
@@ -181,6 +201,11 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
           </div>;
         })}</div>
         <footer><span>{total} suara</span><span>{closed?<><Lock size={12}/> {expired&&!poll.closed_at?'Waktu habis':'Ditutup'}</>:'Pilih jawaban · bisa mengubah pilihan'}</span></footer>
+        {reactionPollId===poll.id&&<div className="atl-poll-reactions" role="group" aria-label="Reaksi polling">
+          {['👍','❤️','😂','🎉','🔥'].map(emoji=>{const items=reactions.filter(item=>item.poll_id===poll.id&&item.emoji===emoji);const selected=items.some(item=>item.user_id===user?.id);return <button type="button" key={emoji} className={selected?'is-selected':''} onClick={()=>toggleReaction(poll,emoji)} aria-label={`Reaksi ${emoji}, ${items.length}`}><span>{emoji}</span>{items.length>0&&<b>{items.length}</b>}</button>;})}
+          <button type="button" onClick={()=>setReactionPollId(null)} aria-label="Tutup reaksi">×</button>
+        </div>}
+        {reactions.some(item=>item.poll_id===poll.id)&&<div className="atl-poll-reaction-summary">{['👍','❤️','😂','🎉','🔥'].filter(emoji=>reactions.some(item=>item.poll_id===poll.id&&item.emoji===emoji)).map(emoji=><span key={emoji}>{emoji} {reactions.filter(item=>item.poll_id===poll.id&&item.emoji===emoji).length}</span>)}</div>}
       </article>;
     }))}
   </section>;
