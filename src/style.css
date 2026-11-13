@@ -1189,3 +1189,6 @@ html[data-theme="dark"] .atl-message-reactions button.is-mine{background:#263e5c
 .atl-channel-admin-list article b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .atl-channel-admin-list article small{font-size:10px;color:var(--muted,#777)}
 .atl-channel-admin-list article button{padding:7px 9px;border:1px solid var(--line,var(--ink));border-radius:8px;background:var(--accent);font-size:10px;font-weight:850}
+
+.atl-community.is-channel-open>.atl-community-head{display:none}
+.atl-community.is-channel-open>.atl-community-error{width:min(100%,1040px);box-sizing:border-box;margin:0 auto 10px}
