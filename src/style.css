@@ -1645,3 +1645,54 @@ html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32
 .atl-poll-progress{height:4px}
 .atl-poll-card>footer{border-top:0;padding-top:2px}
 .atl-poll-voters{padding-top:0}
+
+
+/* Poll cards inherit the chat bubble palette instead of using a separate paper surface. */
+.bubble .atl-polls{
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  color:inherit;
+}
+.bubble .atl-poll-card{
+  background:transparent;
+  border:0;
+  color:inherit;
+}
+.bubble .atl-poll-option>button{
+  background:color-mix(in srgb,currentColor 6%,transparent);
+  border-color:color-mix(in srgb,currentColor 16%,transparent);
+  color:inherit;
+}
+.bubble .atl-poll-option.is-selected>button{
+  background:color-mix(in srgb,currentColor 11%,transparent);
+  border-color:color-mix(in srgb,currentColor 30%,transparent);
+}
+.bubble .atl-poll-progress{
+  background:color-mix(in srgb,currentColor 14%,transparent);
+}
+.bubble .atl-poll-progress span{
+  background:currentColor;
+  opacity:.58;
+}
+.bubble .atl-poll-card>footer{
+  color:inherit;
+  opacity:.72;
+}
+.bubble .atl-poll-voters,
+.bubble .atl-poll-card small,
+.bubble .atl-poll-tag{
+  color:inherit;
+  opacity:.68;
+}
+.bubble .atl-poll-reactions button{
+  color:inherit;
+  border-color:color-mix(in srgb,currentColor 18%,transparent);
+  background:color-mix(in srgb,currentColor 5%,transparent);
+}
+.bubble .atl-poll-reactions button.is-selected{
+  background:color-mix(in srgb,currentColor 13%,transparent);
+  border-color:color-mix(in srgb,currentColor 32%,transparent);
+}
