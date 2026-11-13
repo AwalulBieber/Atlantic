@@ -9,9 +9,10 @@ import AtlanticGroupInfo from './components/AtlanticGroupInfo';
 import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
 import AtlanticPolls from './components/AtlanticPolls';
 import {
-  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,  
+  MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
-  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck
+  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck,
+  Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -81,6 +82,8 @@ export default function App() {
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState('');
   const [showChatPolls, setShowChatPolls] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [attachmentAccept, setAttachmentAccept] = useState('image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf');
   const attachmentInputRef = useRef(null);
   const [sending, setSending] = useState(false);
   const [mobileChat, setMobileChat] = useState(false);
@@ -541,7 +544,8 @@ export default function App() {
 
   function chooseChatAttachment(event) {
     const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
-    const allowed = ['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','application/pdf'];
+    setShowAttachmentMenu(false);
+    const allowed = ['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','application/pdf','text/plain','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.openxmlformats-officedocument.presentationml.presentation'];
     if (!allowed.includes(file.type)) { setNotice('Format file tidak didukung.'); return; }
     if (file.size > 50 * 1024 * 1024) { setNotice('Ukuran lampiran maksimal 50 MB.'); return; }
     if (attachmentPreview) URL.revokeObjectURL(attachmentPreview);
@@ -710,6 +714,23 @@ export default function App() {
     if (value.trim()) typingStopTimer.current = setTimeout(() => {
       channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
     }, 1400);
+  }
+
+  function pickChatAttachment(accept) {
+    setAttachmentAccept(accept);
+    setShowAttachmentMenu(false);
+    window.setTimeout(() => attachmentInputRef.current?.click(), 0);
+  }
+
+  async function shareCurrentLocation(label = 'Lokasi') {
+    if (!navigator.geolocation) { setNotice('Perangkat ini tidak mendukung berbagi lokasi.'); return; }
+    navigator.geolocation.getCurrentPosition(async position => {
+      const { latitude, longitude } = position.coords;
+      const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:`${label}: ${mapUrl}` });
+      if (error) setNotice('Lokasi gagal dikirim: ' + error.message);
+      else setShowAttachmentMenu(false);
+    }, error => setNotice(error.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk Atlantic.' : 'Lokasi gagal didapatkan.'), { enableHighAccuracy:true, timeout:12000, maximumAge:10000 });
   }
 
   async function sendMessage(e) {
@@ -983,10 +1004,18 @@ export default function App() {
             {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
             {attachmentPreview && <div className="atl-chat-attachment-preview"><span>{attachmentFile?.name}</span><button type="button" onClick={() => {setAttachmentFile(null);setAttachmentPreview('');}}>Hapus</button></div>}
             {showChatPolls && active.is_group && <div className="atl-chat-polls-panel"><AtlanticPolls targetType="group" targetId={active.conversation_id} user={session.user} canCreate createOnly onCreated={() => setShowChatPolls(false)} onNotice={setNotice}/></div>}
+            {showAttachmentMenu && <div className="atl-attachment-menu" role="menu" aria-label="Menu lampiran">
+              <button type="button" role="menuitem" onClick={() => pickChatAttachment('image/*')}><ImageIcon className="atl-menu-photo"/><b>Foto</b></button>
+              <button type="button" role="menuitem" onClick={() => pickChatAttachment('video/*')}><Video className="atl-menu-video"/><b>Video</b></button>
+              <button type="button" role="menuitem" onClick={() => pickChatAttachment('.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx')}><FileText className="atl-menu-document"/><b>Dokumen</b></button>
+              <button type="button" role="menuitem" onClick={() => shareCurrentLocation('Lokasi')}><MapPin className="atl-menu-location"/><b>Lokasi</b></button>
+              <button type="button" role="menuitem" onClick={() => setNotice('Live Share sedang disiapkan untuk pembaruan lokasi secara langsung.')}><Crosshair className="atl-menu-live"/><b>Live Share</b></button>
+              {active.is_group && <button type="button" role="menuitem" onClick={() => { setShowChatPolls(true); setShowAttachmentMenu(false); }}><BarChart3 className="atl-menu-poll"/><b>Polling</b></button>}
+              <button type="button" className="atl-attachment-tools" role="menuitem" onClick={() => setNotice('Efek Pesan, Spoiler, dan Jadwal sedang disiapkan.')}><WandSparkles/><b>Efek Pesan, Spoiler &amp; Jadwal</b></button>
+            </div>}
             <form className="composer" onSubmit={sendMessage}>
-              <input ref={attachmentInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf" onChange={chooseChatAttachment} hidden />
-              <button type="button" className="atl-chat-attach" onClick={() => attachmentInputRef.current?.click()} aria-label="Lampirkan foto, video, atau file"><ImagePlus size={19}/></button>
-              {active.is_group && <button type="button" className={`atl-chat-attach atl-chat-poll-trigger${showChatPolls ? ' is-active' : ''}`} onClick={() => setShowChatPolls(value => !value)} aria-label="Buka fitur polling" title="Polling"><BarChart3 size={19}/></button>}
+              <input ref={attachmentInputRef} type="file" accept={attachmentAccept} onChange={chooseChatAttachment} hidden />
+              <button type="button" className={`atl-chat-attach${showAttachmentMenu ? ' is-active' : ''}`} onClick={() => setShowAttachmentMenu(value => !value)} aria-label="Buka menu lampiran" aria-expanded={showAttachmentMenu}><Plus size={21}/></button>
               <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder={active.is_group ? 'Pesan ke ' + active.title + '…' : 'Tulis pesan…'} autoComplete="off" />
               <button className="send" disabled={(!draft.trim() && !attachmentFile) || sending} aria-label="Kirim pesan">{sending ? <span className="button-spinner" /> : <Send size={19} />}</button>
             </form>
