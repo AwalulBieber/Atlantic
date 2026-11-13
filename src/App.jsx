@@ -1080,10 +1080,12 @@ export default function App() {
   const filtered = visibleChats.filter(c =>
     (c.person.display_name || c.person.username || '')
       .toLowerCase().includes(search.toLowerCase())
-  ).sort((a, b) =>
-    new Date(latestMessages[b.conversation_id]?.created_at || 0).getTime() -
-    new Date(latestMessages[a.conversation_id]?.created_at || 0).getTime()
-  );
+  ).sort((a, b) => {
+    if (a.is_saved_chat) return -1;
+    if (b.is_saved_chat) return 1;
+    return new Date(latestMessages[b.conversation_id]?.created_at || 0).getTime() -
+      new Date(latestMessages[a.conversation_id]?.created_at || 0).getTime();
+  });
 
   return (
     <main className={`app-shell tab-${activeTab}`}>
@@ -1117,9 +1119,9 @@ export default function App() {
           <input placeholder="Cari Chat…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Tersimpan</button></div>
+        <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Bookmark</button></div>
         <AtlanticGroupInvitations user={session.user} onNotice={setNotice} onAccepted={async conversationId=>{const updated=await loadProfiles();const joined=updated?.find(item=>item.conversation_id===conversationId);if(joined)openGroupChat(joined);}} />
-        <div className="section-title"><span>{showSaved ? 'Pesan Tersimpan' : showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{showSaved ? savedMessages.length : filtered.length}</span></div>
+        <div className="section-title"><span>{showSaved ? 'Pesan Ditandai' : showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{showSaved ? savedMessages.length : filtered.length}</span></div>
         <div className="people">
   {showSaved ? (savedBusy ? <p className="empty">Memuat pesan tersimpan…</p> : savedMessages.map(item => {
     const message = item.message;
