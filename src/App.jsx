@@ -13,7 +13,7 @@ import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck,
-  Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock
+  Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock, Forward
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -117,6 +117,7 @@ export default function App() {
   const [attachmentAccept, setAttachmentAccept] = useState('image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,application/pdf');
   const attachmentInputRef = useRef(null);
   const [sending, setSending] = useState(false);
+  const [forwardingMessageId, setForwardingMessageId] = useState(null);
   const [mobileChat, setMobileChat] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
@@ -980,6 +981,92 @@ export default function App() {
     setSending(false);
   }
 
+
+  async function forwardToSavedMessages(message) {
+    if (!message?.id || !active || active.is_saved_chat || forwardingMessageId) return;
+    const savedChat = chats.find(chat => chat.is_saved_chat);
+    if (!savedChat?.conversation_id) {
+      setNotice('Ruang Pesan Tersimpan belum tersedia. Muat ulang daftar chat lalu coba lagi.');
+      return;
+    }
+    if (message.decrypt_error) {
+      setNotice('Pesan ini belum bisa dibuka di perangkat ini, jadi tidak dapat diteruskan.');
+      return;
+    }
+    if (message.body?.startsWith('[[ATLANTIC_POLL:')) {
+      setNotice('Polling belum bisa diteruskan sebagai polling aktif. Kamu bisa membagikan pertanyaannya sebagai teks.');
+      return;
+    }
+    if (message.media_url && !message.media_type) {
+      setNotice('Jenis lampiran tidak diketahui, jadi pesan ini belum bisa diteruskan.');
+      return;
+    }
+    if (message.media_type && !message.media_url) {
+      setNotice('Lampiran belum berhasil dibuka di perangkat ini. Coba lagi setelah lampiran tampil.');
+      return;
+    }
+
+    setForwardingMessageId(message.id);
+    let uploadedPath = null;
+    try {
+      const targetConversationId = savedChat.conversation_id;
+      const targetKey = await ensureConversationE2EE(supabase, targetConversationId, [session.user.id], session.user.id);
+      const targetKeyId = await getCurrentConversationE2EEKeyId(supabase, targetConversationId);
+      let attachmentEnvelope = null;
+
+      if (message.media_url) {
+        const response = await fetch(message.media_url);
+        if (!response.ok) throw new Error('Lampiran sumber gagal dibaca.');
+        const sourceBlob = await response.blob();
+        const sourceFile = new File(
+          [sourceBlob],
+          message.media_name || 'Lampiran',
+          { type: message.media_type || sourceBlob.type || 'application/octet-stream' }
+        );
+        const encryptedFile = await encryptE2EEBytes(targetKey, sourceFile);
+        attachmentEnvelope = {
+          iv: encryptedFile.iv,
+          name: sourceFile.name,
+          type: sourceFile.type || 'application/octet-stream',
+          size: sourceFile.size
+        };
+        uploadedPath = targetConversationId + '/' + session.user.id + '/' + crypto.randomUUID() + '.atlenc';
+        const { error: uploadError } = await supabase.storage.from('atlantic-chat-media').upload(
+          uploadedPath,
+          new Blob([encryptedFile.ciphertext], { type: 'application/octet-stream' }),
+          { upsert: false, contentType: 'application/octet-stream' }
+        );
+        if (uploadError) throw new Error('Lampiran gagal disimpan: ' + uploadError.message);
+      }
+
+      const sourceName = active.is_group
+        ? (active.title || 'Grup Atlantic')
+        : (active.person?.display_name || active.person?.username || 'Chat Atlantic');
+      const forwardedText = '↪ Diteruskan dari ' + sourceName + (message.body ? '\n\n' + message.body : '');
+      const encryptedBody = await encryptE2EEMessage(targetKey, {
+        text: forwardedText,
+        attachment: attachmentEnvelope
+      });
+      const { error: insertError } = await supabase.from('messages').insert({
+        conversation_id: targetConversationId,
+        sender_id: session.user.id,
+        body: encryptedBody,
+        e2ee_key_id: targetKeyId,
+        media_url: uploadedPath,
+        media_type: uploadedPath ? 'application/octet-stream' : null,
+        media_name: null
+      });
+      if (insertError) throw new Error('Pesan gagal diteruskan: ' + insertError.message);
+      setNotice('Pesan berhasil diteruskan ke Pesan Tersimpan.');
+      void loadLatestMessages([targetConversationId]);
+    } catch (forwardError) {
+      if (uploadedPath) await supabase.storage.from('atlantic-chat-media').remove([uploadedPath]);
+      setNotice(forwardError.message || 'Pesan gagal diteruskan.');
+    } finally {
+      setForwardingMessageId(null);
+    }
+  }
+
   function requestCall(callType) {
     if (!active?.person?.id || !active?.conversation_id || active.is_group || !session?.user?.id) return;
     setCallIntent({
@@ -1221,7 +1308,7 @@ export default function App() {
                     {active.is_group && <b className="group-sender-name">{m.senderProfile?.display_name || m.senderProfile?.username || (m.sender_id === session.user.id ? 'Kamu' : 'Anggota grup')}</b>}
                     {m.media_url && (m.media_type?.startsWith('image/') ? <img className="atl-message-media" src={m.media_url} alt={m.media_name || 'Foto'} loading="lazy"/> : m.media_type?.startsWith('video/') ? <video className="atl-message-media" src={m.media_url} controls playsInline preload="metadata"/> : <a className="atl-message-file" href={m.media_url} target="_blank" rel="noreferrer">📎 {m.media_name || 'Buka lampiran'}</a>)}
                     {m.body?.startsWith('[[ATLANTIC_POLL:') && active.is_group ? <AtlanticPolls targetType="group" targetId={active.conversation_id} pollId={m.body.match(/^\[\[ATLANTIC_POLL:([0-9a-f-]+)\]\]$/i)?.[1]} user={session.user} canCreate={false} inline e2eeKey={e2eeKeyRef.current} e2eeKeyId={e2eeKeyIdRef.current} onKeyReady={(key, keyId) => { e2eeKeyRef.current = key; e2eeKeyIdRef.current = keyId; }}/> : m.body && <div>{m.body}</div>}
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button><button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button></div>
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={`message-save-btn ${savedMessages.some(item => item.message_id === m.id) ? 'is-saved' : ''}`} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={`message-status ${m.read_at ? 'is-read' : ''}`} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}{!active.is_saved_chat && <button type="button" className="message-reply-btn" onClick={() => forwardToSavedMessages(m)} aria-label="Teruskan ke Pesan Tersimpan" title={forwardingMessageId === m.id ? "Meneruskan…" : "Teruskan ke Pesan Tersimpan"} disabled={forwardingMessageId === m.id}><Forward size={13}/></button>}<button type="button" className="message-reply-btn" onClick={() => setReplyTarget(m)} aria-label="Balas pesan"><Reply size={13}/></button><button type="button" className="message-delete-btn" onClick={() => setDeleteTarget(m)} aria-label="Hapus pesan"><Trash2 size={13}/></button></div>
                   </div>
                 </div>
               ))}
