@@ -152,8 +152,10 @@ async function createOrLoadE2EEIdentity(supabase, userId, password) {
       .from('profile_e2ee_recovery_backups').select('backup').eq('user_id', userId).maybeSingle();
     if (backupError) throw new Error('Cadangan kunci E2EE gagal dimuat: ' + backupError.message);
     const backup = backupRow?.backup;
-    if (!backup || !backup.salt || !backup.iv || !backup.ciphertext ||
-        Number(backup.iterations) < 100000 || !backup.publicJwk?.x || !backup.publicJwk?.y) {
+    if (!backup || ![1, 2].includes(backup.version) || backup.kdf !== 'PBKDF2-SHA256' ||
+        !backup.salt || !backup.iv || !backup.ciphertext ||
+        Number(backup.iterations) < 100000 || Number(backup.iterations) > 1000000 ||
+        !backup.publicJwk?.x || !backup.publicJwk?.y) {
       throw new Error('Akun ini belum memiliki cadangan kunci otomatis. Perangkat lama masih menyimpan kunci utama; jangan hapus data perangkat tersebut.');
     }
     if (canonicalPublicJwk(profile.e2ee_public_key) !== canonicalPublicJwk(backup.publicJwk)) {
