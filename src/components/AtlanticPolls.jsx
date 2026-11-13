@@ -164,7 +164,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
 
   const formatExpiry=(value)=>value?new Date(value).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Tanpa batas waktu';
 
-  return <section className="atl-polls">
+  return <section className={"atl-polls"+(inline&&targetType==="channel"?" atl-polls-channel-chat":"")}>
     {!inline&&!createOnly&&<div className="atl-polls-heading"><div><BarChart3 size={18}/><div><b>Polling</b><small>{polls.length} polling</small></div></div>{canCreate&&<button type="button" onClick={()=>setShowCreate(v=>!v)}><Plus size={15}/> Buat polling</button>}</div>}
     {showCreate&&<form className="atl-poll-create" onSubmit={createPoll}>
       <label>Pertanyaan<input value={question} onChange={e=>setQuestion(e.target.value)} maxLength={240} placeholder="Apa yang ingin ditanyakan?" required/></label>
