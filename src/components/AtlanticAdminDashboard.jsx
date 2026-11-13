@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
-import { X, ShieldCheck, Users, BadgeCheck, Clock3, CheckCircle2, XCircle, RefreshCw, Search, MessageSquare, Layers3 } from 'lucide-react';
+import { X, ShieldCheck, Users, BadgeCheck, Clock3, CheckCircle2, XCircle, RefreshCw, Search, MessageSquare, Layers3, Radio, Eye, EyeOff } from 'lucide-react';
 import './AtlanticAdminDashboard.css';
 
 const dateLabel = value => value ? new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
@@ -19,6 +19,7 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
   const [userRequests, setUserRequests] = useState([]);
   const [groupRequests, setGroupRequests] = useState([]);
   const [reports, setReports] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [profilesById, setProfilesById] = useState({});
   const [groupsById, setGroupsById] = useState({});
   const [reviewNotes, setReviewNotes] = useState({});
@@ -26,16 +27,17 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const [userCount, conversationCount, messageCount, usersResult, userRequestsResult, groupRequestsResult, reportsResult] = await Promise.all([
+      const [userCount, conversationCount, messageCount, usersResult, userRequestsResult, groupRequestsResult, reportsResult, channelsResult] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('conversations').select('id', { count: 'exact', head: true }),
         supabase.from('messages').select('id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,created_at').order('created_at', { ascending: false }).limit(100),
         supabase.from('atlantic_verification_requests').select('id,user_id,note,status,requested_at,reviewed_at,review_note').order('requested_at', { ascending: false }).limit(100),
         supabase.from('atlantic_group_verification_requests').select('id,conversation_id,requester_id,status,note,admin_note,created_at,reviewed_at').order('created_at', { ascending: false }).limit(100),
-        supabase.from('atlantic_account_reports').select('id,reporter_id,reported_user_id,reason,status,admin_note,created_at,reviewed_at').order('created_at', { ascending: false }).limit(100)
+        supabase.from('atlantic_account_reports').select('id,reporter_id,reported_user_id,reason,status,admin_note,created_at,reviewed_at').order('created_at', { ascending: false }).limit(100),
+        supabase.rpc('admin_list_channels')
       ]);
-      const firstError = [usersResult, userRequestsResult, groupRequestsResult, reportsResult].find(result => result.error);
+      const firstError = [usersResult, userRequestsResult, groupRequestsResult, reportsResult, channelsResult].find(result => result.error);
       if (firstError) throw firstError.error;
       const { data: moderationRows, error: moderationError } = await supabase.rpc('admin_get_profile_moderation', {
         p_user_ids: (usersResult.data || []).map(profile => profile.id)
@@ -53,8 +55,10 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
       setUserRequests(userRequestsResult.data || []);
       setGroupRequests(groupRequestsResult.data || []);
       setReports(reportsResult.data || []);
+      setChannels(channelsResult.data || []);
 
       const ids = [...new Set([
+        ...(channelsResult.data || []).map(item => item.owner_id),
         ...(userRequestsResult.data || []).map(item => item.user_id),
         ...(groupRequestsResult.data || []).map(item => item.requester_id),
         ...(reportsResult.data || []).flatMap(item => [item.reporter_id, item.reported_user_id])
@@ -116,6 +120,26 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
   const pendingGroups = groupRequests.filter(item => item.status === 'pending').length;
   const pendingReports = reports.filter(item => item.status === 'pending').length;
 
+  const toggleChannelVisibility = async channel => {
+    const shouldPublish = !channel.is_public;
+    const confirmed = await onDialog?.({
+      type: 'confirm',
+      title: shouldPublish ? 'Tampilkan saluran?' : 'Sembunyikan saluran?',
+      message: shouldPublish ? `Saluran “${channel.channel_name}” akan muncul kembali di penemuan saluran.` : `Saluran “${channel.channel_name}” akan disembunyikan dari penemuan publik.`,
+      confirmLabel: shouldPublish ? 'Tampilkan' : 'Sembunyikan'
+    });
+    if (!confirmed) return;
+    setBusyId('channel:' + channel.channel_id);
+    const { error } = await supabase.rpc('admin_set_channel_visibility', {
+      target_channel: channel.channel_id,
+      should_publish: shouldPublish
+    });
+    if (error) onNotice?.('Gagal mengubah saluran: ' + error.message);
+    else onNotice?.(shouldPublish ? 'Saluran ditampilkan kembali.' : 'Saluran berhasil disembunyikan.');
+    setBusyId('');
+    await loadDashboard();
+  };
+
   const toggleAdminBlock = async profile => {
     const shouldBlock = !profile.is_blocked;
     const reason = shouldBlock ? ((await onDialog?.({type:'prompt',title:'Alasan blokir akun',message:`Masukkan alasan memblokir @${profile.username} (opsional).`,defaultValue:'Pelanggaran aturan Atlantic',placeholder:'Alasan blokir…',confirmLabel:'Lanjutkan',maxLength:500})) || '') : '';
@@ -156,6 +180,7 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Pengguna ({userTotal})</button>
           <button className={tab === 'verification' ? 'active' : ''} onClick={() => setTab('verification')}>Pemeriksaan akun {pendingUsers > 0 && <i>{pendingUsers}</i>}</button>
           <button className={tab === 'groups' ? 'active' : ''} onClick={() => setTab('groups')}>Verifikasi grup {pendingGroups > 0 && <i>{pendingGroups}</i>}</button>
+          <button className={tab === 'channels' ? 'active' : ''} onClick={() => setTab('channels')}>Saluran ({channels.length})</button>
           <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Laporan akun {pendingReports > 0 && <i>{pendingReports}</i>}</button>
         </nav>
         <main className="atl-admin-content">
@@ -169,6 +194,15 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
             <div className="atl-admin-section-heading"><div><h3>Pemeriksaan akun</h3><p>Tinjau permintaan pemeriksaan akun. Persetujuan tidak memberikan badge; badge biru hanya untuk Admin Atlantic utama.</p></div></div>
             <div className="atl-admin-request-list">{userRequests.map(request => { const profile = profilesById[request.user_id] || {}; const key = 'user:' + request.id; return <article className="atl-admin-request" key={request.id}><div className="atl-admin-request-top"><div><b>{profile.display_name || profile.username || 'Pengguna'}</b><span>@{profile.username || 'akun'}</span></div><span className={'atl-admin-status ' + request.status}>{request.status === 'pending' ? 'Menunggu' : request.status === 'approved' ? 'Disetujui' : 'Ditolak'}</span></div><p>{request.note || 'Tidak ada catatan tambahan.'}</p><small>Diajukan {dateLabel(request.requested_at)}{request.reviewed_at ? ' · Ditinjau ' + dateLabel(request.reviewed_at) : ''}</small>{request.status === 'pending' && <><textarea value={reviewNotes[key] || ''} onChange={event => setReviewNotes(current => ({...current,[key]:event.target.value}))} maxLength={500} placeholder="Catatan admin (opsional)"/><div className="atl-admin-review-actions"><button className="reject" disabled={busyId === key} onClick={() => reviewRequest('user',request,false)}><XCircle size={16}/> Tolak</button><button className="approve" disabled={busyId === key} onClick={() => reviewRequest('user',request,true)}><CheckCircle2 size={16}/> Setujui</button></div></>}</article>; })}
               {!userRequests.length && <p className="atl-admin-empty">Belum ada pengajuan verifikasi.</p>}</div>
+          </>}
+          {!loading && tab === 'channels' && <>
+            <div className="atl-admin-section-heading"><div><h3>Moderasi saluran</h3><p>Kelola visibilitas saluran publik. Menyembunyikan saluran tidak menghapus pesan atau anggota.</p></div></div>
+            <div className="atl-admin-channel-list">{channels.map(channel => { const owner = profilesById[channel.owner_id] || {}; const key = 'channel:' + channel.channel_id; return <article className="atl-admin-channel" key={channel.channel_id}>
+              <div className="atl-admin-channel-icon"><Radio size={19}/></div>
+              <div className="atl-admin-channel-info"><b>{channel.channel_name || 'Saluran Atlantic'}</b><small>{channel.channel_description || 'Tidak ada deskripsi'}</small><span>Pemilik: {owner.display_name || owner.username || 'Pengguna'} · {Number(channel.member_count || 0).toLocaleString('id-ID')} pengikut · {dateLabel(channel.created_at)}</span></div>
+              <span className={'atl-admin-status ' + (channel.is_public ? 'approved' : 'rejected')}>{channel.is_public ? 'Publik' : 'Disembunyikan'}</span>
+              <button className={channel.is_public ? 'hide' : 'show'} disabled={busyId === key} onClick={() => toggleChannelVisibility(channel)}>{channel.is_public ? <><EyeOff size={15}/> Sembunyikan</> : <><Eye size={15}/> Tampilkan</>}</button>
+            </article>; })}{!channels.length && <p className="atl-admin-empty">Belum ada saluran.</p>}</div>
           </>}
           {!loading && tab === 'reports' && <>
             <div className="atl-admin-section-heading"><div><h3>Laporan akun</h3><p>Periksa laporan pengguna dan ambil tindakan yang sesuai.</p></div></div>
