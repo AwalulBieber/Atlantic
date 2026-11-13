@@ -1309,7 +1309,7 @@ export default function App() {
         <div className="me">
           <div className="avatar">{myProfile?.avatar_url ? <img src={myProfile.avatar_url} alt="" /> : initials(myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email)}</div>
           <div>
-            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{myProfile?.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={16}/></span>}</b>
+            <b>{myProfile?.display_name || session.user.user_metadata?.display_name || session.user.email}{(myProfile?.is_admin || myProfile?.is_verified) && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={16}/></span>}</b>
             <small><i className="online-dot" /> Online</small>
           </div>
         </div>
@@ -1351,7 +1351,7 @@ export default function App() {
           {c.is_saved_chat ? <Bookmark size={19}/> : c.person.avatar_url ? <img src={c.person.avatar_url} alt="" /> : c.is_group ? <Users size={19}/> : initials(c.person.display_name || c.person.username)}
         </div>
         <div className="person-info">
-          <b>{c.is_saved_chat ? 'Pesan Tersimpan' : c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span>}</b>
+          <b>{c.is_saved_chat ? 'Pesan Tersimpan' : c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : (c.person.is_admin || c.person.is_verified) && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span>}</b>
           <small className="person-preview">{(() => {
             const latest = latestMessages[c.conversation_id];
             if (!latest) return 'Belum ada pesan';
@@ -1384,7 +1384,7 @@ export default function App() {
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
               <div className={`avatar ${active.is_saved_chat ? 'saved-chat-avatar' : ''}`}>{active.is_saved_chat ? <Bookmark size={21}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</div>
               <div className="chat-person" onClick={() => active.is_group && setGroupInfoOpen(true)} role={active.is_group ? "button" : undefined} tabIndex={active.is_group ? 0 : undefined}>
-                <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : active.person.is_admin && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span>}</b>
+                <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : (active.person.is_admin || active.person.is_verified) && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span>}</b>
                 <small>{active.is_saved_chat ? 'Cloud Pribadi · Terenkripsi E2E' : otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
               </div>
               {!active.is_group && !active.is_saved_chat && <div className="chat-head-actions">
