@@ -403,7 +403,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
                 <label>Kata sandi akun untuk membuat cadangan baru
                   <input type="password" autoComplete="current-password" value={resetAccountPassword} onChange={e => setResetAccountPassword(e.target.value)} placeholder="Masukkan kata sandi akun" />
                 </label>
-                <button type="button" disabled={recoveryBusy || resetAccountPassword.length < 8} onClick={resetLostE2EEIdentity}>{recoveryBusy ? "Menyiapkan identitas baru…" : "Reset identitas E2EE"}</button>
+                <button type="button" disabled={recoveryBusy || resetAccountPassword.length < 6} onClick={resetLostE2EEIdentity}>{recoveryBusy ? "Menyiapkan identitas baru…" : "Reset identitas E2EE"}</button>
               </div>
             )}
             <small className="atl-settings-hint">Server hanya menyimpan kunci publik dan cadangan terenkripsi. Jangan hapus data browser pada perangkat yang masih menyimpan identitas E2EE lama.</small>
