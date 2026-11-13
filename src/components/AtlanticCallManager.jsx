@@ -334,29 +334,76 @@ export default function AtlanticCallManager({ user, intent, onIntentHandled }) {
   };
 
   const switchCamera = useCallback(async () => {
-    if (!localStreamRef.current || !pcRef.current) return;
+    const currentStream = localStreamRef.current;
+    const peer = pcRef.current;
+    if (!currentStream || !peer) {
+      setError('Kamera belum siap. Tunggu sampai panggilan video tersambung, lalu coba lagi.');
+      return;
+    }
+    const currentTrack = currentStream.getVideoTracks()[0];
+    const videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video');
+    if (!currentTrack || !videoSender) {
+      setError('Track kamera belum siap. Coba nyalakan kamera lagi.');
+      return;
+    }
+
     const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
     let replacementStream;
     try {
-      replacementStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: nextFacing } }
-      });
+      // Prefer an explicitly different physical camera. On some Android
+      // browsers, facingMode: ideal silently returns the front camera again.
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(device => device.kind === 'videoinput');
+      const currentDeviceId = currentTrack.getSettings?.().deviceId;
+      const currentLabel = (cameras.find(device => device.deviceId === currentDeviceId)?.label || '').toLowerCase();
+      const wantsBack = nextFacing === 'environment';
+      const labelMatches = device => {
+        const label = (device.label || '').toLowerCase();
+        return wantsBack
+          ? /back|rear|environment|belakang|world/.test(label)
+          : /front|user|fac(e)? ?(ing)?|depan/.test(label);
+      };
+      let target = cameras.find(device => device.deviceId !== currentDeviceId && labelMatches(device));
+      if (!target) target = cameras.find(device => device.deviceId !== currentDeviceId);
+
+      if (target?.deviceId) {
+        try {
+          replacementStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { deviceId: { exact: target.deviceId } }
+          });
+        } catch {
+          // Fall through to facingMode constraints if the device ID is stale.
+        }
+      }
+      if (!replacementStream) {
+        try {
+          replacementStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { exact: nextFacing } }
+          });
+        } catch {
+          replacementStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { ideal: nextFacing } }
+          });
+        }
+      }
+
       const replacementTrack = replacementStream.getVideoTracks()[0];
       if (!replacementTrack) throw new Error('Kamera yang dipilih tidak tersedia.');
-      const videoSender = pcRef.current.getSenders().find(sender => sender.track?.kind === 'video');
-      if (!videoSender) throw new Error('Track video belum siap. Coba nyalakan kamera lagi.');
       await videoSender.replaceTrack(replacementTrack);
-      const currentStream = localStreamRef.current;
-      const previousTrack = currentStream.getVideoTracks()[0];
+
       const nextStream = new MediaStream([...currentStream.getAudioTracks(), replacementTrack]);
-      previousTrack?.stop();
+      currentTrack.stop();
       attachStream(nextStream);
-      setCameraFacing(nextFacing);
+      const actualFacing = replacementTrack.getSettings?.().facingMode;
+      setCameraFacing(actualFacing === 'environment' ? 'environment' : actualFacing === 'user' ? 'user' : nextFacing);
       setCameraOff(false);
+      setError('');
     } catch (err) {
       replacementStream?.getTracks().forEach(track => track.stop());
-      setError(err.message || 'Gagal mengganti kamera.');
+      setError(err.message || 'Gagal mengganti kamera. Pastikan izin kamera diberikan ke browser.');
     }
   }, [attachStream, cameraFacing]);
 
