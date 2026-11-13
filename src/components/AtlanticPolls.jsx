@@ -3,7 +3,7 @@ import { supabase } from '../supabase';
 import { encryptE2EEText, decryptE2EEText, encryptE2EEMessage, ensureConversationE2EE, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById } from '../e2ee';
 import { BarChart3, Plus, X, Check, Lock, Clock3, Users } from 'lucide-react';
 
-export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, onDialog, pollId = null, inline = false, createOnly = false, onCreated, onDeleted, e2eeKey = null, e2eeKeyId = null, onKeyReady }) {
+export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, onDialog, onCancel, pollId = null, inline = false, createOnly = false, onCreated, onDeleted, e2eeKey = null, e2eeKeyId = null, onKeyReady }) {
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
@@ -167,7 +167,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       <div className="atl-poll-choice-list">{choices.map((choice,index)=><div key={index}><input value={choice} onChange={e=>setChoices(old=>old.map((v,i)=>i===index?e.target.value:v))} maxLength={100} placeholder={'Pilihan '+(index+1)}/>{choices.length>2&&<button type="button" onClick={()=>setChoices(old=>old.filter((_,i)=>i!==index))} aria-label="Hapus pilihan"><X size={15}/></button>}</div>)}</div>
       {choices.length<8&&<button className="atl-poll-add-choice" type="button" onClick={()=>setChoices(old=>[...old,''])}><Plus size={14}/> Tambah pilihan</button>}
       <label>Batas waktu<select value={expiry} onChange={e=>setExpiry(e.target.value)}><option value="never">Tanpa batas waktu</option><option value="1">1 hari</option><option value="3">3 hari</option><option value="7">7 hari</option></select></label>
-      <div className="atl-poll-create-actions"><button type="button" onClick={()=>setShowCreate(false)}>Batal</button><button type="submit" disabled={busy||question.trim().length<3||choices.filter(v=>v.trim()).length<2}>{busy?'Membuat…':'Terbitkan polling'}</button></div>
+      <div className="atl-poll-create-actions"><button type="button" onClick={()=>{setShowCreate(false);onCancel?.();}}>Batal</button><button type="submit" disabled={busy||question.trim().length<3||choices.filter(v=>v.trim()).length<2}>{busy?'Membuat…':'Terbitkan polling'}</button></div>
     </form>}
     {error&&<p className="atl-poll-error">{error}</p>}
     {!createOnly&&(!polls.length&&!inline?<div className="atl-polls-empty"><BarChart3 size={24}/><span>Belum ada polling di sini.</span></div>:polls.map(poll=>{
