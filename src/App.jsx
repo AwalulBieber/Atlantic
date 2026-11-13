@@ -827,7 +827,6 @@ export default function App() {
     const body = draft.trim();
     if ((!body && !attachmentFile) || !active || sending) return;
     if (e2eeStatus.state !== 'active' || !e2eeKeyRef.current) { setNotice(e2eeStatus.error || 'Menyiapkan kunci enkripsi. Coba lagi sebentar.'); return; }
-    if (attachmentFile) { setNotice('Lampiran belum mendukung enkripsi end-to-end. Kirim teks saja untuk chat terenkripsi.'); return; }
     setSending(true); setDraft('');
     let mediaPath = null;
     let attachmentEnvelope = null;
@@ -1064,7 +1063,7 @@ export default function App() {
             </header>
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
             <div className={`atl-e2ee-banner ${e2eeStatus.state === 'active' ? 'is-secure' : 'is-pending'}`} role="status">
-              <Lock size={15}/><span>{e2eeStatus.state === 'active' ? 'Pesan teks dienkripsi end-to-end. Kunci privat tersimpan di perangkat anggota chat.' : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
+              <Lock size={15}/><span>{e2eeStatus.state === 'active' ? 'Pesan dan lampiran dienkripsi end-to-end. Polling grup juga dienkripsi. Kunci privat tersimpan di perangkat ini.' : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
             </div>
             <div className="messages">
               {messages.map((m, messageIndex) => (
