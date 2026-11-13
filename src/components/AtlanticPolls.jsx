@@ -7,7 +7,6 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
-  const [reactions,setReactions]=useState([]);
   const [profiles,setProfiles]=useState({});
   const [question,setQuestion]=useState('');
   const [choices,setChoices]=useState(['','']);
@@ -37,14 +36,12 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       } catch { return { ...poll, question: '🔒 Polling terenkripsi tidak dapat dibuka.', decrypt_error: true, is_e2ee: true }; }
     }));
     setPolls(visiblePolls);
-    if(!pollIds.length){setOptions([]);setVotes([]);setReactions([]);setProfiles({});return;}
-    const [{data:optionRows,error:optionError},{data:voteRows,error:voteError},{data:reactionRows,error:reactionError}]=await Promise.all([
+    if(!pollIds.length){setOptions([]);setVotes([]);setProfiles({});return;}
+    const [{data:optionRows,error:optionError},{data:voteRows,error:voteError}]=await Promise.all([
       supabase.from('atlantic_poll_options').select('id,poll_id,label,position').in('poll_id',pollIds).order('position'),
-      supabase.from('atlantic_poll_votes').select('id,poll_id,option_id,user_id,created_at').in('poll_id',pollIds),
-      supabase.from('atlantic_poll_reactions').select('id,poll_id,user_id,emoji').in('poll_id',pollIds)
+      supabase.from('atlantic_poll_votes').select('id,poll_id,option_id,user_id,created_at').in('poll_id',pollIds)
     ]);
-    if(optionError||voteError||reactionError){setError(optionError?.message||voteError?.message||reactionError?.message||'Gagal memuat hasil polling.');return;}
-    setReactions(reactionRows||[]);
+    if(optionError||voteError){setError(optionError?.message||voteError?.message||'Gagal memuat hasil polling.');return;}
     const visibleOptions = await Promise.all((optionRows||[]).map(async option => {
       if (!e2eeKey) return targetType === 'group' ? { ...option, label: '🔒 Pilihan terkunci', decrypt_error: true, is_e2ee: true } : option;
       try {
@@ -68,7 +65,6 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     const pollFilter=pollId?{filter:'id=eq.'+pollId}:{};
     channel
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_votes',...voteFilter},()=>load())
-      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_reactions',...voteFilter},()=>load())
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_polls',...pollFilter},()=>load())
       .subscribe();
     return()=>{supabase.removeChannel(channel);};
@@ -118,9 +114,13 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
 
   const vote=async(pollId,optionId)=>{
     if(busy)return;
+    const previousVotes=votes;
+    const optimisticVote={id:'optimistic-'+pollId,user_id:user?.id,poll_id:pollId,option_id:optionId,created_at:new Date().toISOString()};
+    setVotes(current=>[...current.filter(item=>!(item.poll_id===pollId&&item.user_id===user?.id)),optimisticVote]);
     setBusy(true);setError('');
     const {error:e}=await supabase.rpc('cast_atlantic_poll_vote',{p_poll_id:pollId,p_option_id:optionId});
-    if(e)setError(e.message);else await load();
+    if(e){setVotes(previousVotes);setError(e.message);}
+    else { load(); }
     setBusy(false);
   };
 
@@ -129,18 +129,6 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     setBusy(true);setError('');
     const {error:e}=await supabase.rpc('close_atlantic_poll',{p_poll_id:poll.id});
     if(e)setError(e.message);else{onNotice?.('Polling ditutup.');await load();}
-    setBusy(false);
-  };
-
-  const toggleReaction=async(poll,emoji)=>{
-    if(busy)return;
-    const existing=reactions.find(item=>item.poll_id===poll.id&&item.user_id===user?.id&&item.emoji===emoji);
-    setBusy(true);setError('');
-    const result=existing
-      ? await supabase.from('atlantic_poll_reactions').delete().eq('id',existing.id).eq('user_id',user.id)
-      : await supabase.from('atlantic_poll_reactions').insert({poll_id:poll.id,user_id:user.id,emoji});
-    if(result.error)setError('Reaksi gagal disimpan: '+result.error.message);
-    else await load();
     setBusy(false);
   };
 
@@ -195,7 +183,6 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
           </div>;
         })}</div>
         <footer><span>{total} suara</span><span>{closed?<><Lock size={12}/> {expired&&!poll.closed_at?'Waktu habis':'Ditutup'}</>:'Pilih jawaban · bisa mengubah pilihan'}</span></footer>
-        <div className="atl-poll-reactions">{['👍','❤️','😂','🎉','🔥'].map(emoji=>{const items=reactions.filter(item=>item.poll_id===poll.id&&item.emoji===emoji);const selected=items.some(item=>item.user_id===user?.id);return <button type="button" key={emoji} className={selected?'is-selected':''} onClick={()=>toggleReaction(poll,emoji)} disabled={busy} aria-label={`Reaksi ${emoji}, ${items.length}`}><span>{emoji}</span>{items.length>0&&<b>{items.length}</b>}</button>;})}</div>
       </article>;
     }))}
   </section>;
