@@ -1621,3 +1621,27 @@ html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32
   .bubble .atl-poll-options{gap:5px}
   .bubble .atl-poll-option>button{padding:6px 7px;font-size:9.5px}
 }
+
+
+/* Minimal poll visual language across Atlantic: quiet surfaces, lighter controls. */
+.atl-poll-card{
+  gap:9px;
+  padding:11px;
+  border:1px solid color-mix(in srgb,var(--ink,#171717) 10%,transparent);
+  border-radius:14px;
+  box-shadow:none;
+}
+.atl-poll-card>header{align-items:center}
+.atl-poll-card h3{font-size:13px;font-weight:750;letter-spacing:-.01em}
+.atl-poll-card-actions button{min-height:28px;padding:5px 8px;border-radius:9px;box-shadow:none}
+.atl-poll-options{gap:7px}
+.atl-poll-option>button{
+  border-color:color-mix(in srgb,var(--ink,#171717) 12%,transparent);
+  border-radius:10px;
+  background:color-mix(in srgb,var(--panel,#fff) 94%,var(--ink,#171717));
+  font-weight:550;
+}
+.atl-poll-option.is-selected>button{border-width:1px}
+.atl-poll-progress{height:4px}
+.atl-poll-card>footer{border-top:0;padding-top:2px}
+.atl-poll-voters{padding-top:0}
