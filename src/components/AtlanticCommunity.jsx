@@ -359,7 +359,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   }
 
   const title=tab==='updates'?'Pembaruan':tab==='channels'?'Saluran':'Panggilan';\n  const isChannelStaff=Boolean(selectedChannel&&(selectedChannel.owner_id===user.id||['owner','admin'].includes(selectedChannel.member_role)));
-  return <section className="atl-community">
+  return <section className={"atl-community"+(tab==='channels'&&selectedChannel?" is-channel-open":"")}>
     <header className="atl-community-head">
       <div><span className="eyebrow">ATLANTIC / {tab.toUpperCase()}</span><h1>{title}</h1><p>{tab==='updates'?'Bagikan momen dan catatan singkat.':'Terhubung dengan komunitas Atlantic.'}</p></div>
       <div className="atl-community-actions">
