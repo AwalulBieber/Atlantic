@@ -30,17 +30,26 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('conversations').select('id', { count: 'exact', head: true }),
         supabase.from('messages').select('id', { count: 'exact', head: true }),
-        supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,is_blocked,blocked_reason,created_at').order('created_at', { ascending: false }).limit(100),
+        supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,created_at').order('created_at', { ascending: false }).limit(100),
         supabase.from('atlantic_verification_requests').select('id,user_id,note,status,requested_at,reviewed_at,review_note').order('requested_at', { ascending: false }).limit(100),
         supabase.from('atlantic_group_verification_requests').select('id,conversation_id,requester_id,status,note,admin_note,created_at,reviewed_at').order('created_at', { ascending: false }).limit(100),
         supabase.from('atlantic_account_reports').select('id,reporter_id,reported_user_id,reason,status,admin_note,created_at,reviewed_at').order('created_at', { ascending: false }).limit(100)
       ]);
       const firstError = [usersResult, userRequestsResult, groupRequestsResult, reportsResult].find(result => result.error);
       if (firstError) throw firstError.error;
+      const { data: moderationRows, error: moderationError } = await supabase.rpc('admin_get_profile_moderation', {
+        p_user_ids: (usersResult.data || []).map(profile => profile.id)
+      });
+      if (moderationError) throw moderationError;
+      const moderationById = Object.fromEntries((moderationRows || []).map(item => [item.user_id, item]));
       setUserTotal(userCount.count || 0);
       setConversationTotal(conversationCount.count || 0);
       setMessageTotal(messageCount.count || 0);
-      setUsers(usersResult.data || []);
+      setUsers((usersResult.data || []).map(profile => ({
+        ...profile,
+        is_blocked: moderationById[profile.id]?.is_blocked === true,
+        blocked_reason: moderationById[profile.id]?.blocked_reason || null
+      })));
       setUserRequests(userRequestsResult.data || []);
       setGroupRequests(groupRequestsResult.data || []);
       setReports(reportsResult.data || []);
