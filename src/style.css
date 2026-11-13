@@ -1554,3 +1554,43 @@ html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32
 @media(prefers-reduced-motion:reduce){
   .atl-message-focus-backdrop,.bubble-row.message-focused>.bubble,.bubble-row.message-focused .atl-message-action-menu{animation:none;transition:none}
 }
+
+
+/* Compact, softer chat bubbles — less rigid and more conversational */
+.bubble-row{margin:5px 0;align-items:flex-end}
+.bubble{
+  max-width:min(78%,480px);
+  padding:9px 11px 7px;
+  border:1px solid color-mix(in srgb,var(--ink) 13%,transparent);
+  border-radius:18px 18px 18px 6px;
+  box-shadow:0 2px 9px rgba(20,25,35,.07);
+  font-size:13px;
+  line-height:1.42;
+  transition:border-radius .18s ease,box-shadow .18s ease,transform .18s ease;
+}
+.mine .bubble{
+  border-radius:18px 18px 6px 18px;
+  box-shadow:0 2px 10px rgba(20,25,35,.08);
+}
+.bubble time{font-size:9px;margin-top:4px;opacity:.72}
+.bubble-meta{gap:5px;min-height:15px;margin-top:4px}
+.bubble .message-status{font-size:9px;gap:2px}
+.bubble .message-status small{font-size:9px}
+.bubble .message-menu-trigger,.bubble .message-save-btn{opacity:.72}
+.bubble .reply-quote{border-radius:11px;margin-bottom:6px}
+.bubble .group-sender-name{font-size:10px;margin-bottom:3px}
+.bubble .atl-message-reactions{margin-top:5px}
+.bubble-row.message-focused>.bubble{
+  border-radius:18px;
+  box-shadow:0 8px 24px rgba(0,0,0,.16);
+}
+@media(max-width:700px){
+  .bubble-row{margin:4px 0}
+  .bubble{max-width:84%;padding:8px 10px 6px;font-size:13px;border-radius:16px 16px 16px 6px;box-shadow:0 2px 7px rgba(20,25,35,.07)}
+  .mine .bubble{border-radius:16px 16px 6px 16px}
+  .bubble-meta{margin-top:3px;gap:4px}
+}
+@media(max-width:390px){
+  .bubble{max-width:86%;padding:7px 9px 6px;font-size:12.5px}
+  .bubble-row{margin:3px 0}
+}
