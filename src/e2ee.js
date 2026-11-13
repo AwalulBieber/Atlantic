@@ -146,7 +146,50 @@ export async function ensureE2EEIdentity(supabase, userId) {
     throw new Error('Kunci privat akun ini tersimpan di perangkat lain. Fitur E2EE perlu pemindahan kunci perangkat sebelum bisa digunakan di sini.');
   }
 
-  throw new Error('Kunci E2EE belum disiapkan. Buka Pengaturan akun → Keamanan, lalu buat cadangan pemulihan sebelum mulai mengirim pesan terenkripsi.');
+  // First-time setup is automatic. Generate a fresh device identity, register
+  // only its public key, and keep the non-extractable private key in IndexedDB.
+  // If another device wins the registration race, never overwrite its identity.
+  const pair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+  );
+  const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
+  const privatePkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+  let privateKey;
+  try {
+    privateKey = await crypto.subtle.importKey(
+      'pkcs8', privatePkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+    );
+  } finally {
+    privatePkcs8.fill(0);
+  }
+
+  const { data: registered, error: registerError } = await supabase
+    .from('profiles')
+    .update({ e2ee_public_key: publicJwk })
+    .eq('id', userId)
+    .is('e2ee_public_key', null)
+    .select('id')
+    .maybeSingle();
+
+  if (registerError || !registered) {
+    throw new Error(
+      registerError
+        ? 'Identitas E2EE otomatis gagal didaftarkan: ' + registerError.message
+        : 'Akun ini sudah memiliki identitas E2EE di perangkat lain. Pulihkan atau transfer kunci lama; identitas tidak akan ditimpa.'
+    );
+  }
+
+  try {
+    await writeLocalKey(IDENTITY_STORE, userId, { privateKey, publicJwk });
+  } catch (storageError) {
+    // Avoid leaving a public key registered when this device could not persist
+    // the matching private key. The conditional update cannot clear a newer key.
+    await supabase.from('profiles').update({ e2ee_public_key: null })
+      .eq('id', userId).eq('e2ee_public_key', publicJwk);
+    throw new Error('Kunci privat gagal disimpan di perangkat ini: ' + storageError.message);
+  }
+
+  return { userId, privateKey, publicJwk };
 }
 
 export async function ensureConversationE2EE(supabase, conversationId, memberIds, userId) {
