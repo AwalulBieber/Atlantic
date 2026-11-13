@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import "./AtlanticAccountSettings.css";
 import AtlanticImageCropper from "./AtlanticImageCropper";
+import { createE2EERecoveryBackup, restoreE2EEIdentityFromBackup } from "../e2ee";
 
 const DEFAULTS = {
   bio: "", is_private: false, show_online_status: true,
@@ -25,6 +26,11 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
   const [dashboardBusy, setDashboardBusy] = useState(false);
   const [dashboardError, setDashboardError] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [recoveryPassphrase, setRecoveryPassphrase] = useState("");
+  const [recoveryConfirm, setRecoveryConfirm] = useState("");
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryBackupExists, setRecoveryBackupExists] = useState(false);
+  const [e2eeIdentityExists, setE2eeIdentityExists] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -33,7 +39,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       if (!user?.id) return;
       const [{ data: p, error: profileError }, { data: admin, error: adminError }] =
         await Promise.all([
-          supabase.from("profiles").select("id,username,display_name,avatar_url,bio,is_private,show_online_status,read_receipts_enabled,group_invite_policy,is_verified").eq("id", user.id).maybeSingle(),
+          supabase.from("profiles").select("id,username,display_name,avatar_url,bio,is_private,show_online_status,read_receipts_enabled,group_invite_policy,is_verified,e2ee_public_key").eq("id", user.id).maybeSingle(),
           supabase.rpc("is_atlantic_admin")
         ]);
       if (!alive) return;
@@ -42,6 +48,9 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
         setProfile({ ...DEFAULTS, ...(p || {}) });
         setSavedAvatarUrl(p?.avatar_url || "");
       }
+      setE2eeIdentityExists(Boolean(p?.e2ee_public_key));
+      const { data: recoveryRow } = await supabase.from("profile_e2ee_recovery_backups").select("user_id").eq("user_id", user.id).maybeSingle();
+      setRecoveryBackupExists(Boolean(recoveryRow));
       const adminMode = (!adminError && admin === true) || user.email?.toLowerCase() === 'awalulhakim94@gmail.com';
       setIsAdmin(adminMode);
       const { data: requests, error: requestError } = await supabase.from("atlantic_verification_requests").select("id,user_id,note,status,requested_at,review_note").order("requested_at", { ascending: false }).limit(adminMode ? 100 : 10);
@@ -110,6 +119,33 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       setGroupVerificationRequests(current=>current.filter(item=>item.id!==request.id));
       setMessage(approve ? "Grup berhasil diverifikasi." : "Pengajuan verifikasi grup ditolak.");
     }
+  }
+
+  async function createRecoveryBackup() {
+    if (!user?.id || recoveryBusy) return;
+    if (recoveryPassphrase.length < 12) { setMessage("Passphrase pemulihan minimal 12 karakter."); return; }
+    if (recoveryPassphrase !== recoveryConfirm) { setMessage("Konfirmasi passphrase tidak cocok."); return; }
+    setRecoveryBusy(true); setMessage("");
+    try {
+      await createE2EERecoveryBackup(supabase, user.id, recoveryPassphrase);
+      setRecoveryBackupExists(true); setE2eeIdentityExists(true);
+      setRecoveryPassphrase(""); setRecoveryConfirm("");
+      setMessage("Cadangan E2EE berhasil dibuat. Simpan passphrase di tempat aman; Atlantic tidak menyimpannya dan tidak dapat memulihkannya jika hilang.");
+    } catch (error) { setMessage(error.message || "Cadangan pemulihan gagal dibuat."); }
+    finally { setRecoveryBusy(false); }
+  }
+
+  async function restoreRecoveryBackup() {
+    if (!user?.id || recoveryBusy) return;
+    if (recoveryPassphrase.length < 12) { setMessage("Masukkan passphrase pemulihan minimal 12 karakter."); return; }
+    setRecoveryBusy(true); setMessage("");
+    try {
+      const result = await restoreE2EEIdentityFromBackup(supabase, user.id, recoveryPassphrase);
+      setRecoveryPassphrase("");
+      setE2eeIdentityExists(true);
+      setMessage(result.alreadyRestored ? "Kunci E2EE sudah tersedia di perangkat ini." : "Kunci E2EE berhasil dipulihkan di perangkat ini. Riwayat terenkripsi dapat dibuka kembali jika perangkat masih memiliki akses ke akun dan data chat.");
+    } catch (error) { setMessage(error.message || "Pemulihan E2EE gagal."); }
+    finally { setRecoveryBusy(false); }
   }
 
   function update(key, value) {
@@ -213,6 +249,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
         <nav className="atl-settings-tabs">
           <button type="button" className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}>Profil</button>
           <button type="button" className={tab === "privacy" ? "active" : ""} onClick={() => setTab("privacy")}>Privasi</button>
+          <button type="button" className={tab === "security" ? "active" : ""} onClick={() => setTab("security")}>Keamanan</button>
           <button type="button" className={tab === "verification" ? "active" : ""} onClick={() => setTab("verification")}>Verifikasi</button>
           {isAdmin && <button type="button" className={tab === "admin" ? "active" : ""} onClick={() => setTab("admin")}>Admin</button>}
         </nav>
@@ -294,6 +331,17 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
               </section>
               <button type="button" className="atl-admin-open-verification" onClick={() => setTab("verification")}>Kelola pengajuan verifikasi →</button>
             </>}
+          </section>}
+          {tab === "security" && <section className="atl-e2ee-recovery-panel">
+            <h3>Keamanan & pemulihan E2EE</h3>
+            <p>Private key dibuat di perangkat dan tidak dikirim ke server. Cadangan di bawah dienkripsi dengan passphrase pilihanmu sebelum disimpan. Server hanya menyimpan ciphertext.</p>
+            <div className="atl-e2ee-recovery-status"><b>{recoveryBackupExists ? "Cadangan pemulihan tersedia" : e2eeIdentityExists ? "Identitas E2EE sudah terdaftar" : "E2EE belum disiapkan"}</b><small>{recoveryBackupExists ? "Kamu dapat memulihkan identitas di perangkat baru menggunakan passphrase." : e2eeIdentityExists ? "Identitas lama tidak dapat diekspor secara retroaktif karena private key bersifat non-extractable." : "Buat cadangan sebelum membuka chat terenkripsi di perangkat ini."}</small></div>
+            <label>Passphrase pemulihan<input type="password" autoComplete="new-password" minLength={12} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder="Minimal 12 karakter" /></label>
+            {!recoveryBackupExists && !e2eeIdentityExists && <label>Ulangi passphrase<input type="password" autoComplete="new-password" minLength={12} value={recoveryConfirm} onChange={e => setRecoveryConfirm(e.target.value)} placeholder="Ulangi passphrase" /></label>}
+            {!recoveryBackupExists && !e2eeIdentityExists && <button type="button" disabled={recoveryBusy} onClick={createRecoveryBackup}>{recoveryBusy ? "Menyiapkan…" : "Buat cadangan dan aktifkan E2EE"}</button>}
+            {recoveryBackupExists && <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>}
+            {e2eeIdentityExists && !recoveryBackupExists && <p className="atl-settings-hint">Jangan hapus data browser atau perangkat yang masih memiliki kunci ini. Untuk akun ini, pemulihan baru tidak dapat dibuat tanpa akses ke private key lama.</p>}
+            <small className="atl-settings-hint">Gunakan passphrase unik yang kuat dan simpan di password manager. Jika passphrase hilang, Atlantic tidak dapat membuka cadangan. Cadangan tidak memulihkan pesan atau lampiran yang sudah dihapus dari server.</small>
           </section>}
           {tab === "privacy" && <>
             <label className="atl-switch-row"><span><b>Akun private</b><small>Sembunyikan profil dari daftar pemilihan anggota saat pengguna membuat grup baru.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
