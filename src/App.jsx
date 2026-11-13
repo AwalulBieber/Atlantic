@@ -992,6 +992,11 @@ export default function App() {
     }).subscribe();
     return () => {
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+      if (typingActiveRef.current && session?.user?.id) {
+        channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
+      }
+      typingActiveRef.current = false;
+      typingLastSentAt.current = 0;
       if (typingIndicatorTimer.current) clearTimeout(typingIndicatorTimer.current);
       typingChannelRef.current = null;
       setOtherTyping(false);
