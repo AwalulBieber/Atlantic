@@ -1206,3 +1206,16 @@ html[data-theme="dark"] .atl-message-reactions button.is-mine{background:#263e5c
 
 .atl-community.is-channel-open>.atl-community-head{display:none}
 .atl-community.is-channel-open>.atl-community-error{width:min(100%,1040px);box-sizing:border-box;margin:0 auto 10px}
+
+/* Channel timeline uses chat-message bubbles instead of feed post cards. */
+.atl-channel-posts{width:min(100%,760px);margin:14px auto 0;display:flex;flex-direction:column;gap:12px;padding:4px 16px 18px;box-sizing:border-box}
+.atl-channel-posts>.atl-channel-message{width:min(86%,620px);box-sizing:border-box;align-self:flex-start;margin:0;padding:12px 14px;border:1px solid var(--line,var(--ink));border-radius:17px 17px 17px 5px;background:var(--paper,var(--panel,#fffdf5));box-shadow:0 2px 8px #0000000a}
+.atl-channel-posts>.atl-channel-message.is-own{align-self:flex-end;border-radius:17px 17px 5px 17px;background:var(--accent,#e9f3ff)}
+.atl-channel-message .atl-channel-post-author{margin-bottom:8px}
+.atl-channel-message>p{margin:4px 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;font-size:13px}
+.atl-channel-message-meta{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:7px}
+.atl-channel-message-meta small{font-size:10px;opacity:.65}
+.atl-channel-message .atl-channel-delete-post{border:0;background:transparent;color:var(--muted,#777);font-size:10px;padding:2px 0}
+.atl-channel-message .atl-channel-media{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:12px}
+.atl-channel-posts>.atl-channel-timeline-poll{width:min(86%,620px);align-self:flex-start}
+@media(max-width:560px){.atl-channel-posts{padding-inline:10px}.atl-channel-posts>.atl-channel-message,.atl-channel-posts>.atl-channel-timeline-poll{width:min(94%,620px)}}
