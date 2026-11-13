@@ -609,9 +609,10 @@ export default function App() {
     const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id));
     const messagesWithMedia = await Promise.all(visibleMessages.map(async message => {
       let next = message;
+      let messageKey = e2eeKeyRef.current;
       if (e2eeKeyRef.current && typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')) {
         try {
-          const messageKey = message.e2ee_key_id && message.e2ee_key_id !== e2eeKeyIdRef.current
+          messageKey = message.e2ee_key_id && message.e2ee_key_id !== e2eeKeyIdRef.current
             ? await getConversationE2EEKeyById(supabase, id, message.e2ee_key_id, session.user.id)
             : e2eeKeyRef.current;
           const payload = await decryptE2EEMessage(messageKey, message.body);
@@ -626,7 +627,7 @@ export default function App() {
           const response = await fetch(signed.signedUrl);
           if (!response.ok) throw new Error('Lampiran terenkripsi gagal diunduh.');
           const encryptedBytes = new Uint8Array(await response.arrayBuffer());
-          const plainBytes = await decryptE2EEBytes(e2eeKeyRef.current, { iv: next.e2eeAttachment.iv, ciphertext: encryptedBytes });
+          const plainBytes = await decryptE2EEBytes(messageKey, { iv: next.e2eeAttachment.iv, ciphertext: encryptedBytes });
           const blobUrl = URL.createObjectURL(new Blob([plainBytes], { type: next.e2eeAttachment.type || 'application/octet-stream' }));
           return { ...next, media_url: blobUrl, media_type: next.e2eeAttachment.type, media_name: next.e2eeAttachment.name };
         } catch { return { ...next, media_url: null, body: (next.body ? next.body + '\\n' : '') + '🔒 Lampiran tidak dapat dibuka.', decrypt_error: true }; }
@@ -680,12 +681,13 @@ export default function App() {
         filter: `conversation_id=eq.${active.conversation_id}`
       }, async payload => {
         const incoming = payload.new;
+        let incomingMessageKey = e2eeKeyRef.current;
         if (e2eeKeyRef.current && typeof incoming.body === 'string' && incoming.body.startsWith('ATL-E2EE1:')) {
           try {
-            const messageKey = incoming.e2ee_key_id && incoming.e2ee_key_id !== e2eeKeyIdRef.current
+            incomingMessageKey = incoming.e2ee_key_id && incoming.e2ee_key_id !== e2eeKeyIdRef.current
               ? await getConversationE2EEKeyById(supabase, active.conversation_id, incoming.e2ee_key_id, session.user.id)
               : e2eeKeyRef.current;
-            const payload = await decryptE2EEMessage(messageKey, incoming.body);
+            const payload = await decryptE2EEMessage(incomingMessageKey, incoming.body);
             incoming.body = payload.text || '';
             incoming.e2eeAttachment = payload.attachment || null;
             incoming.is_e2ee = true;
@@ -696,7 +698,7 @@ export default function App() {
             const { data: signed } = await supabase.storage.from('atlantic-chat-media').createSignedUrl(incoming.media_url, 3600);
             const response = await fetch(signed.signedUrl);
             const encryptedBytes = new Uint8Array(await response.arrayBuffer());
-            const plainBytes = await decryptE2EEBytes(e2eeKeyRef.current, { iv: incoming.e2eeAttachment.iv, ciphertext: encryptedBytes });
+            const plainBytes = await decryptE2EEBytes(incomingMessageKey, { iv: incoming.e2eeAttachment.iv, ciphertext: encryptedBytes });
             incoming.media_url = URL.createObjectURL(new Blob([plainBytes], { type: incoming.e2eeAttachment.type || 'application/octet-stream' }));
             incoming.media_type = incoming.e2eeAttachment.type;
             incoming.media_name = incoming.e2eeAttachment.name;
