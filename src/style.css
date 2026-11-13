@@ -902,3 +902,39 @@ html[data-animations="off"] :where(a,button,input,select,textarea,[role="button"
 .atl-poll-card>footer span:last-child{display:flex;align-items:center;gap:4px}
 .atl-polls-empty{display:flex;align-items:center;justify-content:center;gap:8px;padding:18px;color:var(--muted,#777);font-size:11px}
 .atl-poll-error{margin:0;padding:8px 10px;border-radius:8px;background:#ffe5e5;color:#9c2525;font-size:11px}
+
+
+/* Screenshot-inspired attachment tray */
+.chat-panel{position:relative}
+.atl-attachment-menu{
+  position:absolute;z-index:8;left:12px;bottom:calc(76px + env(safe-area-inset-bottom));width:min(264px,calc(100% - 24px));
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:10px;
+  border:3px solid #171717;border-radius:18px;background:#fffdf7;color:#171717;
+  box-shadow:6px 6px 0 #171717;animation:atlAttachmentPop .16s cubic-bezier(.2,.9,.25,1.18) both;
+}
+.atl-attachment-menu>button{
+  min-width:0;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  padding:7px 4px;border:1px solid #ded8ca;border-radius:12px;background:#fffaf0;color:#171717;
+  font-size:10px;font-weight:900;box-shadow:none;
+}
+.atl-attachment-menu>button svg{width:19px;height:19px;stroke-width:2.8}
+.atl-attachment-menu>button b{font-size:10px;line-height:1.1}
+.atl-attachment-menu>button:active{transform:translateY(2px);filter:brightness(.96)}
+.atl-attachment-menu .atl-menu-photo{color:#f04491;fill:#f0449120}
+.atl-attachment-menu .atl-menu-video{color:#8b5cf6;fill:#8b5cf620}
+.atl-attachment-menu .atl-menu-document{color:#3478df}
+.atl-attachment-menu .atl-menu-location{color:#00a978;fill:#00a97820}
+.atl-attachment-menu .atl-menu-live{color:#00a6a6}
+.atl-attachment-menu .atl-menu-poll{color:#ed9800}
+.atl-attachment-menu>button.atl-attachment-tools{
+  grid-column:1/-1;min-height:39px;flex-direction:row;justify-content:flex-start;gap:9px;
+  margin-top:3px;padding:8px 11px;border:1px solid #ded8ca;border-radius:10px;background:#fff;
+  font-size:10px;text-align:left;
+}
+.atl-attachment-menu .atl-attachment-tools svg{width:15px;height:15px;color:#a855f7}
+.atl-chat-attach.is-active{background:#ffe17a;transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+@keyframes atlAttachmentPop{from{opacity:0;transform:translateY(7px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:560px){
+  .atl-attachment-menu{left:11px;bottom:calc(72px + env(safe-area-inset-bottom));width:min(264px,calc(100% - 22px));}
+}
+@media(prefers-reduced-motion:reduce){.atl-attachment-menu{animation:none}}
