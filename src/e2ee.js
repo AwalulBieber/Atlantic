@@ -156,7 +156,10 @@ async function createOrLoadE2EEIdentity(supabase, userId, password) {
         !backup.salt || !backup.iv || !backup.ciphertext ||
         Number(backup.iterations) < 100000 || Number(backup.iterations) > 1000000 ||
         !backup.publicJwk?.x || !backup.publicJwk?.y) {
-      throw new Error('Akun ini belum memiliki cadangan kunci otomatis. Perangkat lama masih menyimpan kunci utama; jangan hapus data perangkat tersebut.');
+      throw new Error('Cadangan kunci E2EE tidak ditemukan atau formatnya tidak didukung. Jangan hapus data perangkat lama.');
+    }
+    if (backup.version === 1) {
+      throw new Error('Cadangan E2EE akun ini memakai passphrase pemulihan lama. Pulihkan dari Pengaturan dengan passphrase tersebut atau gunakan perangkat yang masih menyimpan kunci. Kata sandi akun tidak dapat membuka cadangan lama.');
     }
     if (canonicalPublicJwk(profile.e2ee_public_key) !== canonicalPublicJwk(backup.publicJwk)) {
       throw new Error('Kunci publik cadangan tidak cocok dengan identitas akun. Pemulihan dihentikan.');
@@ -676,7 +679,9 @@ export async function verifyE2EEIdentityBackup(supabase, userId, password) {
       wrappingKey, base64ToBytes(backup.ciphertext)
     );
   } catch {
-    throw new Error('Kata sandi akun tidak cocok dengan cadangan E2EE.');
+    throw new Error(backup.version === 1
+      ? 'Passphrase pemulihan khusus yang digunakan saat cadangan lama dibuat tidak cocok.'
+      : 'Kata sandi akun tidak cocok dengan cadangan E2EE.');
   }
   let backupPrivate;
   try {
@@ -698,4 +703,96 @@ export async function verifyE2EEIdentityBackup(supabase, userId, password) {
     }
   }
   return { localIdentityVerified: Boolean(local), backupVerified: true };
+}
+
+
+async function deleteLocalKey(storeName, key) {
+  const db = await openKeyDatabase();
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeName, 'readwrite');
+      transaction.objectStore(storeName).delete(key);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Penghapusan kunci lokal dibatalkan.'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function hasLocalE2EEIdentity(userId) {
+  if (!userId) return false;
+  return Boolean(await readLocalKey(IDENTITY_STORE, userId));
+}
+
+// Explicit self-service recovery reset. The server archives the previous
+// encrypted backup and refuses the reset if any conversation has key epochs.
+export async function resetOwnE2EEIdentity(supabase, userId, accountPassword) {
+  if (!userId || typeof accountPassword !== 'string' || accountPassword.length < 6) {
+    throw new Error('Masukkan kata sandi akun yang benar untuk membuat identitas E2EE baru.');
+  }
+  if (await readLocalKey(IDENTITY_STORE, userId)) {
+    throw new Error('Perangkat ini masih menyimpan identitas E2EE. Reset dibatalkan agar kunci lokal lama tidak tertimpa.');
+  }
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle();
+  if (profileError || !profile?.e2ee_public_key) {
+    throw new Error('Identitas E2EE akun tidak ditemukan atau gagal dimuat.');
+  }
+
+  const pair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+  );
+  const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
+  const privatePkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const iterations = 600000;
+  const wrappingKey = await deriveRecoveryWrappingKey(accountPassword, salt, iterations);
+  let ciphertext;
+  try {
+    ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrappingKey, privatePkcs8);
+  } finally {
+    privatePkcs8.fill(0);
+  }
+  const backup = {
+    version: 2, kdf: 'PBKDF2-SHA256', iterations,
+    salt: bytesToBase64(salt), iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext)), publicJwk
+  };
+  const privateBytes = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv }, wrappingKey, ciphertext
+  );
+  let privateKey;
+  try {
+    privateKey = await crypto.subtle.importKey(
+      'pkcs8', privateBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+    );
+  } finally {
+    new Uint8Array(privateBytes).fill(0);
+  }
+
+  await writeLocalKey(IDENTITY_STORE, userId, { privateKey, publicJwk });
+  const { data, error } = await supabase.rpc('reset_own_e2ee_identity', {
+    p_public_key: publicJwk,
+    p_backup: backup
+  });
+  if (error || data !== true) {
+    // A network interruption can hide a successful server commit. Confirm the
+    // authoritative profile + backup before deciding whether to discard local key.
+    const [{ data: currentProfile }, { data: currentBackup }] = await Promise.all([
+      supabase.from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle(),
+      supabase.from('profile_e2ee_recovery_backups').select('backup').eq('user_id', userId).maybeSingle()
+    ]);
+    const resetCommitted =
+      canonicalPublicJwk(currentProfile?.e2ee_public_key) === canonicalPublicJwk(publicJwk) &&
+      currentBackup?.backup?.version === 2 &&
+      canonicalPublicJwk(currentBackup.backup.publicJwk) === canonicalPublicJwk(publicJwk);
+    if (!resetCommitted) {
+      await deleteLocalKey(IDENTITY_STORE, userId).catch(() => {});
+      throw new Error(error?.message || 'Reset identitas E2EE ditolak oleh pengaman database.');
+    }
+  }
+  return { userId, publicJwk };
 }
