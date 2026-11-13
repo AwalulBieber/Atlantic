@@ -13,7 +13,7 @@ import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
   Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck, Lock,
-  Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock, Forward, MoreHorizontal, Languages, Pin, Copy, Info, Pencil
+  Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock, Forward, MoreHorizontal, ListFilter, Languages, Pin, Copy, Info, Pencil
 } from 'lucide-react';
 
 function initials(name = 'A') {
@@ -102,6 +102,8 @@ export default function App() {
   const [groupSearch, setGroupSearch] = useState('');
   const [groupBusy, setGroupBusy] = useState(false);
   const [search, setSearch] = useState('');
+  const [chatFilter, setChatFilter] = useState('all');
+  const [chatFilterMenuOpen, setChatFilterMenuOpen] = useState(false);
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [e2eeStatus, setE2eeStatus] = useState({ state: 'loading', error: '' });
@@ -1242,14 +1244,17 @@ export default function App() {
 
   const visibleChats = chats.filter(c => archivedIds.includes(c.conversation_id) === showArchived);
   const visibleInboxSummaries = inboxSummaries.filter(item => !archivedIds.includes(item.conversation_id));
-  const filtered = visibleChats.filter(c =>
-    (c.person.display_name || c.person.username || '')
-      .toLowerCase().includes(search.toLowerCase())
-  ).sort((a, b) => {
+  const filtered = visibleChats.filter(c => {
+    const matchesSearch = (c.is_saved_chat ? "pesan tersimpan" : c.person.display_name || c.person.username || "").toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    if (chatFilter === "unread") return (unread[c.conversation_id] || 0) > 0;
+    if (chatFilter === "private") return !c.is_group && !c.is_saved_chat;
+    if (chatFilter === "group") return c.is_group;
+    return true;
+  }).sort((a, b) => {
     if (a.is_saved_chat) return -1;
     if (b.is_saved_chat) return 1;
-    return new Date(latestMessages[b.conversation_id]?.created_at || 0).getTime() -
-      new Date(latestMessages[a.conversation_id]?.created_at || 0).getTime();
+    return new Date(latestMessages[b.conversation_id]?.created_at || 0).getTime() - new Date(latestMessages[a.conversation_id]?.created_at || 0).getTime();
   });
 
   return (
@@ -1281,10 +1286,22 @@ export default function App() {
 
         <div className="search">
           <Search size={17} />
-          <input placeholder="Cari Chat…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Cari percakapan…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-
-        <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Bookmark</button></div>
+        <div className="chat-filter-strip">
+          <button className={chatFilter==="all"?"active":""} onClick={()=>{setChatFilter("all");setShowArchived(false);setShowSaved(false);}}>Semua</button>
+          <button className={chatFilter==="unread"?"active":""} onClick={()=>{setChatFilter("unread");setShowArchived(false);setShowSaved(false);}}>Belum dibaca</button>
+          <button className={chatFilter==="private"?"active":""} onClick={()=>{setChatFilter("private");setShowArchived(false);setShowSaved(false);}}>Pribadi</button>
+          <button className={chatFilter==="group"?"active":""} onClick={()=>{setChatFilter("group");setShowArchived(false);setShowSaved(false);}}>Grup</button>
+          <div className="chat-filter-menu-wrap">
+            <button className="chat-filter-more" aria-label="Filter lainnya" onClick={()=>setChatFilterMenuOpen(v=>!v)}><ListFilter size={19}/>{showArchived?"1":""}</button>
+            {chatFilterMenuOpen&&<div className="chat-filter-menu">
+              <button onClick={()=>{setShowArchived(true);setShowSaved(false);setChatFilter("all");setChatFilterMenuOpen(false);}}>Arsip chat {archivedIds.length?`(${archivedIds.length})`:""}</button>
+              <button onClick={()=>{setShowSaved(true);setShowArchived(false);setChatFilter("all");loadSavedMessages();setChatFilterMenuOpen(false);}}>Pesan tersimpan</button>
+              <button onClick={()=>{setShowArchived(false);setShowSaved(false);setChatFilter("all");setChatFilterMenuOpen(false);}}>Tampilkan semua chat</button>
+            </div>}
+          </div>
+        </div>
         <AtlanticGroupInvitations user={session.user} onNotice={setNotice} onAccepted={async conversationId=>{const updated=await loadProfiles();const joined=updated?.find(item=>item.conversation_id===conversationId);if(joined)openGroupChat(joined);}} />
         <div className="section-title"><span>{showSaved ? 'Pesan Ditandai' : showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{showSaved ? savedMessages.length : filtered.length}</span></div>
         <div className="people">
