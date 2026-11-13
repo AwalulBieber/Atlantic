@@ -150,7 +150,6 @@ export async function ensureE2EEIdentity(supabase, userId) {
     { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
   );
   const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
-  await writeLocalKey(IDENTITY_STORE, userId, { privateKey: pair.privateKey, publicJwk });
   const { data: updated, error: updateError } = await supabase
     .from('profiles')
     .update({ e2ee_public_key: publicJwk })
@@ -159,8 +158,9 @@ export async function ensureE2EEIdentity(supabase, userId) {
     .select('id')
     .maybeSingle();
   if (updateError || !updated) {
-    throw new Error('Kunci publik gagal didaftarkan. Muat ulang chat dan coba lagi.');
+    throw new Error('Kunci publik sudah didaftarkan dari perangkat lain atau gagal disimpan. Perangkat ini memerlukan proses tautkan perangkat sebelum E2EE aktif.');
   }
+  await writeLocalKey(IDENTITY_STORE, userId, { privateKey: pair.privateKey, publicJwk });
   return { userId, privateKey: pair.privateKey, publicJwk };
 }
 
