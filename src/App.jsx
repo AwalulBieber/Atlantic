@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ensureConversationE2EE, encryptE2EEText, decryptE2EEText } from './e2ee';
+import { ensureConversationE2EE, encryptE2EEText, decryptE2EEText, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage } from './e2ee';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
@@ -605,12 +605,25 @@ export default function App() {
     const messagesWithMedia = await Promise.all(visibleMessages.map(async message => {
       let next = message;
       if (e2eeKeyRef.current && typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')) {
-        try { next = { ...next, body: await decryptE2EEText(e2eeKeyRef.current, message.body), is_e2ee: true }; }
-        catch { next = { ...next, body: '🔒 Tidak dapat membuka pesan ini di perangkat ini.', is_e2ee: true, decrypt_error: true }; }
+        try {
+          const payload = await decryptE2EEMessage(e2eeKeyRef.current, message.body);
+          next = { ...next, body: payload.text || '', e2eeAttachment: payload.attachment || null, is_e2ee: true };
+        } catch { next = { ...next, body: '🔒 Tidak dapat membuka pesan ini di perangkat ini.', is_e2ee: true, decrypt_error: true }; }
       }
       if (!next.media_url) return next;
       const { data: signed } = await supabase.storage.from('atlantic-chat-media').createSignedUrl(next.media_url, 3600);
-      return { ...next, media_url: signed?.signedUrl || null };
+      if (!signed?.signedUrl) return { ...next, media_url: null };
+      if (next.is_e2ee && next.e2eeAttachment?.iv) {
+        try {
+          const response = await fetch(signed.signedUrl);
+          if (!response.ok) throw new Error('Lampiran terenkripsi gagal diunduh.');
+          const encryptedBytes = new Uint8Array(await response.arrayBuffer());
+          const plainBytes = await decryptE2EEBytes(e2eeKeyRef.current, { iv: next.e2eeAttachment.iv, ciphertext: encryptedBytes });
+          const blobUrl = URL.createObjectURL(new Blob([plainBytes], { type: next.e2eeAttachment.type || 'application/octet-stream' }));
+          return { ...next, media_url: blobUrl, media_type: next.e2eeAttachment.type, media_name: next.e2eeAttachment.name };
+        } catch { return { ...next, media_url: null, body: (next.body ? next.body + '\\n' : '') + '🔒 Lampiran tidak dapat dibuka.', decrypt_error: true }; }
+      }
+      return { ...next, media_url: signed.signedUrl };
     }));
     const senderIds = [...new Set((data || []).map(message => message.sender_id).filter(Boolean))];
     const { data: senderProfiles } = senderIds.length ? await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id', senderIds) : { data: [] };
@@ -655,8 +668,12 @@ export default function App() {
       }, async payload => {
         const incoming = payload.new;
         if (e2eeKeyRef.current && typeof incoming.body === 'string' && incoming.body.startsWith('ATL-E2EE1:')) {
-          try { incoming.body = await decryptE2EEText(e2eeKeyRef.current, incoming.body); incoming.is_e2ee = true; }
-          catch { incoming.body = '🔒 Tidak dapat membuka pesan ini di perangkat ini.'; incoming.decrypt_error = true; }
+          try {
+            const payload = await decryptE2EEMessage(e2eeKeyRef.current, incoming.body);
+            incoming.body = payload.text || '';
+            incoming.e2eeAttachment = payload.attachment || null;
+            incoming.is_e2ee = true;
+          } catch { incoming.body = '🔒 Tidak dapat membuka pesan ini di perangkat ini.'; incoming.decrypt_error = true; }
         }
         if (incoming.reply_to) {
           const { data: original } = await supabase.from('messages').select('id,body,sender_id').eq('id', incoming.reply_to).maybeSingle();
@@ -797,18 +814,29 @@ export default function App() {
     if (attachmentFile) { setNotice('Lampiran belum mendukung enkripsi end-to-end. Kirim teks saja untuk chat terenkripsi.'); return; }
     setSending(true); setDraft('');
     let mediaPath = null;
-    if (attachmentFile) {
-      const extension = (attachmentFile.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g,'') || 'bin';
-      mediaPath = active.conversation_id + '/' + session.user.id + '/' + crypto.randomUUID() + '.' + extension;
-      const { error: uploadError } = await supabase.storage.from('atlantic-chat-media').upload(mediaPath, attachmentFile, { upsert:false, contentType:attachmentFile.type });
-      if (uploadError) { setDraft(body); setNotice('Lampiran gagal diunggah: ' + uploadError.message); setSending(false); return; }
+    let attachmentEnvelope = null;
+    try {
+      if (attachmentFile) {
+        const encryptedFile = await encryptE2EEBytes(e2eeKeyRef.current, attachmentFile);
+        attachmentEnvelope = { iv: encryptedFile.iv, name: attachmentFile.name, type: attachmentFile.type || 'application/octet-stream', size: attachmentFile.size };
+        mediaPath = active.conversation_id + '/' + session.user.id + '/' + crypto.randomUUID() + '.atlenc';
+        const encryptedBlob = new Blob([encryptedFile.ciphertext], { type: 'application/octet-stream' });
+        const { error: uploadError } = await supabase.storage.from('atlantic-chat-media').upload(mediaPath, encryptedBlob, { upsert:false, contentType:'application/octet-stream' });
+        if (uploadError) throw new Error('Lampiran gagal diunggah: ' + uploadError.message);
+      }
+      if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+      typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
+      const encryptedBody = await encryptE2EEMessage(e2eeKeyRef.current, { text: body, attachment: attachmentEnvelope });
+      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedBody, media_url:mediaPath, media_type:mediaPath ? 'application/octet-stream' : null, media_name:null, reply_to:replyTarget?.id || null });
+      if (error) throw new Error('Pesan gagal dikirim: ' + error.message);
+      setReplyTarget(null); setAttachmentFile(null); setAttachmentPreview('');
+    } catch (sendError) {
+      if (mediaPath) await supabase.storage.from('atlantic-chat-media').remove([mediaPath]);
+      setDraft(body);
+      setNotice(sendError.message || 'Pesan gagal dienkripsi atau dikirim.');
     }
-    if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
-    typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: session.user.id, is_typing: false } });
-    let encryptedBody = '';
-    try { encryptedBody = body ? await encryptE2EEText(e2eeKeyRef.current, body) : ''; }
-    catch (encryptionError) { setDraft(body); setNotice('Pesan gagal dienkripsi: ' + encryptionError.message); setSending(false); return; }
-    const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedBody, media_url:mediaPath, media_type:attachmentFile?.type || null, media_name:attachmentFile?.name || null, reply_to:replyTarget?.id || null });
+    setSending(false);
+    return;
     if (error) { if (mediaPath) await supabase.storage.from('atlantic-chat-media').remove([mediaPath]); setDraft(body); setNotice('Pesan gagal dikirim: ' + error.message); }
     else { setReplyTarget(null); setAttachmentFile(null); setAttachmentPreview(''); }
     setSending(false);
