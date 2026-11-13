@@ -359,11 +359,11 @@ export default function App() {
   if (conversationError) { setNotice('Daftar percakapan: ' + conversationError.message); return; }
 
   // Delivery receipts are useful but should not block rendering the sidebar.
-  void supabase.from('messages')
-    .update({ delivered_at: new Date().toISOString() })
-    .in('conversation_id', ids)
-    .neq('sender_id', session.user.id)
-    .is('delivered_at', null);
+  void supabase.rpc('record_atlantic_message_receipts', {
+    p_conversation_ids: ids,
+    p_message_ids: null,
+    p_mark_read: false
+  });
 
   const userIds = [...new Set((members || []).map(m => m.user_id))];
   const { data: people, error: profileError } = userIds.length ? await supabase
@@ -686,10 +686,11 @@ export default function App() {
     }
     const incomingIds = visibleMessages.filter(m => m.sender_id !== session.user.id).map(m => m.id);
     if (incomingIds.length) {
-      const now = new Date().toISOString();
-      const receipt = { delivered_at: now };
-      if (myProfile?.read_receipts_enabled !== false) receipt.read_at = now;
-      await supabase.from('messages').update(receipt).in('id', incomingIds);
+      await supabase.rpc('record_atlantic_message_receipts', {
+        p_conversation_ids: null,
+        p_message_ids: incomingIds,
+        p_mark_read: myProfile?.read_receipts_enabled !== false
+      });
     }
     setMessages(messagesWithMedia.map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body, senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
     void refreshInboxSummaries();
@@ -760,10 +761,11 @@ export default function App() {
           }
         }
         if (incoming.sender_id !== session.user.id) {
-          const now = new Date().toISOString();
-          const receipt = { delivered_at: now };
-          if (myProfile?.read_receipts_enabled !== false) receipt.read_at = now;
-          const { error: receiptError } = await supabase.from('messages').update(receipt).eq('id', incoming.id);
+          const { error: receiptError } = await supabase.rpc('record_atlantic_message_receipts', {
+            p_conversation_ids: null,
+            p_message_ids: [incoming.id],
+            p_mark_read: myProfile?.read_receipts_enabled !== false
+          });
           if (!receiptError) {
             incoming.delivered_at = now;
             if (receipt.read_at) incoming.read_at = now;
@@ -815,7 +817,11 @@ export default function App() {
         if (profileError || !person) return;
 
         const targetChat = chats.find(chat => chat.conversation_id === message.conversation_id);
-        await supabase.from('messages').update({ delivered_at: new Date().toISOString() }).eq('id', message.id).is('delivered_at', null);
+        await supabase.rpc('record_atlantic_message_receipts', {
+          p_conversation_ids: null,
+          p_message_ids: [message.id],
+          p_mark_read: false
+        });
         void refreshInboxSummaries();
         const notificationBody = typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')
           ? '🔒 Pesan terenkripsi baru'
