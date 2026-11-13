@@ -8,6 +8,6 @@ alter table public.profile_e2ee_recovery_backups
     jsonb_typeof(backup) = 'object'
     and backup->>'version' in ('1', '2')
     and backup->>'kdf' = 'PBKDF2-SHA256'
-    and backup ?& array['iterations','salt','iv','ciphertext','publicJwk']
+    and backup ?& array['version','iterations','salt','iv','ciphertext','publicJwk']
     and pg_column_size(backup) < 16384
   );
