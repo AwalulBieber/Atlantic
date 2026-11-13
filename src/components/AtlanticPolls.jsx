@@ -19,7 +19,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   const load=useCallback(async()=>{
     if(!targetId)return;
     if(targetType==='group'&&user?.id){const {data:membership}=await supabase.from('conversation_members').select('role').eq('conversation_id',targetId).eq('user_id',user.id).maybeSingle();setCanModerate(membership?.role==='admin');}else setCanModerate(Boolean(canCreate));
-    let pollQuery=supabase.from('atlantic_polls').select('id,target_type,target_id,question,created_by,created_at,expires_at,closed_at').eq('target_type',targetType).eq('target_id',targetId).order('created_at',{ascending:false}).limit(pollId?1:30);
+    let pollQuery=supabase.from('atlantic_polls').select('id,target_type,target_id,question,created_by,created_at,expires_at,closed_at,e2ee_key_id').eq('target_type',targetType).eq('target_id',targetId).order('created_at',{ascending:false}).limit(pollId?1:30);
     if(pollId) pollQuery=pollQuery.eq('id',pollId);
     const {data:rows,error:pollError}=await pollQuery;
     if(pollError){setError(pollError.message);return;}
