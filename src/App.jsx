@@ -329,7 +329,7 @@ export default function App() {
   }
 
   async function loadProfiles() {
-  const { data: savedConversationId, error: savedConversationError } = await supabase.rpc('get_or_create_saved_messages_conversation');
+  const { error: savedConversationError } = await supabase.rpc('get_or_create_saved_messages_conversation');
   if (savedConversationError) setNotice('Pesan Tersimpan gagal disiapkan: ' + savedConversationError.message);
   const { data: mine, error } = await supabase
     .from('conversation_members')
@@ -511,6 +511,7 @@ export default function App() {
     setUnread(old => { const next = { ...old }; delete next[chat.conversation_id]; return next; });
     setIncomingNotice(null);
     setActive({ conversation_id: chat.conversation_id, person: chat.person, is_group: false, is_saved_chat: true, title: 'Pesan Tersimpan', members: [{ id: session.user.id }] });
+    setShowSaved(false);
     setReplyTarget(null);
     setMobileChat(true);
     await loadMessages(chat.conversation_id);
