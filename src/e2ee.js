@@ -729,7 +729,7 @@ export async function hasLocalE2EEIdentity(userId) {
 // Explicit self-service recovery reset. The server archives the previous
 // encrypted backup and refuses the reset if any conversation has key epochs.
 export async function resetOwnE2EEIdentity(supabase, userId, accountPassword) {
-  if (!userId || typeof accountPassword !== 'string' || accountPassword.length < 8) {
+  if (!userId || typeof accountPassword !== 'string' || accountPassword.length < 6) {
     throw new Error('Masukkan kata sandi akun yang benar untuk membuat identitas E2EE baru.');
   }
   if (await readLocalKey(IDENTITY_STORE, userId)) {
