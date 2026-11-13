@@ -887,6 +887,13 @@ html[data-animations="off"] :where(a,button,input,select,textarea,[role="button"
 .atl-poll-card h3{margin:6px 0 4px;font-size:14px;font-weight:900;line-height:1.35}
 .atl-poll-tag{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:950;letter-spacing:.07em;color:var(--muted,#777)}
 .atl-poll-close{padding:6px 9px;border:1px solid var(--line,#ccc);border-radius:8px;background:transparent;color:var(--ink,#171717);font-size:10px;font-weight:850}
+.atl-poll-card-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.atl-poll-delete{padding:6px 9px;border:1px solid #d95b5b;border-radius:8px;background:transparent;color:#c43b3b;font-size:10px;font-weight:850}
+.atl-poll-reactions{display:flex;flex-wrap:wrap;gap:6px;padding-top:2px}
+.atl-poll-reactions button{display:inline-flex;align-items:center;gap:4px;min-width:38px;padding:5px 8px;border:1px solid var(--line,#ddd);border-radius:18px;background:transparent;color:var(--ink,#171717);font-size:13px}
+.atl-poll-reactions button.is-selected{border-color:var(--ink,#171717);background:color-mix(in srgb,var(--accent,#ffd84d) 32%,transparent)}
+.atl-poll-reactions button b{font-size:10px}
+
 .atl-poll-options{display:grid;gap:12px}
 .atl-poll-option{display:grid;gap:5px}
 .atl-poll-option>button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 10px;border:1px solid var(--line,#d6d6d6);border-radius:9px;background:transparent;color:var(--ink,#171717);text-align:left;font-size:11px}
@@ -1153,6 +1160,13 @@ html[data-theme="dark"] .atl-message-reactions button.is-mine{background:#263e5c
   padding:13px 15px;
 }
 .atl-channel-post-author{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12px}
+.atl-channel-timeline-poll{width:min(94%,620px);align-self:flex-start;padding:12px;border:1px solid var(--line,var(--ink));border-radius:16px;background:var(--paper,var(--panel,#fffdf5))}
+.atl-channel-timeline-poll .atl-channel-post-author{margin-bottom:10px}
+.atl-channel-timeline-poll .atl-poll-card{width:100%;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.atl-channel-timeline-poll .atl-poll-card>header{gap:8px}
+.atl-channel-timeline-poll .atl-poll-card h3{font-size:14px}
+.atl-channel-timeline-poll .atl-poll-tag{font-size:9px}
+
 .atl-channel-post-author>span{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:var(--accent);font-weight:900}
 .atl-channel-post-author img{width:100%;height:100%;object-fit:cover}
 .atl-channel-posts article p{margin:8px 0;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
