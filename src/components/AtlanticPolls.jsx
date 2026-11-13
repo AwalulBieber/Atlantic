@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
+import { encryptE2EEText, decryptE2EEText, encryptE2EEMessage } from '../e2ee';
 import { BarChart3, Plus, X, Check, Lock, Clock3, Users } from 'lucide-react';
 
-export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated }) {
+export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, e2eeKey = null }) {
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
@@ -23,20 +24,30 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     const {data:rows,error:pollError}=await pollQuery;
     if(pollError){setError(pollError.message);return;}
     const pollIds=(rows||[]).map(p=>p.id);
-    setPolls(rows||[]);
+    const visiblePolls = await Promise.all((rows||[]).map(async poll => {
+      if (!e2eeKey) return poll;
+      try { return { ...poll, question: await decryptE2EEText(e2eeKey, poll.question), is_e2ee: true }; }
+      catch { return { ...poll, question: '🔒 Polling terenkripsi tidak dapat dibuka.', decrypt_error: true, is_e2ee: true }; }
+    }));
+    setPolls(visiblePolls);
     if(!pollIds.length){setOptions([]);setVotes([]);setProfiles({});return;}
     const [{data:optionRows,error:optionError},{data:voteRows,error:voteError}]=await Promise.all([
       supabase.from('atlantic_poll_options').select('id,poll_id,label,position').in('poll_id',pollIds).order('position'),
       supabase.from('atlantic_poll_votes').select('id,poll_id,option_id,user_id,created_at').in('poll_id',pollIds)
     ]);
     if(optionError||voteError){setError(optionError?.message||voteError?.message||'Gagal memuat hasil polling.');return;}
-    setOptions(optionRows||[]);setVotes(voteRows||[]);
+    const visibleOptions = await Promise.all((optionRows||[]).map(async option => {
+      if (!e2eeKey) return option;
+      try { return { ...option, label: await decryptE2EEText(e2eeKey, option.label), is_e2ee: true }; }
+      catch { return { ...option, label: '🔒 Pilihan terkunci', decrypt_error: true, is_e2ee: true }; }
+    }));
+    setOptions(visibleOptions);setVotes(voteRows||[]);
     const ids=[...new Set((voteRows||[]).map(v=>v.user_id))];
     if(ids.length){
       const {data:people}=await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids);
       setProfiles(Object.fromEntries((people||[]).map(p=>[p.id,p])));
     }else setProfiles({});
-  },[targetId,targetType,user?.id,canCreate,pollId]);
+  },[targetId,targetType,user?.id,canCreate,pollId,e2eeKey]);
 
   useEffect(()=>{
     load();
@@ -54,13 +65,23 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     if(new Set(clean.map(v=>v.toLocaleLowerCase())).size!==clean.length){setError('Pilihan polling tidak boleh duplikat.');return;}
     setBusy(true);setError('');
     const expiresAt=expiry==='never'?null:new Date(Date.now()+Number(expiry)*86400000).toISOString();
-    const {error:e1}=await supabase.rpc('create_atlantic_poll',{p_type:targetType,p_target:targetId,p_question:question.trim(),p_options:clean,p_expires_at:expiresAt});
+    let storedQuestion = question.trim();
+    let storedOptions = clean;
+    try {
+      if (e2eeKey) {
+        storedQuestion = await encryptE2EEText(e2eeKey, storedQuestion);
+        storedOptions = await Promise.all(clean.map(option => encryptE2EEText(e2eeKey, option)));
+      }
+    } catch (encryptionError) { setError('Polling gagal dienkripsi: ' + encryptionError.message); setBusy(false); return; }
+    const {error:e1}=await supabase.rpc('create_atlantic_poll',{p_type:targetType,p_target:targetId,p_question:storedQuestion,p_options:storedOptions,p_expires_at:expiresAt});
     if(e1)setError(e1.message);
     else{
       const {data:created,error:fetchError}=await supabase.from('atlantic_polls').select('id').eq('target_type',targetType).eq('target_id',targetId).eq('created_by',user.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
       if(fetchError||!created?.id){setError(fetchError?.message||'Polling dibuat, tetapi pesan polling gagal disiapkan.');}
       else{
-        const {error:messageError}=await supabase.from('messages').insert({conversation_id:targetId,sender_id:user.id,body:`[[ATLANTIC_POLL:${created.id}]]`});
+        const pollMarker = `[[ATLANTIC_POLL:${created.id}]]`;
+        const storedMarker = e2eeKey ? await encryptE2EEMessage(e2eeKey, { text: pollMarker }) : pollMarker;
+        const {error:messageError}=await supabase.from('messages').insert({conversation_id:targetId,sender_id:user.id,body:storedMarker});
         if(messageError)setError('Polling dibuat, tetapi gagal dikirim ke chat: '+messageError.message);
         else{setQuestion('');setChoices(['','']);setExpiry('never');setShowCreate(false);onNotice?.('Polling berhasil dikirim ke chat.');onCreated?.();await load();}
       }
