@@ -423,6 +423,10 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
             <button type="button" onClick={()=>{setChannelToolsOpen(false);setChannelHeaderSearchOpen(v=>!v);}}>Cari pesan</button>
           </div>}
         </div>
+        <div className="atl-channel-e2ee-notice" role="status">
+          <Lock size={15}/>
+          <span><b>Enkripsi end-to-end belum aktif di saluran</b><small>Pesan, lampiran, dan polling saluran belum dilindungi E2EE. Jangan kirim informasi sensitif melalui saluran.</small></span>
+        </div>
         {channelHeaderSearchOpen&&<label className="atl-channel-search"><Search size={16}/><input value={communitySearch} onChange={e=>setCommunitySearch(e.target.value)} placeholder="Cari pesan di saluran…"/><button type="button" onClick={()=>{setCommunitySearch('');setChannelHeaderSearchOpen(false);}}>×</button></label>}
         {isChannelStaff&&channelToolsOpen&&<div className="atl-channel-invite-settings"><label>Masa berlaku<select value={channelInviteExpiry} onChange={e=>setChannelInviteExpiry(e.target.value)}><option value="never">Tidak kedaluwarsa</option><option value="1">1 hari</option><option value="7">7 hari</option><option value="30">30 hari</option></select></label><label>Batas penggunaan (opsional)<input type="number" min="1" max="10000" value={channelInviteMaxUses} onChange={e=>setChannelInviteMaxUses(e.target.value)} placeholder="Kosong = tanpa batas"/></label></div>}
         {channelInviteLink&&<div className="atl-channel-invite-link"><input readOnly value={channelInviteLink} onFocus={e=>e.target.select()}/><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(channelInviteLink);onNotice?.('Link saluran disalin.');}catch{setError('Gagal menyalin otomatis. Tekan dan tahan link untuk menyalin.');}}}>Salin</button><button type="button" onClick={revokeChannelInviteLink} disabled={channelInviteBusy}>Nonaktifkan</button></div>}
