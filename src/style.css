@@ -549,7 +549,7 @@ html[data-animations="off"] .bubble-row,html[data-animations="off"] .swipe-reply
 .atl-contact-person{display:grid;gap:2px;min-width:0;flex:1}
 .atl-contact-person b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .atl-contact-person>small{font-size:11px;color:#888}
-.atl-contact-verified{color:#e59b36}
+.atl-contact-verified{color:#1677e8;fill:#1677e8;stroke:#fff;stroke-width:2.5px;vertical-align:middle}
 .atl-contact-actions{display:flex;gap:5px}
 .atl-contact-actions button,.atl-contact-add{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:6px 9px;border:2px solid var(--ink);border-radius:8px;background:var(--panel,#fff);color:var(--ink);font-weight:850}
 .atl-contact-actions button:first-child{background:var(--accent)}
