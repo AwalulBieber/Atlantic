@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ensureConversationE2EE, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById, getE2EEFingerprint } from './e2ee';
+import { ensureE2EEIdentity, ensureConversationE2EE, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById, getE2EEFingerprint } from './e2ee';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
@@ -197,6 +197,15 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!session?.user?.id) return;
+    ensureE2EEIdentity(supabase, session.user.id).catch(error => {
+      if (!cancelled) console.warn('Atlantic automatic E2EE setup:', error.message);
+    });
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!session?.user?.id || !window.location.search) return;
