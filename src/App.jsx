@@ -1415,6 +1415,7 @@ export default function App() {
               {messageActionTarget && <button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/>}
               {messages.map((m, messageIndex) => (
                 <React.Fragment key={m.id}>
+                  {(messageIndex === 0 || new Date(m.created_at).toDateString() !== new Date(messages[messageIndex - 1].created_at).toDateString()) && <div className="atl-chat-day-separator">{chatDayLabel(m.created_at)}</div>}
                 <div
                   className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${messageFocusActive && messageActionTarget === m.id ? 'message-focused' : ''} ${messageActionTarget === m.id ? 'message-menu-open' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
                   key={m.id}
@@ -1458,7 +1459,6 @@ export default function App() {
                     longPressTriggered.current = false;
                   }}
                 >
-                  {(messageIndex === 0 || new Date(m.created_at).toDateString() !== new Date(messages[messageIndex - 1].created_at).toDateString()) && <div className="atl-chat-day-separator">{chatDayLabel(m.created_at)}</div>}
                   <div className={`swipe-reply-indicator ${swipeState.id === m.id && swipeState.offset > 12 ? 'visible' : ''}`} style={swipeState.id === m.id ? { opacity: Math.min(swipeState.offset / 65, 1) } : undefined}><Reply size={15}/></div>
                   <div className="bubble">
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.is_group ? (m.replyPreview.senderProfile?.display_name || m.replyPreview.senderProfile?.username || 'Anggota grup') : (active.person.display_name || active.person.username))}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
