@@ -851,10 +851,6 @@ export default function App() {
       setNotice(sendError.message || 'Pesan gagal dienkripsi atau dikirim.');
     }
     setSending(false);
-    return;
-    if (error) { if (mediaPath) await supabase.storage.from('atlantic-chat-media').remove([mediaPath]); setDraft(body); setNotice('Pesan gagal dikirim: ' + error.message); }
-    else { setReplyTarget(null); setAttachmentFile(null); setAttachmentPreview(''); }
-    setSending(false);
   }
 
   function requestCall(callType) {
