@@ -566,8 +566,8 @@ export async function createE2EERecoveryBackup(supabase, userId, passphrase) {
 }
 
 export async function restoreE2EEIdentityFromBackup(supabase, userId, passphrase) {
-  if (typeof passphrase !== 'string' || passphrase.length < 12) {
-    throw new Error('Passphrase pemulihan minimal 12 karakter.');
+  if (typeof passphrase !== 'string' || passphrase.length < 6) {
+    throw new Error('Masukkan kata sandi akun minimal 6 karakter.');
   }
   const local = await readLocalKey(IDENTITY_STORE, userId);
   if (local) return { userId, alreadyRestored: true };
