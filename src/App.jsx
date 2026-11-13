@@ -62,7 +62,9 @@ function inboxDate(value) {
 
 const DEFAULT_SETTINGS = {
   theme: 'atlantic', accent: 'yellow', font: 'ios',
-  textSize: 'medium', fps: '60', animations: true
+  textSize: 'medium', fps: '60', animations: true,
+  bubbleStyle: 'theme', bubbleMineMode: 'theme', bubbleMineColor: '#b8f36b',
+  bubbleOtherMode: 'theme', bubbleOtherColor: '#ffffff', bubbleFontMode: 'theme', bubbleFontColor: '#171717'
 };
 
 const THEME_OPTIONS = [
@@ -200,6 +202,19 @@ export default function App() {
       green: '#b8f36b', purple: '#c6a5ff'
     };
     root.style.setProperty('--accent', accents[settings.accent] || accents.yellow);
+    const bubbleStyles = {
+      theme: { radius: '13px 13px 13px 3px', shadow: '4px 4px 0 var(--ink)', border: 'var(--line)' },
+      rounded: { radius: '20px', shadow: '0 5px 18px rgba(0,0,0,.10)', border: '1px solid color-mix(in srgb, var(--ink) 12%, transparent)' },
+      sharp: { radius: '5px', shadow: '3px 3px 0 var(--ink)', border: '2px solid var(--ink)' },
+      glass: { radius: '18px', shadow: '0 8px 26px rgba(15,23,42,.12)', border: '1px solid rgba(255,255,255,.55)' }
+    };
+    const bubbleStyle = bubbleStyles[settings.bubbleStyle] || bubbleStyles.theme;
+    root.style.setProperty('--chat-bubble-radius', bubbleStyle.radius);
+    root.style.setProperty('--chat-bubble-shadow', bubbleStyle.shadow);
+    root.style.setProperty('--chat-bubble-border', bubbleStyle.border);
+    root.style.setProperty('--chat-bubble-mine', settings.bubbleMineMode === 'custom' ? settings.bubbleMineColor : '');
+    root.style.setProperty('--chat-bubble-other', settings.bubbleOtherMode === 'custom' ? settings.bubbleOtherColor : '');
+    root.style.setProperty('--chat-bubble-font', settings.bubbleFontMode === 'custom' ? settings.bubbleFontColor : '');
   }, [settings]);
 
   function updateSetting(key, value) {
@@ -1624,6 +1639,38 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="setting-group">
+                  <h3>Gaya bubble chat</h3>
+                  <p>Pilih bentuk bubble. Opsi Ikuti tema menyesuaikan desain tema Atlantic yang sedang aktif.</p>
+                  <div className="choice-row bubble-style-choices">
+                    {[['theme', 'Ikuti tema'], ['rounded', 'Bulat'], ['sharp', 'Kotak'], ['glass', 'Glass']].map(([v, label]) => (
+                      <button type="button" key={v} className={settings.bubbleStyle === v ? 'choice selected' : 'choice'} onClick={() => updateSetting('bubbleStyle', v)}>{settings.bubbleStyle === v && <Check size={15} />} {label}</button>
+                    ))}
+                  </div>
+                  <div className="bubble-custom-preview" aria-label="Pratinjau bubble chat">
+                    <span className="bubble-custom-sample">Pesan masuk</span>
+                    <span className="bubble-custom-sample mine">Pesan terkirim</span>
+                  </div>
+                </div>
+                <div className="setting-group">
+                  <h3>Warna bubble chat</h3>
+                  <label className="bubble-color-row"><span><b>Bubble pesan terkirim</b><small>Warna bubble pesan dari kamu.</small></span>
+                    <select value={settings.bubbleMineMode} onChange={e => updateSetting('bubbleMineMode', e.target.value)}><option value="theme">Ikuti tema</option><option value="custom">Warna kustom</option></select>
+                    {settings.bubbleMineMode === 'custom' && <input aria-label="Warna bubble pesan terkirim" type="color" value={settings.bubbleMineColor} onChange={e => updateSetting('bubbleMineColor', e.target.value)} />}
+                  </label>
+                  <label className="bubble-color-row"><span><b>Bubble pesan diterima</b><small>Warna bubble dari orang lain.</small></span>
+                    <select value={settings.bubbleOtherMode} onChange={e => updateSetting('bubbleOtherMode', e.target.value)}><option value="theme">Ikuti tema</option><option value="custom">Warna kustom</option></select>
+                    {settings.bubbleOtherMode === 'custom' && <input aria-label="Warna bubble pesan diterima" type="color" value={settings.bubbleOtherColor} onChange={e => updateSetting('bubbleOtherColor', e.target.value)} />}
+                  </label>
+                </div>
+                <div className="setting-group">
+                  <h3>Warna font chat</h3>
+                  <p>Atur warna tulisan di dalam bubble pesan.</p>
+                  <label className="bubble-color-row"><span><b>Warna tulisan</b><small>Berlaku untuk pesan masuk dan terkirim.</small></span>
+                    <select value={settings.bubbleFontMode} onChange={e => updateSetting('bubbleFontMode', e.target.value)}><option value="theme">Ikuti tema</option><option value="custom">Warna kustom</option></select>
+                    {settings.bubbleFontMode === 'custom' && <input aria-label="Warna font chat" type="color" value={settings.bubbleFontColor} onChange={e => updateSetting('bubbleFontColor', e.target.value)} />}
+                  </label>
                 </div>
                 <div className="setting-group">
                   <h3>Font website</h3><p>Emoji menggunakan fallback emoji bawaan perangkat.</p>
