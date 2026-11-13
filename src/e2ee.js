@@ -136,7 +136,7 @@ export async function ensureE2EEIdentity(supabase, userId) {
       if (restoreError || !restored) {
         throw new Error('Kunci publik perangkat gagal dipulihkan. Jangan kirim pesan terenkripsi sebelum status kunci diperiksa.');
       }
-    } else if (JSON.stringify(profile.e2ee_public_key) !== JSON.stringify(local.publicJwk)) {
+    } else if (canonicalPublicJwk(profile.e2ee_public_key) !== canonicalPublicJwk(local.publicJwk)) {
       throw new Error('Kunci perangkat dan kunci akun tidak cocok. Jangan kirim pesan terenkripsi dari perangkat ini sebelum pemulihan kunci dilakukan.');
     }
     return { userId, privateKey: local.privateKey, publicJwk: local.publicJwk };
