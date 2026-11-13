@@ -36,7 +36,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const {data:people}=await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids);
       setProfiles(Object.fromEntries((people||[]).map(p=>[p.id,p])));
     }else setProfiles({});
-  },[targetId,targetType,user?.id,canCreate]);
+  },[targetId,targetType,user?.id,canCreate,pollId]);
 
   useEffect(()=>{
     load();
@@ -99,7 +99,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       <div className="atl-poll-create-actions"><button type="button" onClick={()=>setShowCreate(false)}>Batal</button><button type="submit" disabled={busy||question.trim().length<3||choices.filter(v=>v.trim()).length<2}>{busy?'Membuat…':'Terbitkan polling'}</button></div>
     </form>}
     {error&&<p className="atl-poll-error">{error}</p>}
-    {!polls.length&&!inline&&!createOnly?<div className="atl-polls-empty"><BarChart3 size={24}/><span>Belum ada polling di sini.</span></div>:polls.map(poll=>{
+    {!createOnly&&(!polls.length&&!inline?<div className="atl-polls-empty"><BarChart3 size={24}/><span>Belum ada polling di sini.</span></div>:polls.map(poll=>{
       const opts=groupedOptions[poll.id]||[];
       const pollVotes=groupedVotes[poll.id]||[];
       const total=pollVotes.length;
@@ -121,6 +121,6 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
         })}</div>
         <footer><span>{total} suara</span><span>{closed?<><Lock size={12}/> {expired&&!poll.closed_at?'Waktu habis':'Ditutup'}</>:'Pilih jawaban · bisa mengubah pilihan'}</span></footer>
       </article>;
-    })}
+    }))}
   </section>;
 }
