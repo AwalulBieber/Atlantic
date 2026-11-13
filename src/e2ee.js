@@ -207,7 +207,7 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
     // A concurrent member may have initialized this conversation first.
     const { data: racedRow, error: racedError } = await supabase
       .from('conversation_e2ee_keys')
-      .select('conversation_id,key_id,shares,created_by')
+      .select('conversation_id,key_id,shares,created_by,member_ids')
       .eq('conversation_id', conversationId)
       .maybeSingle();
     if (racedError || !racedRow) throw new Error('Kunci percakapan gagal dibuat: ' + insertError.message);
