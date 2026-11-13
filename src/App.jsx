@@ -200,16 +200,18 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!session?.user?.id) return;
-    ensureE2EEIdentity(supabase, session.user.id).catch(error => {
+    // A restored browser session has no password in memory; keep its existing
+    // local identity usable, and run automatic backup/restore on explicit login.
+    if (!session?.user?.id || !password) return;
+    ensureE2EEIdentity(supabase, session.user.id, password).catch(error => {
       if (!cancelled) {
         const message = error?.message || 'Terjadi kesalahan yang tidak diketahui.';
         console.warn('Atlantic automatic E2EE setup:', message);
-        setNotice('Penyiapan keamanan otomatis gagal: ' + message);
+        setNotice('Penyiapan/pemulihan keamanan otomatis gagal: ' + message);
       }
     });
     return () => { cancelled = true; };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, password]);
 
   useEffect(() => {
     if (!session?.user?.id || !window.location.search) return;
