@@ -1443,6 +1443,13 @@ export default function App() {
                     }
                     if (!longPressTriggered.current && dx > 6 && dx > Math.abs(dy)) setSwipeState({ id: m.id, offset: Math.min(dx, 92) });
                   }}
+                  onTouchCancel={() => {
+                    if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    messageLongPressTimer.current = null;
+                    longPressTriggered.current = false;
+                    setSwipeState({ id: null, offset: 0 });
+                    setMessageFocusActive(false);
+                  }}
                   onTouchEnd={e => {
                     if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
                     messageLongPressTimer.current = null;
