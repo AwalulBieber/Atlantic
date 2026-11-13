@@ -1717,3 +1717,9 @@ html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32
 .bubble-color-row input[type="color"] { width:38px; height:36px; padding:2px; border:1px solid #999; border-radius:8px; background:transparent; }
 html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 @media(max-width:520px){.bubble-color-row{flex-wrap:wrap}.bubble-color-row>span{flex-basis:100%}.bubble-custom-sample{max-width:44%}}
+
+
+/* Long-press chat actions */
+.chat-row-action-menu{display:flex;align-items:center;gap:5px;flex:0 0 auto;padding:4px 6px;border:1.5px solid var(--ink,#171717);border-radius:10px;background:var(--surface,#fff);box-shadow:2px 2px 0 var(--ink,#171717)}
+.chat-row-action-menu button{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:1.5px solid var(--ink,#171717);border-radius:7px;background:var(--pink,#ff9ec7);color:var(--ink,#171717);font-size:11px;font-weight:850;white-space:nowrap;cursor:pointer}
+.chat-row-action-menu button:last-child{background:var(--surface,#fff)}
