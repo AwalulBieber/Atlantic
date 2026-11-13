@@ -26,7 +26,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     const pollIds=(rows||[]).map(p=>p.id);
     const pollKeys = new Map();
     const visiblePolls = await Promise.all((rows||[]).map(async poll => {
-      if (!e2eeKey) return poll;
+      if (!e2eeKey) return targetType === 'group' ? { ...poll, question: '🔒 Polling terenkripsi belum dapat dibuka di perangkat ini.', decrypt_error: true, is_e2ee: true } : poll;
       try {
         const pollKey = poll.e2ee_key_id && poll.e2ee_key_id !== e2eeKeyId
           ? await getConversationE2EEKeyById(supabase, targetId, poll.e2ee_key_id, user.id)
@@ -43,7 +43,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     ]);
     if(optionError||voteError){setError(optionError?.message||voteError?.message||'Gagal memuat hasil polling.');return;}
     const visibleOptions = await Promise.all((optionRows||[]).map(async option => {
-      if (!e2eeKey) return option;
+      if (!e2eeKey) return targetType === 'group' ? { ...option, label: '🔒 Pilihan terkunci', decrypt_error: true, is_e2ee: true } : option;
       try {
         const optionKey = pollKeys.get(option.poll_id) || e2eeKey;
         return { ...option, label: await decryptE2EEText(optionKey, option.label), is_e2ee: true };
