@@ -262,8 +262,29 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
         p_member_ids: ids
       }
     );
-    if (rotateError || rotated !== true) {
-      throw new Error('Rotasi kunci grup gagal atau sedang dilakukan perangkat lain. Buka ulang chat untuk mencoba lagi.');
+    if (rotateError) {
+      throw new Error('Rotasi kunci grup gagal: ' + rotateError.message);
+    }
+    if (rotated !== true) {
+      // Another active device may have completed the same membership rotation first.
+      const { data: latest, error: latestError } = await supabase
+        .from('conversation_e2ee_keys')
+        .select('key_id,shares,member_ids')
+        .eq('conversation_id', conversationId)
+        .maybeSingle();
+      const latestMembers = [...(latest?.member_ids || [])].sort();
+      const sameMembership = latestMembers.length === currentMembers.length &&
+        latestMembers.every((id, index) => id === currentMembers[index]);
+      const latestEnvelope = latest?.shares?.[userId];
+      const latestSender = latestEnvelope && profileMap.get(latestEnvelope.sender_id);
+      if (latestError || !latest || !sameMembership || !latestEnvelope || !latestSender?.e2ee_public_key) {
+        throw new Error('Rotasi kunci grup sedang berlangsung. Buka ulang chat sebentar lagi.');
+      }
+      const concurrentKey = await unwrapConversationKey(
+        latestEnvelope, identity, latestSender.e2ee_public_key, conversationId, latest.key_id
+      );
+      await writeLocalKey(CONVERSATION_STORE, conversationCacheId(conversationId, latest.key_id), concurrentKey);
+      return concurrentKey;
     }
     const nextKey = await crypto.subtle.importKey('raw', nextRawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
     await writeLocalKey(CONVERSATION_STORE, conversationCacheId(conversationId, nextKeyId), nextKey);
