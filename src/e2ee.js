@@ -166,7 +166,11 @@ export async function ensureE2EEIdentity(supabase, userId) {
 
 export async function ensureConversationE2EE(supabase, conversationId, memberIds, userId) {
   const identity = await ensureE2EEIdentity(supabase, userId);
-  const ids = [...new Set([userId, ...(memberIds || [])].filter(Boolean))];
+  const { data: liveMembers, error: memberError } = await supabase
+    .from('conversation_members').select('user_id').eq('conversation_id', conversationId);
+  if (memberError) throw new Error('Daftar anggota chat gagal diverifikasi: ' + memberError.message);
+  const verifiedMemberIds = (liveMembers || []).map(member => member.user_id);
+  const ids = [...new Set([userId, ...(verifiedMemberIds.length ? verifiedMemberIds : (memberIds || []))].filter(Boolean))];
   const { data: profiles, error: profileError } = await supabase
     .from('profiles').select('id,e2ee_public_key').in('id', ids);
   if (profileError) throw new Error('Kunci anggota chat gagal dimuat: ' + profileError.message);
