@@ -278,13 +278,15 @@ export default function App() {
 
   async function loadMyProfile() {
     if (!session?.user?.id) return;
-    const [{ data, error }, { data: isAdmin, error: badgeError }] = await Promise.all([
-      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified,is_blocked,blocked_reason,read_receipts_enabled,show_online_status').eq('id', session.user.id).maybeSingle(),
-      supabase.rpc('is_atlantic_admin', { target_user: session.user.id })
+    const [{ data, error }, { data: isAdmin, error: badgeError }, { data: moderationRows, error: moderationError }] = await Promise.all([
+      supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified,read_receipts_enabled,show_online_status').eq('id', session.user.id).maybeSingle(),
+      supabase.rpc('is_atlantic_admin', { target_user: session.user.id }),
+      supabase.rpc('get_my_profile_moderation_state')
     ]);
     if (!error && data) {
+      const moderation = !moderationError ? moderationRows?.[0] : null;
       const isPrimaryAdmin = session.user.email?.toLowerCase() === 'awalulhakim94@gmail.com';
-      setMyProfile({ ...data, is_admin: isAdmin === true || (!badgeError && isAdmin === true) || isPrimaryAdmin });
+      setMyProfile({ ...data, is_blocked: moderation?.is_blocked === true, blocked_reason: moderation?.blocked_reason || null, is_admin: isAdmin === true || (!badgeError && isAdmin === true) || isPrimaryAdmin });
     }
   }
 
