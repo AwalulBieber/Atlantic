@@ -1521,3 +1521,85 @@ html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32
   .atl-poll-card{padding:8px}
 }
 
+
+
+/* Instagram-inspired compact Notes: note bubble floats above the profile avatar. */
+@media(max-width:700px){
+  .atl-note-bubbles{
+    display:flex!important;
+    align-items:flex-end!important;
+    gap:10px!important;
+    padding:10px 2px 14px!important;
+    overflow-x:auto!important;
+  }
+  .atl-note-bubble{
+    position:relative!important;
+    display:flex!important;
+    flex:0 0 104px!important;
+    width:104px!important;
+    min-width:104px!important;
+    flex-direction:column-reverse!important;
+    align-items:center!important;
+    justify-content:flex-end!important;
+    gap:6px!important;
+  }
+  .atl-note-bubble>.atl-note-avatar{
+    width:48px!important;
+    min-width:48px!important;
+    max-width:48px!important;
+    height:48px!important;
+    min-height:48px!important;
+    max-height:48px!important;
+    flex:0 0 48px!important;
+    border-width:2px!important;
+    font-size:17px!important;
+  }
+  .atl-note-bubble>.atl-note-content{
+    width:100%!important;
+    min-height:0!important;
+    padding:7px 7px 6px!important;
+    border-width:1.5px!important;
+    border-radius:12px!important;
+    box-shadow:2px 2px 0 var(--ink)!important;
+    text-align:center!important;
+  }
+  .atl-note-bubble>.atl-note-content:before{
+    top:auto!important;
+    bottom:-6px!important;
+    left:calc(50% - 5px)!important;
+    width:9px!important;
+    height:9px!important;
+    transform:rotate(225deg)!important;
+    border-width:1.5px 0 0 1.5px!important;
+  }
+  .atl-note-bubble>.atl-note-content>b{
+    display:block!important;
+    margin:0 0 3px!important;
+    font-size:9px!important;
+    line-height:1.2!important;
+  }
+  .atl-note-bubble>.atl-note-content>p{
+    margin:0!important;
+    font-size:10px!important;
+    line-height:1.25!important;
+    -webkit-line-clamp:2!important;
+  }
+  .atl-note-bubble>.atl-note-content>small{
+    display:block!important;
+    margin-top:3px!important;
+    font-size:8px!important;
+    line-height:1.1!important;
+  }
+  .atl-note-bubble>.atl-note-delete{
+    top:auto!important;
+    right:2px!important;
+    bottom:43px!important;
+    width:18px!important;
+    height:18px!important;
+    min-width:18px!important;
+    padding:0!important;
+    border-width:1.5px!important;
+    font-size:12px!important;
+    line-height:1!important;
+  }
+}
