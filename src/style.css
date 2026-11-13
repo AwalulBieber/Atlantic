@@ -938,3 +938,30 @@ html[data-animations="off"] :where(a,button,input,select,textarea,[role="button"
   .atl-attachment-menu{left:11px;bottom:calc(72px + env(safe-area-inset-bottom));width:min(264px,calc(100% - 22px));}
 }
 @media(prefers-reduced-motion:reduce){.atl-attachment-menu{animation:none}}
+
+
+/* Date separators in the conversation timeline */
+.atl-chat-day-separator {
+  position: absolute;
+  z-index: 2;
+  top: -17px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border: 1.5px solid #171717;
+  border-radius: 999px;
+  background: #fff1a8;
+  color: #252525;
+  box-shadow: 2px 2px 0 #171717;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+html[data-theme="dark"] .atl-chat-day-separator {
+  background: #3b414c;
+  color: #fff;
+  border-color: #f4f1e8;
+  box-shadow: 2px 2px 0 #f4f1e8;
+}
