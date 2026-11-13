@@ -255,7 +255,7 @@ export function ensureE2EEIdentity(supabase, userId, password) {
         createOrLoadE2EEIdentity(supabase, userId, password)
       );
     }
-    return createOrLoadE2EEIdentity(supabase, userId);
+    return createOrLoadE2EEIdentity(supabase, userId, password);
   };
   const setup = runSetup().finally(() => {
     if (identitySetupPromises.get(userId) === setup) identitySetupPromises.delete(userId);
@@ -577,8 +577,8 @@ export async function restoreE2EEIdentityFromBackup(supabase, userId, passphrase
   if (profileError) throw new Error('Kunci publik gagal dimuat: ' + profileError.message);
   if (backupError) throw new Error('Cadangan pemulihan gagal dimuat: ' + backupError.message);
   const backup = row?.backup;
-  if (!backup || backup.version !== 1 || backup.kdf !== 'PBKDF2-SHA256' ||
-      Number(backup.iterations) !== 600000 ||
+  if (!backup || ![1, 2].includes(backup.version) || backup.kdf !== 'PBKDF2-SHA256' ||
+      Number(backup.iterations) < 100000 ||
       !backup.salt || !backup.iv || !backup.ciphertext ||
       !backup.publicJwk?.x || !backup.publicJwk?.y) {
     throw new Error('Cadangan pemulihan tidak ditemukan atau formatnya tidak didukung.');
