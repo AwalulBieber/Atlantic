@@ -396,7 +396,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
               <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>
               <button type="button" disabled={recoveryBusy} onClick={verifyRecoveryBackup}>{recoveryBusy ? "Memeriksa…" : "Verifikasi kunci & cadangan"}</button>
             </>}
-            {recoveryBackupVersion === 1 && e2eeIdentityExists && !hasLocalIdentity && (
+            {isAdmin && recoveryBackupVersion === 1 && e2eeIdentityExists && !hasLocalIdentity && (
               <div className="atl-e2ee-recovery-reset">
                 <b>Perangkat lama tidak tersedia?</b>
                 <p>Reset membuat identitas baru. Pesan lama yang terenkripsi mungkin tidak dapat dibuka lagi. Cadangan lama tetap disimpan sebagai arsip.</p>
