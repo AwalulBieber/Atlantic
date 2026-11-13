@@ -75,7 +75,6 @@ button:focus-visible, input:focus-visible { outline: 3px dashed #2468a2; outline
 .chat-head { background: var(--blue); }
 .chat-head > div:nth-child(3) { flex: 1; }
 .chat-person small { color: #444; }
-.atl-chat-brand { display:block; margin-bottom:2px; font-size:8px; line-height:1; font-weight:900; letter-spacing:1.7px; color:var(--muted,#64748b); }
 .messages {
   flex: 1; overflow: auto; padding: 24px clamp(14px,5vw,64px);
   background-color: #f7f4e9;
