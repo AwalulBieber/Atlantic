@@ -964,19 +964,28 @@ export default function App() {
             incoming.replyPreview.senderProfile = replyProfile || null;
           }
         }
+        // Render the incoming message first. Receipt updates must never block
+        // the chat UI or throw before the message is appended.
+        setMessages(old => old.some(m => m.id === incoming.id) ? old : [...old, incoming]);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+
         if (incoming.sender_id !== session.user.id) {
-          const { error: receiptError } = await supabase.rpc('record_atlantic_message_receipts', {
+          void supabase.rpc('record_atlantic_message_receipts', {
             p_conversation_ids: null,
             p_message_ids: [incoming.id],
             p_mark_read: myProfile?.read_receipts_enabled !== false
-          });
-          if (!receiptError) {
-            incoming.delivered_at = now;
-            if (receipt.read_at) incoming.read_at = now;
-          }
+          }).then(({ data: receiptRows, error: receiptError }) => {
+            if (receiptError) {
+              console.warn('Atlantic message receipt:', receiptError.message);
+              return;
+            }
+            const receiptRow = Array.isArray(receiptRows) ? receiptRows[0] : receiptRows;
+            if (!receiptRow) return;
+            setMessages(current => current.map(item => item.id === incoming.id
+              ? { ...item, delivered_at: receiptRow.delivered_at || item.delivered_at, read_at: receiptRow.read_at || item.read_at }
+              : item));
+          }).catch(error => console.warn('Atlantic message receipt:', error?.message || error));
         }
-        setMessages(old => old.some(m => m.id === incoming.id) ? old : [...old, incoming]);
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${active.conversation_id}` }, payload => {
         setMessages(old => old.map(m => m.id === payload.new.id ? { ...m, delivered_at: payload.new.delivered_at, read_at: payload.new.read_at } : m));
