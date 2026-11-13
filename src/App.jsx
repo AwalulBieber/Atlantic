@@ -130,6 +130,7 @@ export default function App() {
   const [forwardingMessageId, setForwardingMessageId] = useState(null);
   const [messageReactions, setMessageReactions] = useState([]);
   const [messageActionTarget, setMessageActionTarget] = useState(null);
+  const [messageFocusActive, setMessageFocusActive] = useState(false);
   const [messageInfoTarget, setMessageInfoTarget] = useState(null);
   const [mobileChat, setMobileChat] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1413,15 +1414,15 @@ export default function App() {
             <div className={`atl-e2ee-banner ${e2eeStatus.state === 'active' ? 'is-secure' : 'is-pending'}`} role="status">
               <Lock size={15}/><span>{e2eeStatus.state === 'active' ? <><b>Enkripsi End-to-end</b><small className="atl-e2ee-scope">Perlindungan ini berlaku untuk pesan, lampiran, dan polling grup baru setelah status E2EE aktif. Pesan lama yang dikirim sebelum enkripsi aktif mungkin belum terenkripsi. Server masih dapat melihat metadata seperti anggota, waktu, dan aktivitas pesan.</small><small className="atl-e2ee-scope">Kunci privat hanya tersimpan di perangkat ini. Jangan hapus data browser atau pindah perangkat sebelum kunci dipulihkan.</small>{e2eeFingerprints.length > 0 && <small className="atl-e2ee-fingerprints">Kode verifikasi kunci (cocokkan langsung dengan anggota): {e2eeFingerprints.map(item => item.name + ' — ' + item.fingerprint).join(' · ')}</small>}</> : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
             </div>
-            <div className={`messages ${messageActionTarget ? 'has-message-focus' : ''}`}>
-              {messageActionTarget && <button type="button" className="atl-message-focus-backdrop" aria-label="Tutup menu pesan" onClick={() => setMessageActionTarget(null)}/>}
+            <div className={`messages ${messageFocusActive && messageActionTarget ? 'has-message-focus' : ''}`}>
+              {messageActionTarget && <button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/ >}
               {messages.map((m, messageIndex) => (
                 <div
                   className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${messageActionTarget === m.id ? 'message-focused' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
                   key={m.id}
                   id={`message-${m.id}`}
                   style={swipeState.id === m.id ? { transform: `translateX(${swipeState.offset}px)` } : undefined}
-                  onContextMenu={e => { e.preventDefault(); setMessageActionTarget(m.id); }}
+                  onContextMenu={e => { e.preventDefault(); setMessageActionTarget(m.id); setMessageFocusActive(false); }}
                   onTouchStart={e => {
                     touchStartX.current = e.touches[0].clientX;
                     touchStartY.current = e.touches[0].clientY;
@@ -1431,6 +1432,7 @@ export default function App() {
                       longPressTriggered.current = true;
                       setSwipeState({ id: null, offset: 0 });
                       setMessageActionTarget(m.id);
+                      setMessageFocusActive(true);
                       if (navigator.vibrate) navigator.vibrate(18);
                     }, 520);
                   }}
@@ -1445,6 +1447,7 @@ export default function App() {
                   onTouchEnd={e => {
                     if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
                     messageLongPressTimer.current = null;
+                    setMessageFocusActive(false);
                     const dx = e.changedTouches[0].clientX - touchStartX.current;
                     const dy = e.changedTouches[0].clientY - touchStartY.current;
                     if (!longPressTriggered.current && dx > 65 && dx > Math.abs(dy)) {
@@ -1487,7 +1490,7 @@ export default function App() {
                       <button type="button" role="menuitem" onClick={() => { setDeleteTarget(m); setMessageActionTarget(null); }}><Trash2/>Hapus</button>
                       <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><BookmarkCheck/>Simpan ke Cloud</button>
                     </div>}
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={savedMessages.some(item => item.message_id === m.id) ? 'message-save-btn is-saved' : 'message-save-btn'} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={m.read_at ? 'message-status is-read' : m.delivered_at ? 'message-status is-delivered' : 'message-status is-sent'} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim ke perangkat penerima' : 'Terkirim dari perangkat ini'} aria-label={m.read_at ? 'Pesan dibaca' : m.delivered_at ? 'Pesan diterima' : 'Pesan dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-menu-trigger" onClick={() => setMessageActionTarget(current => current === m.id ? null : m.id)} aria-label="Menu pesan" aria-expanded={messageActionTarget === m.id}><MoreHorizontal size={16}/></button></div>
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={savedMessages.some(item => item.message_id === m.id) ? 'message-save-btn is-saved' : 'message-save-btn'} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={m.read_at ? 'message-status is-read' : m.delivered_at ? 'message-status is-delivered' : 'message-status is-sent'} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim ke perangkat penerima' : 'Terkirim dari perangkat ini'} aria-label={m.read_at ? 'Pesan dibaca' : m.delivered_at ? 'Pesan diterima' : 'Pesan dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-menu-trigger" onClick={() => { setMessageActionTarget(current => current === m.id ? null : m.id); setMessageFocusActive(false); }} aria-label="Menu pesan" aria-expanded={messageActionTarget === m.id}><MoreHorizontal size={16}/></button></div>
                   </div>
                 </div>
               ))}
