@@ -24,3 +24,18 @@
 .atl-admin-channel>button.show{background:#b8f36b}
 .atl-admin-channel>button:disabled{opacity:.5}
 @media(max-width:640px){.atl-admin-channel{flex-wrap:wrap}.atl-admin-channel-info{min-width:calc(100% - 54px)}.atl-admin-channel>button{flex:1}.atl-admin-channel>.atl-admin-status{margin-left:50px}}
+
+/* Admin console inherits the active Atlantic theme */
+html[data-skin] .atl-admin-panel{background:var(--surface-strong,#fffdf5);color:var(--ink,#171717);border-color:var(--line-color,#171717);box-shadow:var(--hard-shadow,9px 9px 0 #171717)}
+html[data-skin] .atl-admin-header{background:var(--accent);color:var(--ink);border-color:var(--line-color)}
+html[data-skin] .atl-admin-stats,html[data-skin] .atl-admin-tabs,html[data-skin] .atl-admin-footer{background:var(--surface);color:var(--ink);border-color:var(--line-color)}
+html[data-skin] .atl-admin-stats article,html[data-skin] .atl-admin-user,html[data-skin] .atl-admin-request,html[data-skin] .atl-admin-channel{background:var(--surface-strong);color:var(--ink);border-color:var(--line-color);box-shadow:var(--hard-shadow)}
+html[data-skin] .atl-admin-tabs button{color:var(--ink)}
+html[data-skin] .atl-admin-tabs button.active{background:var(--accent);color:#171717;border-color:var(--line-color)}
+html[data-skin] .atl-admin-search{background:var(--surface-strong);border-color:var(--line-color)}
+html[data-skin] .atl-admin-search input{color:var(--ink)}
+html[data-skin] .atl-admin-request textarea{background:var(--surface-strong);color:var(--ink);border-color:var(--line-color)}
+html[data-skin="cyberpunk"] .atl-admin-panel{background:#111a2d;color:#e7f8ff}
+html[data-skin="cyberpunk"] .atl-admin-header{background:#17233b;color:#e7f8ff}
+html[data-skin="cyberpunk"] .atl-admin-stats,html[data-skin="cyberpunk"] .atl-admin-tabs,html[data-skin="cyberpunk"] .atl-admin-footer{background:#0d1628;color:#e7f8ff}
+html[data-skin="cyberpunk"] .atl-admin-user-info span,html[data-skin="cyberpunk"] .atl-admin-user-info small,html[data-skin="cyberpunk"] .atl-admin-request-top span:not(.atl-admin-status),html[data-skin="cyberpunk"] .atl-admin-request>small{color:#9ab4ca}
