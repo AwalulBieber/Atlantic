@@ -31,7 +31,7 @@ begin
   end if;
 
   insert into public.conversation_members (conversation_id, user_id, role)
-  values (v_conversation_id, v_user_id, 'owner')
+  values (v_conversation_id, v_user_id, 'member')
   on conflict (conversation_id, user_id) do nothing;
 
   return v_conversation_id;
