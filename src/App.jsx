@@ -634,6 +634,10 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (active && e2eeStatus.state === 'active') loadMessages(active.conversation_id);
+  }, [active?.conversation_id, e2eeStatus.state]);
+
+  useEffect(() => {
     if (!active || !session) return;
     loadMessages(active.conversation_id);
     const channel = supabase
