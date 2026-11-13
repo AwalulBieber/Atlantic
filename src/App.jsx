@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ensureConversationE2EE, encryptE2EEText, decryptE2EEText, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage } from './e2ee';
+import { ensureConversationE2EE, encryptE2EEText, decryptE2EEText, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById } from './e2ee';
 import { supabase, configReady } from './supabase';
 import AtlanticAccountSettings from './components/AtlanticAccountSettings';
 import AtlanticCommunity from './components/AtlanticCommunity';
@@ -95,6 +95,7 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [e2eeStatus, setE2eeStatus] = useState({ state: 'loading', error: '' });
   const e2eeKeyRef = useRef(null);
+  const e2eeKeyIdRef = useRef(null);
   const [draft, setDraft] = useState('');
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [attachmentPreview, setAttachmentPreview] = useState('');
@@ -573,11 +574,15 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     e2eeKeyRef.current = null;
+    e2eeKeyIdRef.current = null;
     if (!active || !session?.user?.id) { setE2eeStatus({ state: 'loading', error: '' }); return; }
     setE2eeStatus({ state: 'loading', error: '' });
     const memberIds = active.is_group ? (active.members || []).map(member => member.id).filter(Boolean) : [active.person?.id].filter(Boolean);
     ensureConversationE2EE(supabase, active.conversation_id, memberIds, session.user.id)
-      .then(key => { if (!cancelled) { e2eeKeyRef.current = key; setE2eeStatus({ state: 'active', error: '' }); } })
+      .then(async key => {
+        const keyId = await getCurrentConversationE2EEKeyId(supabase, active.conversation_id);
+        if (!cancelled) { e2eeKeyRef.current = key; e2eeKeyIdRef.current = keyId; setE2eeStatus({ state: 'active', error: '' }); }
+      })
       .catch(error => { if (!cancelled) { e2eeKeyRef.current = null; setE2eeStatus({ state: 'unavailable', error: error.message || 'Kunci E2EE belum siap.' }); } });
     return () => { cancelled = true; e2eeKeyRef.current = null; };
   }, [active?.conversation_id, session?.user?.id]);
@@ -588,7 +593,7 @@ export default function App() {
     if (markReadError) console.warn('Atlantic mark read:', markReadError.message);
     const { data, error } = await supabase
       .from('messages')
-      .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at,media_url,media_type,media_name')
+      .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at,media_url,media_type,media_name,e2ee_key_id')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true });
     if (error) {
@@ -606,7 +611,10 @@ export default function App() {
       let next = message;
       if (e2eeKeyRef.current && typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')) {
         try {
-          const payload = await decryptE2EEMessage(e2eeKeyRef.current, message.body);
+          const messageKey = message.e2ee_key_id && message.e2ee_key_id !== e2eeKeyIdRef.current
+            ? await getConversationE2EEKeyById(supabase, id, message.e2ee_key_id, session.user.id)
+            : e2eeKeyRef.current;
+          const payload = await decryptE2EEMessage(messageKey, message.body);
           next = { ...next, body: payload.text || '', e2eeAttachment: payload.attachment || null, is_e2ee: true };
         } catch { next = { ...next, body: '🔒 Tidak dapat membuka pesan ini di perangkat ini.', is_e2ee: true, decrypt_error: true }; }
       }
@@ -671,7 +679,10 @@ export default function App() {
         const incoming = payload.new;
         if (e2eeKeyRef.current && typeof incoming.body === 'string' && incoming.body.startsWith('ATL-E2EE1:')) {
           try {
-            const payload = await decryptE2EEMessage(e2eeKeyRef.current, incoming.body);
+            const messageKey = incoming.e2ee_key_id && incoming.e2ee_key_id !== e2eeKeyIdRef.current
+              ? await getConversationE2EEKeyById(supabase, active.conversation_id, incoming.e2ee_key_id, session.user.id)
+              : e2eeKeyRef.current;
+            const payload = await decryptE2EEMessage(messageKey, incoming.body);
             incoming.body = payload.text || '';
             incoming.e2eeAttachment = payload.attachment || null;
             incoming.is_e2ee = true;
