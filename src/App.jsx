@@ -12,7 +12,7 @@ import AtlanticPolls from './components/AtlanticPolls';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
-  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck,
+  Clock3, Radio, Phone, Video, NotebookPen, ImagePlus, BarChart3, BadgeCheck, Trash2, Reply, CheckCheck, Lock,
   Image as ImageIcon, FileText, MapPin, Crosshair, WandSparkles, EyeOff, CalendarClock, Forward, MoreHorizontal, Languages, Pin, Copy, Info, Pencil
 } from 'lucide-react';
 
@@ -505,7 +505,6 @@ export default function App() {
     setCreateMenuOpen(false);
     const {count:pendingInvites}=await supabase.from('atlantic_group_invitations').select('id',{count:'exact',head:true}).eq('conversation_id',conversationId).eq('status','pending');
     setNotice(pendingInvites ? `Grup dibuat. ${pendingInvites} undangan menunggu persetujuan.` : 'Grup berhasil dibuat. Mulai percakapan sekarang!');
-    await loadMessages(conversationId);
     await loadProfiles();
     setGroupBusy(false);
   }
@@ -532,7 +531,6 @@ export default function App() {
     setActive({ conversation_id: group.conversation_id, person: group.person, is_group: true, title: group.title, pinned_message_id:group.pinned_message_id, members: group.members || [] });
     setReplyTarget(null);
     setMobileChat(true);
-    await loadMessages(group.conversation_id);
   }
 
   async function loadSavedMessages() {
@@ -811,7 +809,6 @@ export default function App() {
 
   useEffect(() => {
     if (!active || !session) return;
-    loadMessages(active.conversation_id);
     const channel = supabase
       .channel('chat-' + active.conversation_id)
       .on('postgres_changes', {
