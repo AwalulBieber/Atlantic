@@ -48,6 +48,17 @@ function relativeTime(value) {
   return new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
+function inboxDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return time(value);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return 'Kemarin';
+  return date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
 const DEFAULT_SETTINGS = {
   theme: 'light', accent: 'yellow', font: 'ios',
   textSize: 'medium', fps: '60', animations: true
@@ -115,6 +126,7 @@ export default function App() {
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [unread, setUnread] = useState({});
   const [inboxSummaries, setInboxSummaries] = useState([]);
+  const [latestMessages, setLatestMessages] = useState({});
   const [incomingNotice, setIncomingNotice] = useState(null);
   const [callIntent, setCallIntent] = useState(null);
   const [activeTab, setActiveTab] = useState('chat');
@@ -404,6 +416,7 @@ export default function App() {
   const validChatRows=chatRows.filter(Boolean);
   setChats(validChatRows);
   void refreshInboxSummaries();
+  void loadLatestMessages(ids);
   return validChatRows;
   }
 
@@ -417,6 +430,25 @@ export default function App() {
     const summaries = data || [];
     setInboxSummaries(summaries);
     setUnread(Object.fromEntries(summaries.map(item => [item.conversation_id, Number(item.unread_count) || 0])));
+  }
+
+  async function loadLatestMessages(conversationIds) {
+    const ids = [...new Set((conversationIds || []).filter(Boolean))];
+    if (!ids.length) return;
+    const { data, error } = await supabase.from('messages')
+      .select('id,conversation_id,sender_id,body,created_at,media_url,media_type')
+      .in('conversation_id', ids)
+      .order('created_at', { ascending: false })
+      .limit(1000);
+    if (error) {
+      console.warn('Atlantic latest messages:', error.message);
+      return;
+    }
+    const latest = {};
+    for (const message of data || []) {
+      if (!latest[message.conversation_id]) latest[message.conversation_id] = message;
+    }
+    setLatestMessages(current => ({ ...current, ...latest }));
   }
 
   async function loadGroupUsers() {
@@ -803,8 +835,9 @@ export default function App() {
         event: 'INSERT', schema: 'public', table: 'messages'
       }, async payload => {
         const message = payload.new;
-        if (!message || message.sender_id === session.user.id ||
-            seenMessages.current.has(message.id)) return;
+        if (!message) return;
+        void loadLatestMessages([message.conversation_id]);
+        if (message.sender_id === session.user.id || seenMessages.current.has(message.id)) return;
         seenMessages.current.add(message.id);
         if (active?.conversation_id === message.conversation_id) return;
 
@@ -1066,20 +1099,6 @@ export default function App() {
 
         <div className="chat-list-tabs"><button className={!showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(false); setShowSaved(false); }}>Semua chat</button><button className={showArchived && !showSaved ? 'active' : ''} onClick={() => { setShowArchived(true); setShowSaved(false); }}><Archive size={14}/> Arsip {archivedIds.length ? `(${archivedIds.length})` : ''}</button><button className={showSaved ? 'active' : ''} onClick={() => { setShowSaved(true); loadSavedMessages(); }}><Bookmark size={14}/> Tersimpan</button></div>
         <AtlanticGroupInvitations user={session.user} onNotice={setNotice} onAccepted={async conversationId=>{const updated=await loadProfiles();const joined=updated?.find(item=>item.conversation_id===conversationId);if(joined)openGroupChat(joined);}} />
-        {!showSaved && !showArchived && visibleInboxSummaries.length > 0 && <section className="atl-inbox-summary" aria-label="Pesan belum dibaca">
-          <header><b>Pesan belum dibaca</b><span>{visibleInboxSummaries.reduce((total, item) => total + (Number(item.unread_count) || 0), 0)} total</span></header>
-          {visibleInboxSummaries.map(item => {
-            const chat = chats.find(entry => entry.conversation_id === item.conversation_id);
-            if (!chat) return null;
-            const sender = chat.is_group ? chat.members?.find(member => member.id === item.latest_sender_id) : chat.person;
-            const preview = typeof item.latest_body === 'string' && item.latest_body.startsWith('ATL-E2EE1:') ? '🔒 Pesan terenkripsi' : (item.latest_body || (item.latest_media_type?.startsWith('image/') ? 'Foto' : item.latest_media_type?.startsWith('video/') ? 'Video' : 'Lampiran'));
-            return <button type="button" className="atl-inbox-summary-row" key={item.conversation_id} onClick={() => chat.is_group ? openGroupChat(chat) : openChat(chat.person)}>
-              <span className="atl-inbox-summary-avatar">{chat.person.avatar_url ? <img src={chat.person.avatar_url} alt=""/> : chat.is_group ? <Users size={16}/> : initials(chat.person.display_name || chat.person.username)}</span>
-              <span className="atl-inbox-summary-copy"><b>{chat.person.display_name || chat.person.username}</b><small>{chat.is_group && sender ? sender.display_name || sender.username || 'Anggota' : ''}{chat.is_group && sender ? ': ' : ''}{preview}</small></span>
-              <span className="atl-inbox-summary-meta"><small>{item.latest_created_at ? relativeTime(item.latest_created_at) : ''}</small><i>{item.unread_count}</i></span>
-            </button>;
-          })}
-        </section>}
         <div className="section-title"><span>{showSaved ? 'Pesan Tersimpan' : showArchived ? 'Arsip Chat' : 'Chat'}</span><span className="count-tag">{showSaved ? savedMessages.length : filtered.length}</span></div>
         <div className="people">
   {showSaved ? (savedBusy ? <p className="empty">Memuat pesan tersimpan…</p> : savedMessages.map(item => {
@@ -1099,10 +1118,20 @@ export default function App() {
         </div>
         <div className="person-info">
           <b>{c.person.display_name || c.person.username}{c.is_group && c.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_admin ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={14}/></span> : c.person.is_verified && <span className="atl-inline-verified atl-user-verified" title="Terverifikasi"><BadgeCheck size={14}/></span>}</b>
-          <small>Ketuk untuk membuka chat</small>
+          <small className="person-preview">{(() => {
+            const latest = latestMessages[c.conversation_id];
+            if (!latest) return 'Belum ada pesan';
+            let preview = typeof latest.body === 'string' && latest.body.startsWith('ATL-E2EE1:') ? '🔒 Pesan terenkripsi' : latest.body;
+            if (typeof preview === 'string' && preview.startsWith('[[ATLANTIC_POLL:')) preview = '📊 Polling';
+            if (!preview) preview = latest.media_type?.startsWith('image/') ? '📷 Foto' : latest.media_type?.startsWith('video/') ? '🎥 Video' : latest.media_url ? '📎 Lampiran' : 'Pesan';
+            const sender = c.is_group && latest.sender_id !== session.user.id ? c.members?.find(member => member.id === latest.sender_id) : null;
+            return <>{latest.sender_id === session.user.id ? 'Kamu: ' : sender ? (sender.display_name || sender.username) + ': ' : ''}{preview}</>;
+          })()}</small>
         </div>
-        {(unread[c.conversation_id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.conversation_id] || 0) + ' pesan belum dibaca'}>{(unread[c.conversation_id] || 0) > 99 ? '99+' : unread[c.conversation_id]}</span>}
-        <MessageCircle size={17} />
+        <div className="person-meta">
+          <small>{inboxDate(latestMessages[c.conversation_id]?.created_at)}</small>
+          {(unread[c.conversation_id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.conversation_id] || 0) + ' pesan belum dibaca'}>{(unread[c.conversation_id] || 0) > 99 ? '99+' : unread[c.conversation_id]}</span>}
+        </div>
       </button>
       <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
     </div>
