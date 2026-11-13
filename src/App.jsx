@@ -1061,9 +1061,12 @@ export default function App() {
   const visibleChats = chats.filter(c => archivedIds.includes(c.conversation_id) === showArchived);
   const visibleInboxSummaries = inboxSummaries.filter(item => !archivedIds.includes(item.conversation_id));
   const filtered = visibleChats.filter(c =>
-  (c.person.display_name || c.person.username || '')
-    .toLowerCase().includes(search.toLowerCase())
-);
+    (c.person.display_name || c.person.username || '')
+      .toLowerCase().includes(search.toLowerCase())
+  ).sort((a, b) =>
+    new Date(latestMessages[b.conversation_id]?.created_at || 0).getTime() -
+    new Date(latestMessages[a.conversation_id]?.created_at || 0).getTime()
+  );
 
   return (
     <main className={`app-shell tab-${activeTab}`}>
