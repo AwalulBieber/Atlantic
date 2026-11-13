@@ -1463,3 +1463,9 @@ html[data-skin="cyberpunk"] .me small,html[data-skin="cyberpunk"] .chat-head sma
 html[data-animations="off"] *,html[data-animations="off"] *::before,html[data-animations="off"] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 @media(prefers-reduced-motion:reduce){.person,.bottom-nav,.settings-modal,.atl-settings,.atl-admin-panel,.atl-dialog-card{animation:none!important}}
 @media(max-width:520px){.theme-choice-grid{grid-template-columns:1fr}.theme-choice{min-height:60px}}
+
+.atl-typing-row{display:flex;justify-content:flex-start;margin:8px 0 12px;padding-left:4px;animation:atl-surface-enter .18s ease both}
+.atl-typing-row .typing-indicator{padding:8px 12px;border:1px solid color-mix(in srgb,#1685d8 22%,transparent);border-radius:15px 15px 15px 4px;background:var(--surface-strong,#fff);box-shadow:var(--hard-shadow);font-size:11px}
+.message-status.is-delivered{color:#64748b;background:rgba(100,116,139,.12)}
+.message-status.is-sent{color:#8b95a3}
+html[data-skin="cyberpunk"] .atl-typing-row .typing-indicator{background:#121d32;border-color:#00e5ff;color:#00e5ff}
