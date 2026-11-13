@@ -1120,3 +1120,62 @@ html[data-theme="dark"] .atl-message-reactions button.is-mine{background:#263e5c
 .atl-group-invites-avatar img{width:100%;height:100%;object-fit:cover}
 .atl-group-invites-head-actions{display:flex;align-items:center;gap:7px}
 .atl-group-invites-head-actions button{display:grid;place-items:center;width:34px;height:34px;border:2px solid var(--ink);border-radius:8px;background:var(--panel,#fff);color:var(--ink)}
+
+
+/* Channel room: group-chat layout with a centered message lane */
+.atl-channel-view{
+  width:min(100%,1040px);max-width:1040px;min-height:calc(100dvh - 150px);
+  margin:0 auto 24px;display:flex;flex-direction:column;gap:0;
+  border:1.5px solid var(--line,var(--ink));border-radius:18px;
+  overflow:hidden;background:var(--panel,#fffdf5);
+}
+.atl-channel-view>.atl-channel-back{
+  align-self:flex-start;margin:10px 14px 0;padding:7px 10px;
+  border:1px solid var(--line,var(--ink));border-radius:9px;background:transparent;
+}
+.atl-channel-profile-head{
+  position:relative;z-index:2;display:flex;align-items:center;gap:13px;
+  padding:14px 18px;border:0;border-bottom:1.5px solid var(--line,var(--ink));
+  border-radius:0;background:var(--paper,var(--panel,#fffdf5));box-shadow:none;
+}
+.atl-channel-profile-avatar{border-radius:50%;width:52px;height:52px;flex-basis:52px;border:1px solid var(--line,var(--ink))}
+.atl-channel-profile-head h2{font-size:17px!important}
+.atl-channel-profile-head p{margin:3px 0}
+.atl-channel-posts{
+  width:min(100%,760px);box-sizing:border-box;flex:1;min-height:42vh;
+  margin:0 auto;padding:22px 18px 28px;display:flex;flex-direction:column;
+  align-items:stretch;gap:14px;overflow:visible;
+}
+.atl-channel-posts article{
+  width:min(88%,620px);box-sizing:border-box;align-self:flex-start;
+  border:1px solid var(--line,var(--ink));border-radius:16px;
+  background:var(--paper,var(--panel,#fffdf5));box-shadow:0 2px 8px #0000000a;
+  padding:13px 15px;
+}
+.atl-channel-post-author{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12px}
+.atl-channel-post-author>span{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:var(--accent);font-weight:900}
+.atl-channel-post-author img{width:100%;height:100%;object-fit:cover}
+.atl-channel-posts article p{margin:8px 0;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.atl-channel-posts article>small{display:block;margin-top:8px;text-align:right}
+.atl-channel-posts .atl-channel-media{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:12px}
+.atl-channel-compose{
+  position:sticky;bottom:0;z-index:5;width:min(100%,760px);box-sizing:border-box;
+  margin:0 auto;padding:12px 16px 14px;background:var(--panel,#fffdf5);
+  border-top:1px solid var(--line,var(--ink));
+}
+.atl-channel-readonly-note{
+  width:min(100%,760px);box-sizing:border-box;margin:0 auto;padding:13px 16px;
+  border-top:1px solid var(--line,var(--ink));background:var(--panel,#fffdf5);
+  color:var(--muted,#777);font-size:12px;text-align:center;
+}
+.atl-channel-owner-actions{margin-left:auto}
+.atl-channel-invite-settings,.atl-channel-invite-link{width:min(100%,760px);box-sizing:border-box;margin:10px auto}
+@media(max-width:700px){
+  .atl-channel-view{width:100%;min-height:calc(100dvh - 110px);border-radius:12px}
+  .atl-channel-profile-head{padding:12px}
+  .atl-channel-posts{width:100%;padding:16px 11px 22px}
+  .atl-channel-posts article{width:94%;padding:12px}
+  .atl-channel-compose{width:100%;padding:10px}
+  .atl-channel-readonly-note{width:100%}
+  .atl-channel-owner-actions{margin-left:0}
+}
