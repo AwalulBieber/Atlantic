@@ -37,6 +37,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
   }
 
   useEffect(()=>{load();},[conversationId]);
+  useEffect(()=>()=>{if(avatarPreview)URL.revokeObjectURL(avatarPreview);},[avatarPreview]);
   const isAdmin=members.some(m=>m.user_id===user.id&&m.role==='admin');
 
   async function saveGroup(e){
@@ -55,7 +56,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
     else{
       if(group.avatar_url&&avatarPath!==group.avatar_url)await supabase.storage.from('atlantic-chat-media').remove([group.avatar_url]);
       const {data:signed}=avatarPath?await supabase.storage.from('atlantic-chat-media').createSignedUrl(avatarPath,3600):{data:null};
-      setAvatarUrl(signed?.signedUrl||'');setAvatarFile(null);setAvatarPreview('');const saved={...group,avatar_url:avatarPath,avatar_signed_url:signed?.signedUrl||null};setGroup(saved);onUpdated?.(saved);
+      setAvatarUrl(signed?.signedUrl||'');setAvatarFile(null);if(avatarPreview)URL.revokeObjectURL(avatarPreview);setAvatarPreview('');const saved={...group,avatar_url:avatarPath,avatar_signed_url:signed?.signedUrl||null};setGroup(saved);onUpdated?.(saved);
     }
     setBusy(false);
   }
@@ -116,7 +117,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
         {isAdmin&&<form className="atl-group-edit" onSubmit={saveGroup}>
           <label>Nama grup<input value={group.title||''} maxLength={60} onChange={e=>setGroup({...group,title:e.target.value})}/></label>
           <label>Deskripsi<textarea value={group.description||''} maxLength={500} onChange={e=>setGroup({...group,description:e.target.value})} placeholder="Tambahkan deskripsi…"/></label>
-          <label className="atl-group-photo-pick"><Camera size={16}/> Ubah foto grup<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{const file=e.target.files?.[0];if(file&&file.size<=5*1024*1024){setAvatarFile(file);setAvatarPreview(URL.createObjectURL(file));setAvatarUrl(URL.createObjectURL(file));}else if(file)setError('Foto grup maksimal 5 MB.');}} hidden/></label>
+          <label className="atl-group-photo-pick"><Camera size={16}/> Ubah foto grup<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{const file=e.target.files?.[0];if(file&&file.size<=5*1024*1024){if(avatarPreview)URL.revokeObjectURL(avatarPreview);const preview=URL.createObjectURL(file);setAvatarFile(file);setAvatarPreview(preview);setAvatarUrl(preview);}else if(file)setError('Foto grup maksimal 5 MB.');}} hidden/></label>
           <button disabled={busy||group.title.trim().length<2}>Simpan perubahan</button>
         </form>}
         {isAdmin&&<section className="atl-group-permissions">
