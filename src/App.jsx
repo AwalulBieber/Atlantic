@@ -1228,7 +1228,7 @@ export default function App() {
               {!messages.length && (
                 <div className="empty-chat">
                   {active.is_saved_chat ? <Bookmark size={34}/> : <MessageCircle size={34}/>}<b>{active.is_saved_chat ? 'Ruang pribadi kamu' : 'Mulai percakapan'}</b>
-                  <span>{active.is_saved_chat ? 'Simpan catatan, foto, video, voice note, dan teruskan pesan dari ruang chat mana pun ke sini.' : active.is_group ? `Kirim pesan pertama ke ${active.title}.` : `Kirim pesan pertama ke ${active.person.display_name || active.person.username}.`}</span>
+                  <span>{active.is_saved_chat ? 'Simpan catatan pribadi, foto, video, dan voice note di ruang khusus milik kamu.' : active.is_group ? `Kirim pesan pertama ke ${active.title}.` : `Kirim pesan pertama ke ${active.person.display_name || active.person.username}.`}</span>
                 </div>
               )}
               <div ref={bottomRef} />
