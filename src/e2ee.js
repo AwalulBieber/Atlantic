@@ -462,7 +462,10 @@ export async function restoreE2EEIdentityFromBackup(supabase, userId, passphrase
   if (profileError) throw new Error('Kunci publik gagal dimuat: ' + profileError.message);
   if (backupError) throw new Error('Cadangan pemulihan gagal dimuat: ' + backupError.message);
   const backup = row?.backup;
-  if (!backup || backup.version !== 1 || backup.kdf !== 'PBKDF2-SHA256') {
+  if (!backup || backup.version !== 1 || backup.kdf !== 'PBKDF2-SHA256' ||
+      Number(backup.iterations) !== 600000 ||
+      !backup.salt || !backup.iv || !backup.ciphertext ||
+      !backup.publicJwk?.x || !backup.publicJwk?.y) {
     throw new Error('Cadangan pemulihan tidak ditemukan atau formatnya tidak didukung.');
   }
   if (!profile?.e2ee_public_key || canonicalPublicJwk(profile.e2ee_public_key) !== canonicalPublicJwk(backup.publicJwk)) {
