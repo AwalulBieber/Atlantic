@@ -1415,10 +1415,10 @@ export default function App() {
               <Lock size={15}/><span>{e2eeStatus.state === 'active' ? <><b>Enkripsi End-to-end</b><small className="atl-e2ee-scope">Perlindungan ini berlaku untuk pesan, lampiran, dan polling grup baru setelah status E2EE aktif. Pesan lama yang dikirim sebelum enkripsi aktif mungkin belum terenkripsi. Server masih dapat melihat metadata seperti anggota, waktu, dan aktivitas pesan.</small><small className="atl-e2ee-scope">Kunci privat hanya tersimpan di perangkat ini. Jangan hapus data browser atau pindah perangkat sebelum kunci dipulihkan.</small>{e2eeFingerprints.length > 0 && <small className="atl-e2ee-fingerprints">Kode verifikasi kunci (cocokkan langsung dengan anggota): {e2eeFingerprints.map(item => item.name + ' — ' + item.fingerprint).join(' · ')}</small>}</> : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
             </div>
             <div className={`messages ${messageFocusActive && messageActionTarget ? 'has-message-focus' : ''}`}>
-              {messageActionTarget && <button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/ >}
+              {messageActionTarget && <button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/>}
               {messages.map((m, messageIndex) => (
                 <div
-                  className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${messageActionTarget === m.id ? 'message-focused' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
+                  className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${messageFocusActive && messageActionTarget === m.id ? 'message-focused' : ''} ${messageActionTarget === m.id ? 'message-menu-open' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
                   key={m.id}
                   id={`message-${m.id}`}
                   style={swipeState.id === m.id ? { transform: `translateX(${swipeState.offset}px)` } : undefined}
