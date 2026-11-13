@@ -779,8 +779,20 @@ export async function resetOwnE2EEIdentity(supabase, userId, accountPassword) {
     p_backup: backup
   });
   if (error || data !== true) {
-    await deleteLocalKey(IDENTITY_STORE, userId).catch(() => {});
-    throw new Error(error?.message || 'Reset identitas E2EE ditolak oleh pengaman database.');
+    // A network interruption can hide a successful server commit. Confirm the
+    // authoritative profile + backup before deciding whether to discard local key.
+    const [{ data: currentProfile }, { data: currentBackup }] = await Promise.all([
+      supabase.from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle(),
+      supabase.from('profile_e2ee_recovery_backups').select('backup').eq('user_id', userId).maybeSingle()
+    ]);
+    const resetCommitted =
+      canonicalPublicJwk(currentProfile?.e2ee_public_key) === canonicalPublicJwk(publicJwk) &&
+      currentBackup?.backup?.version === 2 &&
+      canonicalPublicJwk(currentBackup.backup.publicJwk) === canonicalPublicJwk(publicJwk);
+    if (!resetCommitted) {
+      await deleteLocalKey(IDENTITY_STORE, userId).catch(() => {});
+      throw new Error(error?.message || 'Reset identitas E2EE ditolak oleh pengaman database.');
+    }
   }
   return { userId, publicJwk };
 }
