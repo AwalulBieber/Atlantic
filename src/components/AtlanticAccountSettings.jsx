@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import "./AtlanticAccountSettings.css";
 import AtlanticImageCropper from "./AtlanticImageCropper";
-import { restoreE2EEIdentityFromBackup } from "../e2ee";
+import { restoreE2EEIdentityFromBackup, verifyE2EEIdentityBackup } from "../e2ee";
 
 const DEFAULTS = {
   bio: "", is_private: false, show_online_status: true,
@@ -118,6 +118,20 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       setGroupVerificationRequests(current=>current.filter(item=>item.id!==request.id));
       setMessage(approve ? "Grup berhasil diverifikasi." : "Pengajuan verifikasi grup ditolak.");
     }
+  }
+
+  async function verifyRecoveryBackup() {
+    if (!user?.id || recoveryBusy) return;
+    if (recoveryPassphrase.length < 6) { setMessage("Masukkan kata sandi akun yang benar."); return; }
+    setRecoveryBusy(true); setMessage("");
+    try {
+      const result = await verifyE2EEIdentityBackup(supabase, user.id, recoveryPassphrase);
+      setRecoveryPassphrase("");
+      setMessage(result.localIdentityVerified
+        ? "Berhasil diverifikasi: kunci lokal dan cadangan terenkripsi cocok dengan identitas akun. Tidak ada kunci yang diganti."
+        : "Cadangan terenkripsi valid. Perangkat ini belum menyimpan kunci lokal; gunakan pemulihan untuk memasangnya.");
+    } catch (error) { setMessage(error.message || "Pemeriksaan cadangan E2EE gagal."); }
+    finally { setRecoveryBusy(false); }
   }
 
   async function restoreRecoveryBackup() {
@@ -324,6 +338,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
             {recoveryBackupExists && <>
               <label>Kata sandi akun / passphrase cadangan lama<input type="password" autoComplete="current-password" minLength={6} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder="Kata sandi akun" /></label>
               <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>
+              <button type="button" disabled={recoveryBusy} onClick={verifyRecoveryBackup}>{recoveryBusy ? "Memeriksa…" : "Verifikasi kunci & cadangan"}</button>
             </>}
             <small className="atl-settings-hint">Server hanya menyimpan kunci publik dan cadangan terenkripsi. Jangan hapus data browser pada perangkat yang masih menyimpan identitas E2EE lama.</small>
           </section>}
