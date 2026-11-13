@@ -269,7 +269,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           <button type="button" className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}>Profil</button>
           <button type="button" className={tab === "privacy" ? "active" : ""} onClick={() => setTab("privacy")}>Privasi</button>
           <button type="button" className={tab === "security" ? "active" : ""} onClick={() => setTab("security")}>Keamanan</button>
-          <button type="button" className={tab === "verification" ? "active" : ""} onClick={() => setTab("verification")}>Verifikasi</button>
+          <button type="button" className={tab === "verification" ? "active" : ""} onClick={() => setTab("verification")}>Pemeriksaan</button>
           {isAdmin && <button type="button" className={tab === "admin" ? "active" : ""} onClick={() => setTab("admin")}>Admin</button>}
         </nav>
         <form onSubmit={save} className="atl-settings-body">
@@ -285,7 +285,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
               <div className="atl-avatar-actions">
                 <b>Foto profil</b>
                 <small>Pilih foto langsung dari galeri. Maksimal 5 MB.</small>
-                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={uploadAvatar} hidden />
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadAvatar} hidden />
                 <div className="atl-avatar-buttons">
                   <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}>{uploading ? "Mengunggah…" : profile.avatar_url ? "Ganti foto" : "Pilih dari galeri"}</button>
                   {profile.avatar_url && <button type="button" className="atl-avatar-remove" onClick={() => update("avatar_url", null)} disabled={uploading}>Hapus foto</button>}
@@ -299,7 +299,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           {tab === "verification" && <section className="atl-verification-panel">
             <h3>Verifikasi Atlantic</h3>
             {isAdmin ? <>
-              <p>Pengajuan pengguna yang menunggu pemeriksaan.</p>
+              <p>Daftar permintaan pemeriksaan akun. Persetujuan tidak memberikan badge; Atlantic Verified tetap khusus Admin Atlantic utama.</p>
               {verificationRequests.filter(r => r.status === "pending").length === 0 && <p className="atl-muted">Belum ada pengajuan baru.</p>}
               {verificationRequests.filter(r => r.status === "pending").map(request => <article className="atl-verification-request" key={request.id}>
                 <b>{request.applicant?.display_name || request.applicant?.username || "Pengguna Atlantic"}</b><small>{request.applicant?.username ? "@" + request.applicant.username + " · " : ""}{new Date(request.requested_at).toLocaleString("id-ID")}</small><p>{request.note || "Tidak ada keterangan tambahan."}</p>
