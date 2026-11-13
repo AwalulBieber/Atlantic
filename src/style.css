@@ -1008,3 +1008,15 @@ html[data-theme="dark"] .atl-chat-day-separator {
 .atl-e2ee-fingerprints{display:block;margin-top:5px;font-size:10px;line-height:1.45;overflow-wrap:anywhere;opacity:.78}
 
 .atl-e2ee-scope{display:block;margin-top:5px;line-height:1.45;opacity:.82;font-size:11px}
+
+
+/* WhatsApp-style Atlantic inbox rows */
+.person-row .person{gap:11px;padding:10px 9px;border-radius:13px}
+.person-info{flex:1;min-width:0}
+.person-info b{font-size:13px;line-height:1.25}
+.person-info .person-preview{display:block;margin-top:5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.35;color:var(--muted,#747474)}
+.person-meta{flex:0 0 auto;min-width:35px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:7px}
+.person-meta>small{font-size:10px;line-height:1.1;color:var(--muted,#777);white-space:nowrap}
+.person-meta .atl-unread-badge{min-width:19px;height:19px;padding:0 5px;background:#20c76a;color:#fff;border:0;box-shadow:none;font-size:10px}
+.person-row .person.selected .person-preview,.person-row .person:hover .person-preview{color:inherit;opacity:.78}
+@media(max-width:600px){.person-row .person{padding:10px 8px;gap:9px}.person-info b{font-size:13px}.person-info .person-preview{font-size:11px}.person-meta>small{font-size:10px}}
