@@ -85,3 +85,7 @@
 .atl-e2ee-recovery-status{display:grid;gap:4px;padding:12px;border:1.5px solid currentColor;border-radius:10px;background:rgba(120,130,150,.08)}
 .atl-e2ee-recovery-status b{font-size:13px}
 .atl-e2ee-recovery-status small,.atl-e2ee-recovery-panel>.atl-settings-hint{font-size:11px;line-height:1.5;opacity:.72}
+
+.atl-verification-policy{display:flex;align-items:flex-start;gap:11px;padding:13px;border:1.5px solid currentColor;border-radius:12px;background:rgba(120,130,150,.08)}
+.atl-verification-policy>div{display:grid;gap:4px}.atl-verification-policy b{font-size:13px}.atl-verification-policy small{font-size:11px;line-height:1.5;opacity:.72}
+.atl-policy-lock{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border-radius:50%;background:#1677e8;color:#fff;font-weight:950}
