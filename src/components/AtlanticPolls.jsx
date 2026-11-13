@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
 import { BarChart3, Plus, X, Check, Lock, Clock3, Users } from 'lucide-react';
 
-export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice }) {
+export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated }) {
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
@@ -18,7 +18,9 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   const load=useCallback(async()=>{
     if(!targetId)return;
     if(targetType==='group'&&user?.id){const {data:membership}=await supabase.from('conversation_members').select('role').eq('conversation_id',targetId).eq('user_id',user.id).maybeSingle();setCanModerate(membership?.role==='admin');}else setCanModerate(Boolean(canCreate));
-    const {data:rows,error:pollError}=await supabase.from('atlantic_polls').select('id,target_type,target_id,question,created_by,created_at,expires_at,closed_at').eq('target_type',targetType).eq('target_id',targetId).order('created_at',{ascending:false}).limit(30);
+    let pollQuery=supabase.from('atlantic_polls').select('id,target_type,target_id,question,created_by,created_at,expires_at,closed_at').eq('target_type',targetType).eq('target_id',targetId).order('created_at',{ascending:false}).limit(pollId?1:30);
+    if(pollId) pollQuery=pollQuery.eq('id',pollId);
+    const {data:rows,error:pollError}=await pollQuery;
     if(pollError){setError(pollError.message);return;}
     const pollIds=(rows||[]).map(p=>p.id);
     setPolls(rows||[]);
@@ -54,7 +56,15 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     const expiresAt=expiry==='never'?null:new Date(Date.now()+Number(expiry)*86400000).toISOString();
     const {error:e1}=await supabase.rpc('create_atlantic_poll',{p_type:targetType,p_target:targetId,p_question:question.trim(),p_options:clean,p_expires_at:expiresAt});
     if(e1)setError(e1.message);
-    else{setQuestion('');setChoices(['','']);setExpiry('never');setShowCreate(false);onNotice?.('Polling berhasil dibuat.');await load();}
+    else{
+      const {data:created,error:fetchError}=await supabase.from('atlantic_polls').select('id').eq('target_type',targetType).eq('target_id',targetId).eq('created_by',user.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
+      if(fetchError||!created?.id){setError(fetchError?.message||'Polling dibuat, tetapi pesan polling gagal disiapkan.');}
+      else{
+        const {error:messageError}=await supabase.from('messages').insert({conversation_id:targetId,sender_id:user.id,body:`[[ATLANTIC_POLL:${created.id}]]`});
+        if(messageError)setError('Polling dibuat, tetapi gagal dikirim ke chat: '+messageError.message);
+        else{setQuestion('');setChoices(['','']);setExpiry('never');setShowCreate(false);onNotice?.('Polling berhasil dikirim ke chat.');onCreated?.();await load();}
+      }
+    }
     setBusy(false);
   };
 
@@ -80,7 +90,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
   const formatExpiry=(value)=>value?new Date(value).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Tanpa batas waktu';
 
   return <section className="atl-polls">
-    <div className="atl-polls-heading"><div><BarChart3 size={18}/><div><b>Polling</b><small>{polls.length} polling</small></div></div>{canCreate&&<button type="button" onClick={()=>setShowCreate(v=>!v)}><Plus size={15}/> Buat polling</button>}</div>
+    {!inline&&!createOnly&&<div className="atl-polls-heading"><div><BarChart3 size={18}/><div><b>Polling</b><small>{polls.length} polling</small></div></div>{canCreate&&<button type="button" onClick={()=>setShowCreate(v=>!v)}><Plus size={15}/> Buat polling</button>}</div>}
     {showCreate&&<form className="atl-poll-create" onSubmit={createPoll}>
       <label>Pertanyaan<input value={question} onChange={e=>setQuestion(e.target.value)} maxLength={240} placeholder="Apa yang ingin ditanyakan?" required/></label>
       <div className="atl-poll-choice-list">{choices.map((choice,index)=><div key={index}><input value={choice} onChange={e=>setChoices(old=>old.map((v,i)=>i===index?e.target.value:v))} maxLength={100} placeholder={'Pilihan '+(index+1)}/>{choices.length>2&&<button type="button" onClick={()=>setChoices(old=>old.filter((_,i)=>i!==index))} aria-label="Hapus pilihan"><X size={15}/></button>}</div>)}</div>
@@ -89,7 +99,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       <div className="atl-poll-create-actions"><button type="button" onClick={()=>setShowCreate(false)}>Batal</button><button type="submit" disabled={busy||question.trim().length<3||choices.filter(v=>v.trim()).length<2}>{busy?'Membuat…':'Terbitkan polling'}</button></div>
     </form>}
     {error&&<p className="atl-poll-error">{error}</p>}
-    {!polls.length?<div className="atl-polls-empty"><BarChart3 size={24}/><span>Belum ada polling di sini.</span></div>:polls.map(poll=>{
+    {!polls.length&&!inline&&!createOnly?<div className="atl-polls-empty"><BarChart3 size={24}/><span>Belum ada polling di sini.</span></div>:polls.map(poll=>{
       const opts=groupedOptions[poll.id]||[];
       const pollVotes=groupedVotes[poll.id]||[];
       const total=pollVotes.length;
