@@ -610,3 +610,83 @@ export async function restoreE2EEIdentityFromBackup(supabase, userId, passphrase
   });
   return { userId, restored: true };
 }
+
+
+async function verifyPrivateKeyMatchesPublic(privateKey, publicJwk) {
+  const publicKey = await crypto.subtle.importKey(
+    'jwk', publicJwk, { name: 'ECDH', namedCurve: 'P-256' }, false, []
+  );
+  const probe = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+  );
+  const [left, right] = await Promise.all([
+    crypto.subtle.deriveBits({ name: 'ECDH', public: probe.publicKey }, privateKey, 256),
+    crypto.subtle.deriveBits({ name: 'ECDH', public: publicKey }, probe.privateKey, 256)
+  ]);
+  const a = new Uint8Array(left);
+  const b = new Uint8Array(right);
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
+  a.fill(0);
+  b.fill(0);
+  return difference === 0;
+}
+
+export async function verifyE2EEIdentityBackup(supabase, userId, password) {
+  if (!userId || typeof password !== 'string' || !password) {
+    throw new Error('Masukkan kata sandi akun untuk memeriksa cadangan E2EE.');
+  }
+  const [{ data: profile, error: profileError }, { data: row, error: backupError }, local] =
+    await Promise.all([
+      supabase.from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle(),
+      supabase.from('profile_e2ee_recovery_backups').select('backup').eq('user_id', userId).maybeSingle(),
+      readLocalKey(IDENTITY_STORE, userId)
+    ]);
+  if (profileError) throw new Error('Identitas akun gagal dimuat: ' + profileError.message);
+  if (backupError) throw new Error('Cadangan E2EE gagal dimuat: ' + backupError.message);
+  const publicJwk = profile?.e2ee_public_key;
+  const backup = row?.backup;
+  if (!publicJwk?.x || !publicJwk?.y || !backup) {
+    throw new Error('Identitas publik atau cadangan terenkripsi belum tersedia.');
+  }
+  if (canonicalPublicJwk(publicJwk) !== canonicalPublicJwk(backup.publicJwk)) {
+    throw new Error('Kunci publik pada cadangan tidak cocok dengan identitas akun. Tidak ada perubahan dilakukan.');
+  }
+  if (![1, 2].includes(backup.version) || backup.kdf !== 'PBKDF2-SHA256' ||
+      !backup.salt || !backup.iv || !backup.ciphertext ||
+      Number(backup.iterations) < 100000 || Number(backup.iterations) > 1000000) {
+    throw new Error('Format cadangan E2EE tidak valid atau tidak didukung.');
+  }
+  const wrappingKey = await deriveRecoveryWrappingKey(
+    password, base64ToBytes(backup.salt), Number(backup.iterations)
+  );
+  let raw;
+  try {
+    raw = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(backup.iv) },
+      wrappingKey, base64ToBytes(backup.ciphertext)
+    );
+  } catch {
+    throw new Error('Kata sandi akun tidak cocok dengan cadangan E2EE.');
+  }
+  let backupPrivate;
+  try {
+    backupPrivate = await crypto.subtle.importKey(
+      'pkcs8', raw, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+    );
+  } finally {
+    new Uint8Array(raw).fill(0);
+  }
+  if (!await verifyPrivateKeyMatchesPublic(backupPrivate, publicJwk)) {
+    throw new Error('Private key dalam cadangan tidak cocok dengan kunci publik akun.');
+  }
+  if (local) {
+    if (canonicalPublicJwk(local.publicJwk) !== canonicalPublicJwk(publicJwk)) {
+      throw new Error('Kunci lokal berbeda dari identitas akun. Kunci lokal tidak diubah.');
+    }
+    if (!await verifyPrivateKeyMatchesPublic(local.privateKey, publicJwk)) {
+      throw new Error('Kunci privat lokal tidak cocok dengan identitas akun. Tidak ada perubahan dilakukan.');
+    }
+  }
+  return { localIdentityVerified: Boolean(local), backupVerified: true };
+}
