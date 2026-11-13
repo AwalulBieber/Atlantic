@@ -252,19 +252,17 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
         nextRawKey, identity, profileMap.get(recipientId), conversationId, nextKeyId
       );
     }
-    const { data: rotated, error: rotateError } = await supabase
-      .from('conversation_e2ee_keys')
-      .update({
-        key_id: nextKeyId,
-        shares: nextShares,
-        member_ids: ids,
-        updated_at: new Date().toISOString()
-      })
-      .eq('conversation_id', conversationId)
-      .eq('key_id', keyRow.key_id)
-      .select('conversation_id')
-      .maybeSingle();
-    if (rotateError || !rotated) {
+    const { data: rotated, error: rotateError } = await supabase.rpc(
+      'rotate_atlantic_conversation_e2ee_key',
+      {
+        p_conversation_id: conversationId,
+        p_expected_key_id: keyRow.key_id,
+        p_next_key_id: nextKeyId,
+        p_next_shares: nextShares,
+        p_member_ids: ids
+      }
+    );
+    if (rotateError || rotated !== true) {
       throw new Error('Rotasi kunci grup gagal atau sedang dilakukan perangkat lain. Buka ulang chat untuk mencoba lagi.');
     }
     const nextKey = await crypto.subtle.importKey('raw', nextRawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
@@ -322,4 +320,37 @@ export async function decryptE2EEMessage(key, value) {
     if (parsed && parsed.version === 1) return parsed;
   } catch { /* Legacy ATL-E2EE1 text message. */ }
   return { version: 0, text: plaintext };
+}
+
+export async function getCurrentConversationE2EEKeyId(supabase, conversationId) {
+  const { data, error } = await supabase.from('conversation_e2ee_keys')
+    .select('key_id').eq('conversation_id', conversationId).maybeSingle();
+  if (error || !data?.key_id) throw new Error('ID kunci percakapan belum tersedia.');
+  return data.key_id;
+}
+
+export async function getConversationE2EEKeyById(supabase, conversationId, keyId, userId) {
+  const cacheId = conversationCacheId(conversationId, keyId);
+  const cached = await readLocalKey(CONVERSATION_STORE, cacheId);
+  if (cached) return cached;
+  const identity = await ensureE2EEIdentity(supabase, userId);
+  let row = null;
+  const current = await supabase.from('conversation_e2ee_keys')
+    .select('key_id,shares').eq('conversation_id', conversationId).eq('key_id', keyId).maybeSingle();
+  if (current.error) throw new Error('Kunci percakapan gagal dimuat.');
+  row = current.data;
+  if (!row) {
+    const historic = await supabase.from('conversation_e2ee_key_epochs')
+      .select('key_id,shares').eq('conversation_id', conversationId).eq('key_id', keyId).maybeSingle();
+    if (historic.error || !historic.data) throw new Error('Riwayat kunci E2EE tidak tersedia di perangkat ini.');
+    row = historic.data;
+  }
+  const envelope = row.shares?.[userId];
+  if (!envelope) throw new Error('Perangkat ini tidak memiliki kunci untuk epoch pesan tersebut.');
+  const { data: sender } = await supabase.from('profiles')
+    .select('e2ee_public_key').eq('id', envelope.sender_id).maybeSingle();
+  if (!sender?.e2ee_public_key) throw new Error('Kunci publik pengirim tidak tersedia.');
+  const key = await unwrapConversationKey(envelope, identity, sender.e2ee_public_key, conversationId, keyId);
+  await writeLocalKey(CONVERSATION_STORE, cacheId, key);
+  return key;
 }
