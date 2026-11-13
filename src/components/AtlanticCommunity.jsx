@@ -268,14 +268,24 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   }
 
   async function loadPosts(id) {
-    const [{data:postRows,error:postError},{data:pollRows,error:pollError}]=await Promise.all([
-      supabase.from('atlantic_channel_posts').select('id,channel_id,author_id,body,created_at,media_url,media_type,media_name').eq('channel_id',id).order('created_at',{ascending:true}).limit(100),
-      supabase.from('atlantic_polls').select('id,target_type,target_id,question,created_by,created_at,expires_at,closed_at,e2ee_key_id').eq('target_type','channel').eq('target_id',id).order('created_at',{ascending:true}).limit(100)
-    ]);
-    if(postError||pollError){setError(postError?.message||pollError?.message||'Timeline saluran gagal dimuat.');return;}
+    const {data:postRows,error:postError}=await supabase.from('atlantic_channel_posts')
+      .select('id,channel_id,author_id,body,created_at,media_url,media_type,media_name')
+      .eq('channel_id',id).order('created_at',{ascending:true}).limit(100);
+    if(postError){setError(postError.message);return;}
+    const pollRows=[];
+    for(let offset=0;;offset+=500){
+      const {data:page,error:pollError}=await supabase.from('atlantic_polls')
+        .select('id,target_type,target_id,question,created_by,created_at,expires_at,closed_at,e2ee_key_id')
+        .eq('target_type','channel').eq('target_id',id)
+        .order('created_at',{ascending:true}).order('id',{ascending:true})
+        .range(offset,offset+499);
+      if(pollError){setError(pollError.message);return;}
+      pollRows.push(...(page||[]));
+      if(!page||page.length<500)break;
+    }
     const hydrated=await Promise.all((postRows||[]).map(async post=>{if(!post.media_url)return post;const {data:signed}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(post.media_url,3600);return {...post,media_path:post.media_url,media_url:signed?.signedUrl||null};}));
-    setPosts(hydrated);setChannelPolls(pollRows||[]);
-    await loadPeople([...(postRows||[]).map(post=>post.author_id),...(pollRows||[]).map(poll=>poll.created_by)]);
+    setPosts(hydrated);setChannelPolls(pollRows);
+    await loadPeople([...(postRows||[]).map(post=>post.author_id),...pollRows.map(poll=>poll.created_by)]);
   }
 
   async function loadChannelMembers(channelId) {
