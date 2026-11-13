@@ -13,6 +13,7 @@ export default function AtlanticProfileExplorer({ userId, onClose }) {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [storyError, setStoryError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -28,6 +29,8 @@ export default function AtlanticProfileExplorer({ userId, onClose }) {
         return;
       }
       setProfile(data);
+      const { data: adminStatus } = await supabase.rpc("is_atlantic_admin", { target_user: userId });
+      if (alive) setIsAdmin(adminStatus === true);
 
       // Story visibility is enforced by the existing mutual-contact RLS policy.
       const { data: storyRows, error: storiesError } = await supabase.from("atlantic_stories")
@@ -59,9 +62,9 @@ export default function AtlanticProfileExplorer({ userId, onClose }) {
         {loading ? <div className="atl-profile-explorer-loading">Memuat profil…</div> : !profile ? <div className="atl-profile-explorer-loading">Profil tidak dapat ditemukan.</div> : <>
           <div className="atl-profile-hero">
             <div className="atl-profile-photo">{profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name || profile.username}/> : initials(profile.display_name || profile.username)}</div>
-            <h2>{profile.display_name || profile.username}{profile.is_verified && <BadgeCheck className="atl-profile-verified" size={19}/>}</h2>
+            <h2>{profile.display_name || profile.username}{(profile.is_verified || isAdmin) && <BadgeCheck className="atl-profile-verified" size={19}/>}</h2>
             <div className="atl-profile-username">@{profile.username}</div>
-            {profile.is_verified && <span className="atl-profile-badge"><BadgeCheck size={14}/> Atlantic Verified</span>}
+            {(profile.is_verified || isAdmin) && <span className="atl-profile-badge"><BadgeCheck size={14}/> Atlantic Verified</span>}
             {profile.bio && !profile.is_private && <p>{profile.bio}</p>}
             <div className="atl-profile-meta"><CalendarDays size={14}/> Bergabung {profile.created_at ? new Date(profile.created_at).toLocaleDateString("id-ID",{month:"long",year:"numeric"}) : "di Atlantic"}</div>
           </div>
