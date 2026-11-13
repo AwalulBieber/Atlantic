@@ -25,7 +25,9 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   const [channelAvatarFile,setChannelAvatarFile]=useState(null);
   const [channelCropFile,setChannelCropFile]=useState(null);
   const [channelAvatarPreview,setChannelAvatarPreview]=useState('');
-  const [channelSettingsOpen,setChannelSettingsOpen]=useState(false);\n  const [channelAdminsOpen,setChannelAdminsOpen]=useState(false);\n  const [channelMembers,setChannelMembers]=useState([]);
+  const [channelSettingsOpen,setChannelSettingsOpen]=useState(false);
+  const [channelAdminsOpen,setChannelAdminsOpen]=useState(false);
+  const [channelMembers,setChannelMembers]=useState([]);
   const [channelInviteLink,setChannelInviteLink]=useState('');
   const [channelInviteLinkId,setChannelInviteLinkId]=useState('');
   const [channelInviteBusy,setChannelInviteBusy]=useState(false);
