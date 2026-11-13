@@ -3,7 +3,7 @@ import { supabase } from '../supabase';
 import { encryptE2EEText, decryptE2EEText, encryptE2EEMessage, ensureConversationE2EE, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById } from '../e2ee';
 import { BarChart3, Plus, X, Check, Lock, Clock3, Users } from 'lucide-react';
 
-export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, onDeleted, e2eeKey = null, e2eeKeyId = null, onKeyReady }) {
+export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, onDialog, pollId = null, inline = false, createOnly = false, onCreated, onDeleted, e2eeKey = null, e2eeKeyId = null, onKeyReady }) {
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
@@ -144,7 +144,9 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     if(busy)return;
     const allowed=targetType==='channel'?canCreate:(poll.created_by===user?.id||canModerate);
     if(!allowed)return;
-    const confirmed=window.confirm('Hapus polling ini dari timeline? Semua suara dan reaksi ikut dihapus.');
+    const confirmed=onDialog
+      ? await onDialog({type:'confirm',title:'Hapus polling?',message:'Polling ini akan dihapus dari timeline. Semua suara dan reaksi ikut dihapus.',confirmLabel:'Hapus'})
+      : window.confirm('Hapus polling ini dari timeline? Semua suara dan reaksi ikut dihapus.');
     if(!confirmed)return;
     setBusy(true);setError('');
     const {error:deleteError}=await supabase.from('atlantic_polls').delete().eq('id',poll.id);
@@ -175,7 +177,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const ownVote=pollVotes.find(v=>v.user_id===user?.id);
       const expired=poll.expires_at&&new Date(poll.expires_at).getTime()<=Date.now();
       const closed=Boolean(poll.closed_at||expired);
-      const canClose=poll.created_by===user?.id||canModerate;
+      const canClose=targetType==='channel'?canCreate:(poll.created_by===user?.id||canModerate);
       return <article className="atl-poll-card" key={poll.id}>
         <header><div><span className="atl-poll-tag"><BarChart3 size={12}/> {targetType==='group'?'POLLING GRUP':'POLLING SALURAN'}</span><h3>{poll.question}</h3><small>{new Date(poll.created_at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · {formatExpiry(poll.expires_at)}</small></div><div className="atl-poll-card-actions">{canClose&&!closed&&<button type="button" className="atl-poll-close" onClick={()=>closePoll(poll)} disabled={busy}>Tutup</button>}{(targetType==='channel'?canCreate:(poll.created_by===user?.id||canModerate))&&<button type="button" className="atl-poll-delete" onClick={()=>deletePoll(poll)} disabled={busy}>Hapus</button>}</div></header>
         <div className="atl-poll-options">{opts.map(option=>{
