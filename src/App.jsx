@@ -7,6 +7,7 @@ import AtlanticCallManager from './components/AtlanticCallManager';
 import AtlanticAdminDashboard from './components/AtlanticAdminDashboard';
 import AtlanticContacts from './components/AtlanticContacts';
 import AtlanticGroupInfo from './components/AtlanticGroupInfo';
+import AtlanticProfileExplorer from './components/AtlanticProfileExplorer';
 import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
 import AtlanticPolls from './components/AtlanticPolls';
 import {
@@ -130,11 +131,13 @@ export default function App() {
   const [forwardingMessageId, setForwardingMessageId] = useState(null);
   const [messageReactions, setMessageReactions] = useState([]);
   const [messageActionTarget, setMessageActionTarget] = useState(null);
+  const [messageFocusActive, setMessageFocusActive] = useState(false);
   const [messageInfoTarget, setMessageInfoTarget] = useState(null);
   const [mobileChat, setMobileChat] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('appearance');
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [profileExplorerUserId, setProfileExplorerUserId] = useState(null);
   const [adminDashboardOpen, setAdminDashboardOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
@@ -153,6 +156,8 @@ export default function App() {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const swipeTimer = useRef(null);
+  const messageLongPressTimer = useRef(null);
+  const longPressTriggered = useRef(false);
   const typingChannelRef = useRef(null);
   const typingStopTimer = useRef(null);
   const typingIndicatorTimer = useRef(null);
@@ -324,6 +329,11 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [session?.user?.id, myProfile?.show_online_status]);
+
+  function openProfileExplorer(target) {
+    if (!target?.id || target.id === session?.user?.id || target.is_group || target.is_saved_chat) return;
+    setProfileExplorerUserId(target.id);
+  }
 
   async function loadMyProfile() {
     if (!session?.user?.id) return;
@@ -1397,7 +1407,7 @@ export default function App() {
           <>
             <header className="chat-head">
               <button className="back icon-btn" onClick={() => setMobileChat(false)} aria-label="Kembali"><ArrowLeft /></button>
-              <div className={`avatar ${active.is_saved_chat ? 'saved-chat-avatar' : ''}`}>{active.is_saved_chat ? <Bookmark size={21}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</div>
+              <button type="button" className={`avatar profile-avatar-trigger ${active.is_saved_chat ? 'saved-chat-avatar' : ''}`} onClick={() => openProfileExplorer(active.person)} disabled={active.is_group || active.is_saved_chat} aria-label="Lihat profil akun">{active.is_saved_chat ? <Bookmark size={21}/> : active.person.avatar_url ? <img src={active.person.avatar_url} alt="" /> : active.is_group ? <Users size={20}/> : initials(active.person.display_name || active.person.username)}</button>
               <div className="chat-person" onClick={() => active.is_group && setGroupInfoOpen(true)} role={active.is_group ? "button" : undefined} tabIndex={active.is_group ? 0 : undefined}>
                 <b>{active.person.display_name || active.person.username}{active.is_group && active.is_verified ? <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span> : (active.person.is_admin || active.person.is_verified) && <span className="atl-inline-verified" title="Atlantic Verified"><BadgeCheck size={15}/></span>}</b>
                 <small>{active.is_saved_chat ? 'Cloud Pribadi · Terenkripsi E2E' : otherTyping ? <span className="typing-indicator"><i/><i/><i/> sedang mengetik</span> : active.is_group ? `${active.members?.length || 0} anggota` : <>{onlineUsers.includes(active.person.id) && <span className="atl-online-dot" aria-label="Online"/>}{onlineUsers.includes(active.person.id) ? 'Online · ' : ''}@{active.person.username}</>}</small>
@@ -1408,35 +1418,61 @@ export default function App() {
               </div>}
             </header>
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
-            <div className={`atl-e2ee-banner ${e2eeStatus.state === 'active' ? 'is-secure' : 'is-pending'}`} role="status">
-              <Lock size={15}/><span>{e2eeStatus.state === 'active' ? <><b>Enkripsi End-to-end</b><small className="atl-e2ee-scope">Perlindungan ini berlaku untuk pesan, lampiran, dan polling grup baru setelah status E2EE aktif. Pesan lama yang dikirim sebelum enkripsi aktif mungkin belum terenkripsi. Server masih dapat melihat metadata seperti anggota, waktu, dan aktivitas pesan.</small><small className="atl-e2ee-scope">Kunci privat hanya tersimpan di perangkat ini. Jangan hapus data browser atau pindah perangkat sebelum kunci dipulihkan.</small>{e2eeFingerprints.length > 0 && <small className="atl-e2ee-fingerprints">Kode verifikasi kunci (cocokkan langsung dengan anggota): {e2eeFingerprints.map(item => item.name + ' — ' + item.fingerprint).join(' · ')}</small>}</> : e2eeStatus.state === 'loading' ? 'Menyiapkan enkripsi end-to-end…' : 'Enkripsi end-to-end belum aktif: ' + e2eeStatus.error}</span>
-            </div>
-            <div className="messages">
+            <div className={`messages ${messageFocusActive && messageActionTarget ? 'has-message-focus' : ''}`}>
+              {messageActionTarget && <button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/>}
               {messages.map((m, messageIndex) => (
+                <React.Fragment key={m.id}>
+                  {(messageIndex === 0 || new Date(m.created_at).toDateString() !== new Date(messages[messageIndex - 1].created_at).toDateString()) && <div className="atl-chat-day-separator">{chatDayLabel(m.created_at)}</div>}
                 <div
-                  className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
+                  className={`bubble-row ${m.sender_id === session.user.id ? 'mine' : ''} ${messageFocusActive && messageActionTarget === m.id ? 'message-focused' : ''} ${messageActionTarget === m.id ? 'message-menu-open' : ''} ${swipeState.id === m.id && swipeState.offset > 0 ? 'reply-swiping' : ''} ${swipeFeedbackId === m.id ? 'reply-swipe-confirmed' : ''}`}
                   key={m.id}
                   id={`message-${m.id}`}
                   style={swipeState.id === m.id ? { transform: `translateX(${swipeState.offset}px)` } : undefined}
-                  onTouchStart={e => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
+                  onContextMenu={e => { e.preventDefault(); setMessageActionTarget(m.id); setMessageFocusActive(false); }}
+                  onTouchStart={e => {
+                    touchStartX.current = e.touches[0].clientX;
+                    touchStartY.current = e.touches[0].clientY;
+                    longPressTriggered.current = false;
+                    if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    messageLongPressTimer.current = setTimeout(() => {
+                      longPressTriggered.current = true;
+                      setSwipeState({ id: null, offset: 0 });
+                      setMessageActionTarget(m.id);
+                      setMessageFocusActive(true);
+                      if (navigator.vibrate) navigator.vibrate(18);
+                    }, 520);
+                  }}
                   onTouchMove={e => {
                     const dx = e.touches[0].clientX - touchStartX.current;
                     const dy = e.touches[0].clientY - touchStartY.current;
-                    if (dx > 6 && dx > Math.abs(dy)) setSwipeState({ id: m.id, offset: Math.min(dx, 92) });
+                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                      if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    }
+                    if (!longPressTriggered.current && dx > 6 && dx > Math.abs(dy)) setSwipeState({ id: m.id, offset: Math.min(dx, 92) });
+                  }}
+                  onTouchCancel={() => {
+                    if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    messageLongPressTimer.current = null;
+                    longPressTriggered.current = false;
+                    setSwipeState({ id: null, offset: 0 });
+                    setMessageFocusActive(false);
                   }}
                   onTouchEnd={e => {
+                    if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    messageLongPressTimer.current = null;
+                    setMessageFocusActive(false);
                     const dx = e.changedTouches[0].clientX - touchStartX.current;
                     const dy = e.changedTouches[0].clientY - touchStartY.current;
-                    if (dx > 65 && dx > Math.abs(dy)) {
+                    if (!longPressTriggered.current && dx > 65 && dx > Math.abs(dy)) {
                       setReplyTarget(m);
                       setSwipeFeedbackId(m.id);
                       if (swipeTimer.current) clearTimeout(swipeTimer.current);
                       swipeTimer.current = setTimeout(() => setSwipeFeedbackId(null), 650);
                     }
                     setSwipeState({ id: null, offset: 0 });
+                    longPressTriggered.current = false;
                   }}
                 >
-                  {(messageIndex === 0 || new Date(m.created_at).toDateString() !== new Date(messages[messageIndex - 1].created_at).toDateString()) && <div className="atl-chat-day-separator">{chatDayLabel(m.created_at)}</div>}
                   <div className={`swipe-reply-indicator ${swipeState.id === m.id && swipeState.offset > 12 ? 'visible' : ''}`} style={swipeState.id === m.id ? { opacity: Math.min(swipeState.offset / 65, 1) } : undefined}><Reply size={15}/></div>
                   <div className="bubble">
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.is_group ? (m.replyPreview.senderProfile?.display_name || m.replyPreview.senderProfile?.username || 'Anggota grup') : (active.person.display_name || active.person.username))}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
@@ -1466,9 +1502,10 @@ export default function App() {
                       <button type="button" role="menuitem" onClick={() => { setDeleteTarget(m); setMessageActionTarget(null); }}><Trash2/>Hapus</button>
                       <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><BookmarkCheck/>Simpan ke Cloud</button>
                     </div>}
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={savedMessages.some(item => item.message_id === m.id) ? 'message-save-btn is-saved' : 'message-save-btn'} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={m.read_at ? 'message-status is-read' : m.delivered_at ? 'message-status is-delivered' : 'message-status is-sent'} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim ke perangkat penerima' : 'Terkirim dari perangkat ini'} aria-label={m.read_at ? 'Pesan dibaca' : m.delivered_at ? 'Pesan diterima' : 'Pesan dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-menu-trigger" onClick={() => setMessageActionTarget(current => current === m.id ? null : m.id)} aria-label="Menu pesan" aria-expanded={messageActionTarget === m.id}><MoreHorizontal size={16}/></button></div>
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time><button type="button" className={savedMessages.some(item => item.message_id === m.id) ? 'message-save-btn is-saved' : 'message-save-btn'} onClick={() => toggleSavedMessage(m)} aria-label={savedMessages.some(item => item.message_id === m.id) ? 'Hapus dari pesan tersimpan' : 'Simpan pesan'} title={savedMessages.some(item => item.message_id === m.id) ? 'Tersimpan' : 'Simpan pesan'}>{savedMessages.some(item => item.message_id === m.id) ? <BookmarkCheck size={13}/> : <Bookmark size={13}/>}</button>{m.sender_id === session.user.id && <span className={m.read_at ? 'message-status is-read' : m.delivered_at ? 'message-status is-delivered' : 'message-status is-sent'} title={m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim ke perangkat penerima' : 'Terkirim dari perangkat ini'} aria-label={m.read_at ? 'Pesan dibaca' : m.delivered_at ? 'Pesan diterima' : 'Pesan dikirim'}>{m.delivered_at || m.read_at ? <CheckCheck size={13}/> : <Check size={13}/>}<small>{m.read_at ? 'Dibaca' : m.delivered_at ? 'Terkirim' : 'Dikirim'}</small></span>}<button type="button" className="message-menu-trigger" onClick={() => { setMessageActionTarget(current => current === m.id ? null : m.id); setMessageFocusActive(false); }} aria-label="Menu pesan" aria-expanded={messageActionTarget === m.id}><MoreHorizontal size={16}/></button></div>
                   </div>
                 </div>
+                </React.Fragment>
               ))}
               {otherTyping && messages.length > 0 && (
                 <div className="atl-typing-row" aria-live="polite">
@@ -1682,19 +1719,23 @@ export default function App() {
         />
       )}
 
-      <nav className="bottom-nav" aria-label="Navigasi utama">
-        <button className={activeTab === 'chat' ? 'active' : ''} onClick={() => setActiveTab('chat')}><MessageCircle/><span>Chat</span></button>
-        <button className={activeTab === 'updates' ? 'active' : ''} onClick={() => setActiveTab('updates')}><Clock3/><span>Pembaruan</span></button>
-        <button className="nav-create" onClick={() => setCreateMenuOpen(true)} aria-label="Buat baru"><Plus/></button>
-        <button className={activeTab === 'channels' ? 'active' : ''} onClick={() => setActiveTab('channels')}><Radio/><span>Saluran</span></button>
-        <button className={activeTab === 'calls' ? 'active' : ''} onClick={() => setActiveTab('calls')}><Phone/><span>Panggilan</span></button>
-      </nav>
+      {!(activeTab === 'chat' && mobileChat) && (
+        <nav className="bottom-nav" aria-label="Navigasi utama">
+          <button className={activeTab === 'chat' ? 'active' : ''} onClick={() => setActiveTab('chat')}><MessageCircle/><span>Chat</span></button>
+          <button className={activeTab === 'updates' ? 'active' : ''} onClick={() => setActiveTab('updates')}><Clock3/><span>Pembaruan</span></button>
+          <button className="nav-create" onClick={() => setCreateMenuOpen(true)} aria-label="Buat baru"><Plus/></button>
+          <button className={activeTab === 'channels' ? 'active' : ''} onClick={() => setActiveTab('channels')}><Radio/><span>Saluran</span></button>
+          <button className={activeTab === 'calls' ? 'active' : ''} onClick={() => setActiveTab('calls')}><Phone/><span>Panggilan</span></button>
+        </nav>
+      )}
 
       <AtlanticCallManager
         user={session.user}
         intent={callIntent}
         onIntentHandled={() => setCallIntent(null)}
       />
+
+      {profileExplorerUserId && <AtlanticProfileExplorer userId={profileExplorerUserId} onClose={() => setProfileExplorerUserId(null)} />}
 
       {accountSettingsOpen && (
         <AtlanticAccountSettings
