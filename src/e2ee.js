@@ -120,21 +120,19 @@ async function unwrapConversationKey(envelope, identity, senderPublicKey, conver
 
 const identitySetupPromises = new Map();
 
-async function createOrLoadE2EEIdentity(supabase, userId) {
+async function createOrLoadE2EEIdentity(supabase, userId, password) {
   const local = await readLocalKey(IDENTITY_STORE, userId);
   const { data: profile, error } = await supabase
     .from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle();
   if (error) throw new Error('Kunci publik gagal dimuat: ' + error.message);
 
+  // Existing local identities remain untouched. Older non-extractable keys
+  // cannot be retroactively backed up; never replace them automatically.
   if (local) {
     if (!profile?.e2ee_public_key) {
       const { data: restored, error: restoreError } = await supabase
-        .from('profiles')
-        .update({ e2ee_public_key: local.publicJwk })
-        .eq('id', userId)
-        .is('e2ee_public_key', null)
-        .select('id')
-        .maybeSingle();
+        .from('profiles').update({ e2ee_public_key: local.publicJwk })
+        .eq('id', userId).is('e2ee_public_key', null).select('id').maybeSingle();
       if (restoreError || !restored) {
         throw new Error('Kunci publik perangkat gagal dipulihkan. Jangan kirim pesan terenkripsi sebelum status kunci diperiksa.');
       }
@@ -144,57 +142,109 @@ async function createOrLoadE2EEIdentity(supabase, userId) {
     return { userId, privateKey: local.privateKey, publicJwk: local.publicJwk };
   }
 
+  // A new browser/device restores the exact account identity using the
+  // password supplied during this login. The server stores ciphertext only.
   if (profile?.e2ee_public_key) {
-    throw new Error('Kunci privat akun ini tersimpan di perangkat lain. Fitur E2EE perlu pemindahan kunci perangkat sebelum bisa digunakan di sini.');
+    if (!password) {
+      throw new Error('Masuk ulang dengan kata sandi akun untuk memulihkan kunci E2EE secara otomatis di perangkat ini.');
+    }
+    const { data: backupRow, error: backupError } = await supabase
+      .from('profile_e2ee_recovery_backups').select('backup').eq('user_id', userId).maybeSingle();
+    if (backupError) throw new Error('Cadangan kunci E2EE gagal dimuat: ' + backupError.message);
+    const backup = backupRow?.backup;
+    if (!backup || !backup.salt || !backup.iv || !backup.ciphertext ||
+        Number(backup.iterations) < 100000 || !backup.publicJwk?.x || !backup.publicJwk?.y) {
+      throw new Error('Akun ini belum memiliki cadangan kunci otomatis. Perangkat lama masih menyimpan kunci utama; jangan hapus data perangkat tersebut.');
+    }
+    if (canonicalPublicJwk(profile.e2ee_public_key) !== canonicalPublicJwk(backup.publicJwk)) {
+      throw new Error('Kunci publik cadangan tidak cocok dengan identitas akun. Pemulihan dihentikan.');
+    }
+    const wrappingKey = await deriveRecoveryWrappingKey(
+      password, base64ToBytes(backup.salt), Number(backup.iterations)
+    );
+    let privatePkcs8;
+    try {
+      privatePkcs8 = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: base64ToBytes(backup.iv) },
+        wrappingKey, base64ToBytes(backup.ciphertext)
+      );
+    } catch {
+      throw new Error('Kata sandi akun tidak cocok untuk membuka cadangan kunci E2EE. Jika kata sandi pernah diubah, pemulihan perlu diperbarui dari perangkat lama.');
+    }
+    let privateKey;
+    try {
+      privateKey = await crypto.subtle.importKey(
+        'pkcs8', privatePkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+      );
+    } finally {
+      new Uint8Array(privatePkcs8).fill(0);
+    }
+    await writeLocalKey(IDENTITY_STORE, userId, { privateKey, publicJwk: backup.publicJwk });
+    return { userId, privateKey, publicJwk: backup.publicJwk, restored: true };
   }
 
-  // First-time setup is automatic. Generate a fresh device identity, register
-  // only its public key, and keep the non-extractable private key in IndexedDB.
-  // If another device wins the registration race, never overwrite its identity.
+  // First-time identity: generate an exportable pair briefly so an encrypted
+  // recovery copy can be made with PBKDF2 + AES-GCM. The live private key is
+  // then re-imported as non-extractable and only that CryptoKey stays locally.
+  if (!password) {
+    throw new Error('Masuk dengan kata sandi akun diperlukan untuk menyiapkan cadangan kunci E2EE otomatis.');
+  }
   const pair = await crypto.subtle.generateKey(
     { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
   );
   const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
   const privatePkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
-  let privateKey;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const iterations = 600000;
+  const wrappingKey = await deriveRecoveryWrappingKey(password, salt, iterations);
+  let ciphertext;
   try {
-    privateKey = await crypto.subtle.importKey(
-      'pkcs8', privatePkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
-    );
+    ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrappingKey, privatePkcs8);
   } finally {
     privatePkcs8.fill(0);
   }
+  const backup = {
+    version: 2, kdf: 'PBKDF2-SHA256', iterations,
+    salt: bytesToBase64(salt), iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext)), publicJwk
+  };
+  const privateBytesForImport = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv }, wrappingKey, ciphertext
+  );
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8', privateBytesForImport, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+  );
+  new Uint8Array(privateBytesForImport).fill(0);
 
   const { data: registered, error: registerError } = await supabase
-    .from('profiles')
-    .update({ e2ee_public_key: publicJwk })
-    .eq('id', userId)
-    .is('e2ee_public_key', null)
-    .select('id')
-    .maybeSingle();
-
+    .from('profiles').update({ e2ee_public_key: publicJwk })
+    .eq('id', userId).is('e2ee_public_key', null).select('id').maybeSingle();
   if (registerError || !registered) {
-    throw new Error(
-      registerError
-        ? 'Identitas E2EE otomatis gagal didaftarkan: ' + registerError.message
-        : 'Akun ini sudah memiliki identitas E2EE di perangkat lain. Pulihkan atau transfer kunci lama; identitas tidak akan ditimpa.'
-    );
+    throw new Error(registerError
+      ? 'Identitas E2EE otomatis gagal didaftarkan: ' + registerError.message
+      : 'Akun ini sudah memiliki identitas E2EE di perangkat lain. Identitas tidak akan ditimpa.');
   }
 
+  const { error: backupError } = await supabase
+    .from('profile_e2ee_recovery_backups')
+    .upsert({ user_id: userId, backup }, { onConflict: 'user_id' });
+  if (backupError) {
+    await supabase.from('profiles').update({ e2ee_public_key: null })
+      .eq('id', userId).eq('e2ee_public_key', publicJwk);
+    throw new Error('Cadangan kunci otomatis gagal disimpan: ' + backupError.message);
+  }
   try {
     await writeLocalKey(IDENTITY_STORE, userId, { privateKey, publicJwk });
   } catch (storageError) {
-    // Avoid leaving a public key registered when this device could not persist
-    // the matching private key. The conditional update cannot clear a newer key.
+    await supabase.from('profile_e2ee_recovery_backups').delete().eq('user_id', userId);
     await supabase.from('profiles').update({ e2ee_public_key: null })
       .eq('id', userId).eq('e2ee_public_key', publicJwk);
     throw new Error('Kunci privat gagal disimpan di perangkat ini: ' + storageError.message);
   }
-
   return { userId, privateKey, publicJwk };
 }
-
-export function ensureE2EEIdentity(supabase, userId) {
+export function ensureE2EEIdentity(supabase, userId, password) {
   if (!userId) return Promise.reject(new Error('Akun belum terautentikasi untuk menyiapkan E2EE.'));
   const existing = identitySetupPromises.get(userId);
   if (existing) return existing;
@@ -202,7 +252,7 @@ export function ensureE2EEIdentity(supabase, userId) {
     // Web Locks also serialize initialization across tabs on the same device.
     if (globalThis.navigator?.locks?.request) {
       return navigator.locks.request('atlantic-e2ee-identity:' + userId, () =>
-        createOrLoadE2EEIdentity(supabase, userId)
+        createOrLoadE2EEIdentity(supabase, userId, password)
       );
     }
     return createOrLoadE2EEIdentity(supabase, userId);
