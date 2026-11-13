@@ -1006,3 +1006,5 @@ html[data-theme="dark"] .atl-chat-day-separator {
 }
 
 .atl-e2ee-fingerprints{display:block;margin-top:5px;font-size:10px;line-height:1.45;overflow-wrap:anywhere;opacity:.78}
+
+.atl-e2ee-scope{display:block;margin-top:5px;line-height:1.45;opacity:.82;font-size:11px}
