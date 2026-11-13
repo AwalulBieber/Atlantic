@@ -116,15 +116,6 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
   const pendingGroups = groupRequests.filter(item => item.status === 'pending').length;
   const pendingReports = reports.filter(item => item.status === 'pending').length;
 
-  const toggleVerification = async profile => {
-    const confirmed=await onDialog?.({type:'confirm',title:profile.is_verified?'Cabut verifikasi?':'Verifikasi pengguna?',message:profile.is_verified?`Cabut centang verifikasi @${profile.username}?`:`Berikan centang verifikasi ke @${profile.username}?`,confirmLabel:profile.is_verified?'Cabut centang':'Verifikasi'}); if(!confirmed)return;
-    setBusyId('verify:' + profile.id);
-    const { error } = await supabase.rpc('admin_set_user_verified', { target_user: profile.id, should_verify: !profile.is_verified });
-    if (error) onNotice?.('Gagal mengubah verifikasi: ' + error.message);
-    else onNotice?.(profile.is_verified ? 'Centang verifikasi berhasil dicabut.' : 'Pengguna berhasil diverifikasi.');
-    setBusyId(''); await loadDashboard();
-  };
-
   const toggleAdminBlock = async profile => {
     const shouldBlock = !profile.is_blocked;
     const reason = shouldBlock ? ((await onDialog?.({type:'prompt',title:'Alasan blokir akun',message:`Masukkan alasan memblokir @${profile.username} (opsional).`,defaultValue:'Pelanggaran aturan Atlantic',placeholder:'Alasan blokir…',confirmLabel:'Lanjutkan',maxLength:500})) || '') : '';
@@ -163,7 +154,7 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
         </div>
         <nav className="atl-admin-tabs">
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Pengguna ({userTotal})</button>
-          <button className={tab === 'verification' ? 'active' : ''} onClick={() => setTab('verification')}>Verifikasi pengguna {pendingUsers > 0 && <i>{pendingUsers}</i>}</button>
+          <button className={tab === 'verification' ? 'active' : ''} onClick={() => setTab('verification')}>Pemeriksaan akun {pendingUsers > 0 && <i>{pendingUsers}</i>}</button>
           <button className={tab === 'groups' ? 'active' : ''} onClick={() => setTab('groups')}>Verifikasi grup {pendingGroups > 0 && <i>{pendingGroups}</i>}</button>
           <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Laporan akun {pendingReports > 0 && <i>{pendingReports}</i>}</button>
         </nav>
@@ -171,11 +162,11 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
           {loading && <div className="atl-admin-loading"><span className="atl-admin-spinner"/> Memperbarui data…</div>}
           {!loading && tab === 'users' && <>
             <div className="atl-admin-section-heading"><div><h3>Daftar pengguna</h3><p>Menampilkan hingga 100 akun terbaru.</p></div><label className="atl-admin-search"><Search size={16}/><input value={userSearch} onChange={event => setUserSearch(event.target.value)} placeholder="Cari nama atau username"/></label></div>
-            <div className="atl-admin-user-list">{filteredUsers.map(profile => <article key={profile.id} className="atl-admin-user"><div className="atl-admin-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt=""/> : (profile.display_name || profile.username || 'A').slice(0,1).toUpperCase()}</div><div className="atl-admin-user-info"><b>{profile.display_name || profile.username || 'Pengguna'} {profile.is_verified && <BadgeCheck size={15}/>}</b><span>@{profile.username || 'tanpa-username'}</span><small>Bergabung {dateLabel(profile.created_at)}</small></div><div className="atl-admin-user-actions"><span className={profile.is_blocked ? 'atl-admin-status rejected' : profile.is_verified ? 'atl-admin-status verified' : 'atl-admin-status'}>{profile.is_blocked ? 'Diblokir' : profile.is_verified ? 'Terverifikasi' : 'Reguler'}</span><button disabled={busyId === 'verify:' + profile.id} onClick={() => toggleVerification(profile)}>{profile.is_verified ? 'Cabut centang' : 'Verifikasi'}</button><button className={profile.is_blocked ? 'unblock' : 'block'} disabled={busyId === 'block:' + profile.id} onClick={() => toggleAdminBlock(profile)}>{profile.is_blocked ? 'Buka blokir' : 'Blokir'}</button></div></article>)}
+            <div className="atl-admin-user-list">{filteredUsers.map(profile => <article key={profile.id} className="atl-admin-user"><div className="atl-admin-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt=""/> : (profile.display_name || profile.username || 'A').slice(0,1).toUpperCase()}</div><div className="atl-admin-user-info"><b>{profile.display_name || profile.username || 'Pengguna'}</b><span>@{profile.username || 'tanpa-username'}</span><small>Bergabung {dateLabel(profile.created_at)}</small></div><div className="atl-admin-user-actions"><span className={profile.is_blocked ? 'atl-admin-status rejected' : 'atl-admin-status'}>{profile.is_blocked ? 'Diblokir' : 'Pengguna'}</span><button className={profile.is_blocked ? 'unblock' : 'block'} disabled={busyId === 'block:' + profile.id} onClick={() => toggleAdminBlock(profile)}>{profile.is_blocked ? 'Buka blokir' : 'Blokir'}</button></div></article>)}
               {!filteredUsers.length && <p className="atl-admin-empty">Pengguna tidak ditemukan.</p>}</div>
           </>}
           {!loading && tab === 'verification' && <>
-            <div className="atl-admin-section-heading"><div><h3>Pengajuan verifikasi pengguna</h3><p>Tinjau permintaan lencana verifikasi akun.</p></div></div>
+            <div className="atl-admin-section-heading"><div><h3>Pemeriksaan akun</h3><p>Tinjau permintaan pemeriksaan akun. Persetujuan tidak memberikan badge; badge biru hanya untuk Admin Atlantic utama.</p></div></div>
             <div className="atl-admin-request-list">{userRequests.map(request => { const profile = profilesById[request.user_id] || {}; const key = 'user:' + request.id; return <article className="atl-admin-request" key={request.id}><div className="atl-admin-request-top"><div><b>{profile.display_name || profile.username || 'Pengguna'}</b><span>@{profile.username || 'akun'}</span></div><span className={'atl-admin-status ' + request.status}>{request.status === 'pending' ? 'Menunggu' : request.status === 'approved' ? 'Disetujui' : 'Ditolak'}</span></div><p>{request.note || 'Tidak ada catatan tambahan.'}</p><small>Diajukan {dateLabel(request.requested_at)}{request.reviewed_at ? ' · Ditinjau ' + dateLabel(request.reviewed_at) : ''}</small>{request.status === 'pending' && <><textarea value={reviewNotes[key] || ''} onChange={event => setReviewNotes(current => ({...current,[key]:event.target.value}))} maxLength={500} placeholder="Catatan admin (opsional)"/><div className="atl-admin-review-actions"><button className="reject" disabled={busyId === key} onClick={() => reviewRequest('user',request,false)}><XCircle size={16}/> Tolak</button><button className="approve" disabled={busyId === key} onClick={() => reviewRequest('user',request,true)}><CheckCircle2 size={16}/> Setujui</button></div></>}</article>; })}
               {!userRequests.length && <p className="atl-admin-empty">Belum ada pengajuan verifikasi.</p>}</div>
           </>}
