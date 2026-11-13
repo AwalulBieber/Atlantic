@@ -319,13 +319,13 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           </section>}
           {tab === "security" && <section className="atl-e2ee-recovery-panel">
             <h3>Keamanan & pemulihan E2EE</h3>
-            <p>Atlantic membuat identitas E2EE otomatis saat kamu masuk. Private key disimpan hanya di perangkat ini dan tidak dikirim ke server.</p>
-            <div className="atl-e2ee-recovery-status"><b>{recoveryBackupExists ? "Cadangan pemulihan tersedia" : e2eeIdentityExists ? "Identitas E2EE terdaftar" : "Menyiapkan identitas E2EE otomatis"}</b><small>{recoveryBackupExists ? "Kamu dapat memulihkan identitas di perangkat baru menggunakan passphrase cadangan." : e2eeIdentityExists ? "Kunci perangkat ini tidak memiliki cadangan pemulihan. Jangan hapus data browser atau pindah perangkat sebelum tersedia fitur transfer kunci." : "Identitas akan dibuat otomatis saat sesi akun aktif. Tidak perlu membuat kunci secara manual."}</small></div>
+            <p>Atlantic membuat identitas E2EE otomatis saat login. Cadangan private key dienkripsi dengan kata sandi akun sebelum disimpan; server tidak menerima private key dalam bentuk terbuka.</p>
+            <div className="atl-e2ee-recovery-status"><b>{recoveryBackupExists ? "Cadangan pemulihan tersedia" : e2eeIdentityExists ? "Identitas E2EE terdaftar" : "Menyiapkan identitas E2EE otomatis"}</b><small>{recoveryBackupExists ? "Di perangkat baru, login dengan kata sandi akun yang sama agar kunci dipulihkan otomatis. Jika kata sandi akun diubah, cadangan perlu diperbarui dari perangkat yang masih menyimpan kunci." : e2eeIdentityExists ? "Identitas lama ini belum memiliki cadangan otomatis. Perangkat ini masih menyimpan kunci utama; jangan hapus data browser atau keluar sebelum proses migrasi kunci lama tersedia." : "Identitas dan cadangan terenkripsi akan dibuat otomatis setelah login menggunakan kata sandi akun."}</small></div>
             {recoveryBackupExists && <>
-              <label>Passphrase pemulihan<input type="password" autoComplete="current-password" minLength={12} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder="Passphrase cadangan" /></label>
+              <label>Kata sandi akun / passphrase cadangan lama<input type="password" autoComplete="current-password" minLength={6} value={recoveryPassphrase} onChange={e => setRecoveryPassphrase(e.target.value)} placeholder="Kata sandi akun" /></label>
               <button type="button" disabled={recoveryBusy} onClick={restoreRecoveryBackup}>{recoveryBusy ? "Memulihkan…" : "Pulihkan kunci di perangkat ini"}</button>
             </>}
-            <small className="atl-settings-hint">Server hanya menyimpan kunci publik dan, jika tersedia, cadangan terenkripsi. Jangan hapus data browser pada perangkat yang menyimpan private key.</small>
+            <small className="atl-settings-hint">Server hanya menyimpan kunci publik dan cadangan terenkripsi. Jangan hapus data browser pada perangkat yang masih menyimpan identitas E2EE lama.</small>
           </section>}
           {tab === "privacy" && <>
             <label className="atl-switch-row"><span><b>Akun private</b><small>Sembunyikan profil dari daftar pemilihan anggota saat pengguna membuat grup baru.</small></span><input type="checkbox" checked={!!profile.is_private} onChange={e => update("is_private", e.target.checked)}/></label>
