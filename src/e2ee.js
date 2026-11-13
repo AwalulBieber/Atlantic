@@ -146,22 +146,7 @@ export async function ensureE2EEIdentity(supabase, userId) {
     throw new Error('Kunci privat akun ini tersimpan di perangkat lain. Fitur E2EE perlu pemindahan kunci perangkat sebelum bisa digunakan di sini.');
   }
 
-  const pair = await crypto.subtle.generateKey(
-    { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
-  );
-  const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
-  const { data: updated, error: updateError } = await supabase
-    .from('profiles')
-    .update({ e2ee_public_key: publicJwk })
-    .eq('id', userId)
-    .is('e2ee_public_key', null)
-    .select('id')
-    .maybeSingle();
-  if (updateError || !updated) {
-    throw new Error('Kunci publik sudah didaftarkan dari perangkat lain atau gagal disimpan. Perangkat ini memerlukan proses tautkan perangkat sebelum E2EE aktif.');
-  }
-  await writeLocalKey(IDENTITY_STORE, userId, { privateKey: pair.privateKey, publicJwk });
-  return { userId, privateKey: pair.privateKey, publicJwk };
+  throw new Error('Kunci E2EE belum disiapkan. Buka Pengaturan akun → Keamanan, lalu buat cadangan pemulihan sebelum mulai mengirim pesan terenkripsi.');
 }
 
 export async function ensureConversationE2EE(supabase, conversationId, memberIds, userId) {
@@ -381,4 +366,127 @@ export async function getE2EEFingerprint(publicJwk) {
   const canonical = JSON.stringify({ crv: publicJwk.crv, kty: publicJwk.kty, x: publicJwk.x, y: publicJwk.y });
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(canonical)));
   return Array.from(digest.slice(0, 20)).map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(':');
+}
+
+
+function canonicalPublicJwk(jwk) {
+  return JSON.stringify({ crv: jwk?.crv, kty: jwk?.kty, x: jwk?.x, y: jwk?.y });
+}
+
+async function deriveRecoveryWrappingKey(passphrase, salt, iterations) {
+  const material = await crypto.subtle.importKey(
+    'raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+export async function createE2EERecoveryBackup(supabase, userId, passphrase) {
+  if (typeof passphrase !== 'string' || passphrase.length < 12) {
+    throw new Error('Gunakan passphrase pemulihan minimal 12 karakter.');
+  }
+  const local = await readLocalKey(IDENTITY_STORE, userId);
+  if (local) {
+    throw new Error('Identitas E2EE sudah dibuat tanpa cadangan yang dapat diekspor. Demi keamanan, identitas non-extractable lama tidak bisa diubah menjadi cadangan secara retroaktif.');
+  }
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle();
+  if (profileError) throw new Error('Profil keamanan gagal dimuat: ' + profileError.message);
+  if (profile?.e2ee_public_key) {
+    throw new Error('Kunci publik akun sudah ada di perangkat lain. Pulihkan dari cadangan yang sudah dibuat; jangan membuat identitas baru.');
+  }
+
+  const pair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+  );
+  const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
+  const privatePkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const iterations = 600000;
+  const wrappingKey = await deriveRecoveryWrappingKey(passphrase, salt, iterations);
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrappingKey, privatePkcs8);
+  const backup = {
+    version: 1,
+    kdf: 'PBKDF2-SHA256',
+    iterations,
+    salt: bytesToBase64(salt),
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
+    publicJwk
+  };
+
+  const { data: updated, error: updateError } = await supabase
+    .from('profiles')
+    .update({ e2ee_public_key: publicJwk })
+    .eq('id', userId)
+    .is('e2ee_public_key', null)
+    .select('id')
+    .maybeSingle();
+  if (updateError || !updated) {
+    throw new Error('Kunci publik gagal didaftarkan. Tidak ada identitas lokal yang disimpan.');
+  }
+
+  const { error: backupError } = await supabase
+    .from('profile_e2ee_recovery_backups')
+    .insert({ user_id: userId, backup });
+  if (backupError) {
+    await supabase.from('profiles').update({ e2ee_public_key: null })
+      .eq('id', userId).eq('e2ee_public_key', publicJwk);
+    throw new Error('Cadangan pemulihan gagal disimpan: ' + backupError.message);
+  }
+
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8', privatePkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+  );
+  await writeLocalKey(IDENTITY_STORE, userId, { privateKey, publicJwk });
+  return { userId, publicJwk };
+}
+
+export async function restoreE2EEIdentityFromBackup(supabase, userId, passphrase) {
+  if (typeof passphrase !== 'string' || passphrase.length < 12) {
+    throw new Error('Passphrase pemulihan minimal 12 karakter.');
+  }
+  const local = await readLocalKey(IDENTITY_STORE, userId);
+  if (local) return { userId, alreadyRestored: true };
+
+  const [{ data: profile, error: profileError }, { data: row, error: backupError }] = await Promise.all([
+    supabase.from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle(),
+    supabase.from('profile_e2ee_recovery_backups').select('backup').eq('user_id', userId).maybeSingle()
+  ]);
+  if (profileError) throw new Error('Kunci publik gagal dimuat: ' + profileError.message);
+  if (backupError) throw new Error('Cadangan pemulihan gagal dimuat: ' + backupError.message);
+  const backup = row?.backup;
+  if (!backup || backup.version !== 1 || backup.kdf !== 'PBKDF2-SHA256') {
+    throw new Error('Cadangan pemulihan tidak ditemukan atau formatnya tidak didukung.');
+  }
+  if (!profile?.e2ee_public_key || canonicalPublicJwk(profile.e2ee_public_key) !== canonicalPublicJwk(backup.publicJwk)) {
+    throw new Error('Kunci publik cadangan tidak cocok dengan identitas akun. Pemulihan dihentikan.');
+  }
+  const wrappingKey = await deriveRecoveryWrappingKey(
+    passphrase, base64ToBytes(backup.salt), Number(backup.iterations)
+  );
+  let privatePkcs8;
+  try {
+    privatePkcs8 = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(backup.iv) },
+      wrappingKey,
+      base64ToBytes(backup.ciphertext)
+    );
+  } catch {
+    throw new Error('Passphrase pemulihan salah atau cadangan rusak.');
+  }
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8', privatePkcs8, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']
+  );
+  await writeLocalKey(IDENTITY_STORE, userId, {
+    privateKey,
+    publicJwk: backup.publicJwk
+  });
+  return { userId, restored: true };
 }
