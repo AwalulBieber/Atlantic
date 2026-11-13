@@ -96,6 +96,7 @@ export default function App() {
   const [e2eeStatus, setE2eeStatus] = useState({ state: 'loading', error: '' });
   const e2eeKeyRef = useRef(null);
   const e2eeKeyIdRef = useRef(null);
+  const e2eeObjectUrlsRef = useRef(new Set());
   const [e2eeFingerprints, setE2eeFingerprints] = useState([]);
   const [draft, setDraft] = useState('');
   const [attachmentFile, setAttachmentFile] = useState(null);
@@ -588,6 +589,11 @@ export default function App() {
     return () => { cancelled = true; e2eeKeyRef.current = null; };
   }, [active?.conversation_id, session?.user?.id]);
 
+  useEffect(() => () => {
+    for (const url of e2eeObjectUrlsRef.current) URL.revokeObjectURL(url);
+    e2eeObjectUrlsRef.current.clear();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     async function loadFingerprints() {
@@ -651,6 +657,7 @@ export default function App() {
           const encryptedBytes = new Uint8Array(await response.arrayBuffer());
           const plainBytes = await decryptE2EEBytes(messageKey, { iv: next.e2eeAttachment.iv, ciphertext: encryptedBytes });
           const blobUrl = URL.createObjectURL(new Blob([plainBytes], { type: next.e2eeAttachment.type || 'application/octet-stream' }));
+          e2eeObjectUrlsRef.current.add(blobUrl);
           return { ...next, media_url: blobUrl, media_type: next.e2eeAttachment.type, media_name: next.e2eeAttachment.name };
         } catch { return { ...next, media_url: null, body: (next.body ? next.body + '\\n' : '') + '🔒 Lampiran tidak dapat dibuka.', decrypt_error: true }; }
       }
@@ -722,6 +729,7 @@ export default function App() {
             const encryptedBytes = new Uint8Array(await response.arrayBuffer());
             const plainBytes = await decryptE2EEBytes(incomingMessageKey, { iv: incoming.e2eeAttachment.iv, ciphertext: encryptedBytes });
             incoming.media_url = URL.createObjectURL(new Blob([plainBytes], { type: incoming.e2eeAttachment.type || 'application/octet-stream' }));
+            e2eeObjectUrlsRef.current.add(incoming.media_url);
             incoming.media_type = incoming.e2eeAttachment.type;
             incoming.media_name = incoming.e2eeAttachment.name;
           } catch { incoming.media_url = null; incoming.body = (incoming.body ? incoming.body + '\\n' : '') + '🔒 Lampiran tidak dapat dibuka.'; }
