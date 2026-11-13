@@ -1115,3 +1115,8 @@ html[data-theme="dark"] .atl-message-reactions button.is-mine{background:#263e5c
 .atl-channel-attachment{display:block;width:min(100%,680px);margin:7px auto 0}
 .atl-channel-polls-panel{width:min(100%,620px);max-height:85dvh;overflow:auto}
 @media(max-width:560px){.atl-channel-posts,.atl-channel-compose,.atl-channel-attachment{width:100%}.atl-channel-posts article{padding:13px}.atl-channel-attach-menu{width:190px}}
+
+.atl-group-invites-avatar{overflow:hidden;font-size:15px;font-weight:900}
+.atl-group-invites-avatar img{width:100%;height:100%;object-fit:cover}
+.atl-group-invites-head-actions{display:flex;align-items:center;gap:7px}
+.atl-group-invites-head-actions button{display:grid;place-items:center;width:34px;height:34px;border:2px solid var(--ink);border-radius:8px;background:var(--panel,#fff);color:var(--ink)}
