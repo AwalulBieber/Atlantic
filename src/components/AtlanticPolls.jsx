@@ -62,13 +62,16 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
 
   useEffect(()=>{
     load();
-    const channel=supabase.channel('atlantic-polls-'+targetType+'-'+targetId)
-      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_votes'},()=>load())
-      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_reactions'},()=>load())
-      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_polls'},()=>load())
+    const channel=supabase.channel('atlantic-polls-'+targetType+'-'+targetId+'-'+(pollId||'all'));
+    const voteFilter=pollId?{filter:'poll_id=eq.'+pollId}:{};
+    const pollFilter=pollId?{filter:'id=eq.'+pollId}:{};
+    channel
+      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_votes',...voteFilter},()=>load())
+      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_reactions',...voteFilter},()=>load())
+      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_polls',...pollFilter},()=>load())
       .subscribe();
     return()=>{supabase.removeChannel(channel);};
-  },[load,targetId,targetType]);
+  },[load,targetId,targetType,pollId]);
 
   const createPoll=async(e)=>{
     e.preventDefault();
