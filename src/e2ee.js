@@ -118,7 +118,9 @@ async function unwrapConversationKey(envelope, identity, senderPublicKey, conver
   return crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
-export async function ensureE2EEIdentity(supabase, userId) {
+const identitySetupPromises = new Map();
+
+async function createOrLoadE2EEIdentity(supabase, userId) {
   const local = await readLocalKey(IDENTITY_STORE, userId);
   const { data: profile, error } = await supabase
     .from('profiles').select('e2ee_public_key').eq('id', userId).maybeSingle();
@@ -190,6 +192,18 @@ export async function ensureE2EEIdentity(supabase, userId) {
   }
 
   return { userId, privateKey, publicJwk };
+}
+
+export function ensureE2EEIdentity(supabase, userId) {
+  if (!userId) return Promise.reject(new Error('Akun belum terautentikasi untuk menyiapkan E2EE.'));
+  const existing = identitySetupPromises.get(userId);
+  if (existing) return existing;
+  const setup = createOrLoadE2EEIdentity(supabase, userId)
+    .finally(() => {
+      if (identitySetupPromises.get(userId) === setup) identitySetupPromises.delete(userId);
+    });
+  identitySetupPromises.set(userId, setup);
+  return setup;
 }
 
 export async function ensureConversationE2EE(supabase, conversationId, memberIds, userId) {
