@@ -3,15 +3,16 @@ import { supabase } from '../supabase';
 import { encryptE2EEText, decryptE2EEText, encryptE2EEMessage, ensureConversationE2EE, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById } from '../e2ee';
 import { BarChart3, Plus, X, Check, Lock, Clock3, Users } from 'lucide-react';
 
-export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, e2eeKey = null, e2eeKeyId = null, onKeyReady }) {
+export default function AtlanticPolls({ targetType, targetId, user, canCreate = true, onNotice, pollId = null, inline = false, createOnly = false, onCreated, onDeleted, e2eeKey = null, e2eeKeyId = null, onKeyReady }) {
   const [polls,setPolls]=useState([]);
   const [options,setOptions]=useState([]);
   const [votes,setVotes]=useState([]);
+  const [reactions,setReactions]=useState([]);
   const [profiles,setProfiles]=useState({});
   const [question,setQuestion]=useState('');
   const [choices,setChoices]=useState(['','']);
   const [expiry,setExpiry]=useState('never');
-  const [showCreate,setShowCreate]=useState(false);
+  const [showCreate,setShowCreate]=useState(createOnly);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [canModerate,setCanModerate]=useState(false);
@@ -36,12 +37,14 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       } catch { return { ...poll, question: '🔒 Polling terenkripsi tidak dapat dibuka.', decrypt_error: true, is_e2ee: true }; }
     }));
     setPolls(visiblePolls);
-    if(!pollIds.length){setOptions([]);setVotes([]);setProfiles({});return;}
-    const [{data:optionRows,error:optionError},{data:voteRows,error:voteError}]=await Promise.all([
+    if(!pollIds.length){setOptions([]);setVotes([]);setReactions([]);setProfiles({});return;}
+    const [{data:optionRows,error:optionError},{data:voteRows,error:voteError},{data:reactionRows,error:reactionError}]=await Promise.all([
       supabase.from('atlantic_poll_options').select('id,poll_id,label,position').in('poll_id',pollIds).order('position'),
-      supabase.from('atlantic_poll_votes').select('id,poll_id,option_id,user_id,created_at').in('poll_id',pollIds)
+      supabase.from('atlantic_poll_votes').select('id,poll_id,option_id,user_id,created_at').in('poll_id',pollIds),
+      supabase.from('atlantic_poll_reactions').select('id,poll_id,user_id,emoji').in('poll_id',pollIds)
     ]);
-    if(optionError||voteError){setError(optionError?.message||voteError?.message||'Gagal memuat hasil polling.');return;}
+    if(optionError||voteError||reactionError){setError(optionError?.message||voteError?.message||reactionError?.message||'Gagal memuat hasil polling.');return;}
+    setReactions(reactionRows||[]);
     const visibleOptions = await Promise.all((optionRows||[]).map(async option => {
       if (!e2eeKey) return targetType === 'group' ? { ...option, label: '🔒 Pilihan terkunci', decrypt_error: true, is_e2ee: true } : option;
       try {
@@ -61,6 +64,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     load();
     const channel=supabase.channel('atlantic-polls-'+targetType+'-'+targetId)
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_votes'},()=>load())
+      .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_poll_reactions'},()=>load())
       .on('postgres_changes',{event:'*',schema:'public',table:'atlantic_polls'},()=>load())
       .subscribe();
     return()=>{supabase.removeChannel(channel);};
@@ -87,22 +91,23 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
         storedOptions = await Promise.all(clean.map(option => encryptE2EEText(activeKey, option)));
       }
     } catch (encryptionError) { setError('Polling gagal dienkripsi: ' + encryptionError.message); setBusy(false); return; }
-    const {error:e1}=await supabase.rpc('create_atlantic_poll',{p_type:targetType,p_target:targetId,p_question:storedQuestion,p_options:storedOptions,p_expires_at:expiresAt});
+    const {data:createdId,error:e1}=await supabase.rpc('create_atlantic_poll',{p_type:targetType,p_target:targetId,p_question:storedQuestion,p_options:storedOptions,p_expires_at:expiresAt});
     if(e1)setError(e1.message);
+    else if(!createdId)setError('Polling dibuat tetapi ID polling tidak diterima.');
     else{
-      const {data:created,error:fetchError}=await supabase.from('atlantic_polls').select('id').eq('target_type',targetType).eq('target_id',targetId).eq('created_by',user.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
-      if(fetchError||!created?.id){setError(fetchError?.message||'Polling dibuat, tetapi pesan polling gagal disiapkan.');}
-      else{
-        if (activeKey && activeKeyId) {
-          const { error: keyBindError } = await supabase.rpc('set_atlantic_poll_e2ee_key', { p_poll_id: created.id, p_key_id: activeKeyId });
-          if (keyBindError) { setError('Polling dibuat tetapi pengaitan kunci E2EE gagal: ' + keyBindError.message); setBusy(false); return; }
-        }
-        const pollMarker = `[[ATLANTIC_POLL:${created.id}]]`;
+      if (activeKey && activeKeyId) {
+        const { error: keyBindError } = await supabase.rpc('set_atlantic_poll_e2ee_key', { p_poll_id: createdId, p_key_id: activeKeyId });
+        if (keyBindError) { setError('Polling dibuat tetapi pengaitan kunci E2EE gagal: ' + keyBindError.message); setBusy(false); return; }
+      }
+      if(targetType==='group'){
+        const pollMarker = `[[ATLANTIC_POLL:${createdId}]]`;
         const storedMarker = activeKey ? await encryptE2EEMessage(activeKey, { text: pollMarker }) : pollMarker;
         const {error:messageError}=await supabase.from('messages').insert({conversation_id:targetId,sender_id:user.id,body:storedMarker,e2ee_key_id:activeKeyId});
-        if(messageError)setError('Polling dibuat, tetapi gagal dikirim ke chat: '+messageError.message);
-        else{setQuestion('');setChoices(['','']);setExpiry('never');setShowCreate(false);onNotice?.('Polling berhasil dikirim ke chat.');onCreated?.();await load();}
+        if(messageError){setError('Polling dibuat, tetapi gagal dikirim ke chat: '+messageError.message);setBusy(false);return;}
       }
+      setQuestion('');setChoices(['','']);setExpiry('never');setShowCreate(false);
+      onNotice?.(targetType==='channel'?'Polling diterbitkan di timeline saluran.':'Polling berhasil dikirim ke chat.');
+      onCreated?.();await load();
     }
     setBusy(false);
   };
@@ -120,6 +125,31 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
     setBusy(true);setError('');
     const {error:e}=await supabase.rpc('close_atlantic_poll',{p_poll_id:poll.id});
     if(e)setError(e.message);else{onNotice?.('Polling ditutup.');await load();}
+    setBusy(false);
+  };
+
+  const toggleReaction=async(poll,emoji)=>{
+    if(busy)return;
+    const existing=reactions.find(item=>item.poll_id===poll.id&&item.user_id===user?.id&&item.emoji===emoji);
+    setBusy(true);setError('');
+    const result=existing
+      ? await supabase.from('atlantic_poll_reactions').delete().eq('id',existing.id).eq('user_id',user.id)
+      : await supabase.from('atlantic_poll_reactions').insert({poll_id:poll.id,user_id:user.id,emoji});
+    if(result.error)setError('Reaksi gagal disimpan: '+result.error.message);
+    else await load();
+    setBusy(false);
+  };
+
+  const deletePoll=async(poll)=>{
+    if(busy)return;
+    const allowed=targetType==='channel'?canCreate:(poll.created_by===user?.id||canModerate);
+    if(!allowed)return;
+    const confirmed=window.confirm('Hapus polling ini dari timeline? Semua suara dan reaksi ikut dihapus.');
+    if(!confirmed)return;
+    setBusy(true);setError('');
+    const {error:deleteError}=await supabase.from('atlantic_polls').delete().eq('id',poll.id);
+    if(deleteError)setError('Polling gagal dihapus: '+deleteError.message);
+    else{onNotice?.('Polling dihapus.');onDeleted?.(poll.id);await load();}
     setBusy(false);
   };
 
@@ -147,7 +177,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
       const closed=Boolean(poll.closed_at||expired);
       const canClose=poll.created_by===user?.id||canModerate;
       return <article className="atl-poll-card" key={poll.id}>
-        <header><div><span className="atl-poll-tag"><BarChart3 size={12}/> {targetType==='group'?'POLLING GRUP':'POLLING SALURAN'}</span><h3>{poll.question}</h3><small>{new Date(poll.created_at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · {formatExpiry(poll.expires_at)}</small></div>{canClose&&!closed&&<button type="button" className="atl-poll-close" onClick={()=>closePoll(poll)} disabled={busy}>Tutup</button>}</header>
+        <header><div><span className="atl-poll-tag"><BarChart3 size={12}/> {targetType==='group'?'POLLING GRUP':'POLLING SALURAN'}</span><h3>{poll.question}</h3><small>{new Date(poll.created_at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · {formatExpiry(poll.expires_at)}</small></div><div className="atl-poll-card-actions">{canClose&&!closed&&<button type="button" className="atl-poll-close" onClick={()=>closePoll(poll)} disabled={busy}>Tutup</button>}{(targetType==='channel'?canCreate:(poll.created_by===user?.id||canModerate))&&<button type="button" className="atl-poll-delete" onClick={()=>deletePoll(poll)} disabled={busy}>Hapus</button>}</div></header>
         <div className="atl-poll-options">{opts.map(option=>{
           const selected=pollVotes.some(v=>v.option_id===option.id&&v.user_id===user?.id);
           const voters=pollVotes.filter(v=>v.option_id===option.id);
@@ -159,6 +189,7 @@ export default function AtlanticPolls({ targetType, targetId, user, canCreate = 
           </div>;
         })}</div>
         <footer><span>{total} suara</span><span>{closed?<><Lock size={12}/> {expired&&!poll.closed_at?'Waktu habis':'Ditutup'}</>:'Pilih jawaban · bisa mengubah pilihan'}</span></footer>
+        <div className="atl-poll-reactions">{['👍','❤️','😂','🎉','🔥'].map(emoji=>{const items=reactions.filter(item=>item.poll_id===poll.id&&item.emoji===emoji);const selected=items.some(item=>item.user_id===user?.id);return <button type="button" key={emoji} className={selected?'is-selected':''} onClick={()=>toggleReaction(poll,emoji)} disabled={busy} aria-label={`Reaksi ${emoji}, ${items.length}`}><span>{emoji}</span>{items.length>0&&<b>{items.length}</b>}</button>;})}</div>
       </article>;
     }))}
   </section>;
