@@ -893,7 +893,7 @@ export default function App() {
         event: '*', schema: 'public', table: 'message_reactions'
       }, payload => {
         const row = payload.new?.id ? payload.new : payload.old;
-        if (!row?.message_id || !messages.some(message => message.id === row.message_id)) return;
+        if (!row?.message_id) return;
         if (payload.eventType === 'DELETE') setMessageReactions(rows => rows.filter(item => item.id !== row.id));
         else setMessageReactions(rows => [...rows.filter(item => item.id !== row.id && !(item.message_id === row.message_id && item.user_id === row.user_id)), payload.new]);
       })
