@@ -125,8 +125,18 @@ export async function ensureE2EEIdentity(supabase, userId) {
   if (error) throw new Error('Kunci publik gagal dimuat: ' + error.message);
 
   if (local) {
-    if (!profile?.e2ee_public_key ||
-        JSON.stringify(profile.e2ee_public_key) !== JSON.stringify(local.publicJwk)) {
+    if (!profile?.e2ee_public_key) {
+      const { data: restored, error: restoreError } = await supabase
+        .from('profiles')
+        .update({ e2ee_public_key: local.publicJwk })
+        .eq('id', userId)
+        .is('e2ee_public_key', null)
+        .select('id')
+        .maybeSingle();
+      if (restoreError || !restored) {
+        throw new Error('Kunci publik perangkat gagal dipulihkan. Jangan kirim pesan terenkripsi sebelum status kunci diperiksa.');
+      }
+    } else if (JSON.stringify(profile.e2ee_public_key) !== JSON.stringify(local.publicJwk)) {
       throw new Error('Kunci perangkat dan kunci akun tidak cocok. Jangan kirim pesan terenkripsi dari perangkat ini sebelum pemulihan kunci dilakukan.');
     }
     return { userId, privateKey: local.privateKey, publicJwk: local.publicJwk };
