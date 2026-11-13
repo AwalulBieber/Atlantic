@@ -198,10 +198,18 @@ export function ensureE2EEIdentity(supabase, userId) {
   if (!userId) return Promise.reject(new Error('Akun belum terautentikasi untuk menyiapkan E2EE.'));
   const existing = identitySetupPromises.get(userId);
   if (existing) return existing;
-  const setup = createOrLoadE2EEIdentity(supabase, userId)
-    .finally(() => {
-      if (identitySetupPromises.get(userId) === setup) identitySetupPromises.delete(userId);
-    });
+  const runSetup = () => {
+    // Web Locks also serialize initialization across tabs on the same device.
+    if (globalThis.navigator?.locks?.request) {
+      return navigator.locks.request('atlantic-e2ee-identity:' + userId, () =>
+        createOrLoadE2EEIdentity(supabase, userId)
+      );
+    }
+    return createOrLoadE2EEIdentity(supabase, userId);
+  };
+  const setup = runSetup().finally(() => {
+    if (identitySetupPromises.get(userId) === setup) identitySetupPromises.delete(userId);
+  });
   identitySetupPromises.set(userId, setup);
   return setup;
 }
