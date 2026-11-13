@@ -153,6 +153,8 @@ export default function App() {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const swipeTimer = useRef(null);
+  const messageLongPressTimer = useRef(null);
+  const longPressTriggered = useRef(false);
   const typingChannelRef = useRef(null);
   const typingStopTimer = useRef(null);
   const typingIndicatorTimer = useRef(null);
@@ -1418,22 +1420,40 @@ export default function App() {
                   key={m.id}
                   id={`message-${m.id}`}
                   style={swipeState.id === m.id ? { transform: `translateX(${swipeState.offset}px)` } : undefined}
-                  onTouchStart={e => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
+                  onContextMenu={e => { e.preventDefault(); setMessageActionTarget(m.id); }}
+                  onTouchStart={e => {
+                    touchStartX.current = e.touches[0].clientX;
+                    touchStartY.current = e.touches[0].clientY;
+                    longPressTriggered.current = false;
+                    if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    messageLongPressTimer.current = setTimeout(() => {
+                      longPressTriggered.current = true;
+                      setSwipeState({ id: null, offset: 0 });
+                      setMessageActionTarget(m.id);
+                      if (navigator.vibrate) navigator.vibrate(18);
+                    }, 520);
+                  }}
                   onTouchMove={e => {
                     const dx = e.touches[0].clientX - touchStartX.current;
                     const dy = e.touches[0].clientY - touchStartY.current;
-                    if (dx > 6 && dx > Math.abs(dy)) setSwipeState({ id: m.id, offset: Math.min(dx, 92) });
+                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                      if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    }
+                    if (!longPressTriggered.current && dx > 6 && dx > Math.abs(dy)) setSwipeState({ id: m.id, offset: Math.min(dx, 92) });
                   }}
                   onTouchEnd={e => {
+                    if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
+                    messageLongPressTimer.current = null;
                     const dx = e.changedTouches[0].clientX - touchStartX.current;
                     const dy = e.changedTouches[0].clientY - touchStartY.current;
-                    if (dx > 65 && dx > Math.abs(dy)) {
+                    if (!longPressTriggered.current && dx > 65 && dx > Math.abs(dy)) {
                       setReplyTarget(m);
                       setSwipeFeedbackId(m.id);
                       if (swipeTimer.current) clearTimeout(swipeTimer.current);
                       swipeTimer.current = setTimeout(() => setSwipeFeedbackId(null), 650);
                     }
                     setSwipeState({ id: null, offset: 0 });
+                    longPressTriggered.current = false;
                   }}
                 >
                   {(messageIndex === 0 || new Date(m.created_at).toDateString() !== new Date(messages[messageIndex - 1].created_at).toDateString()) && <div className="atl-chat-day-separator">{chatDayLabel(m.created_at)}</div>}
