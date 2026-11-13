@@ -819,8 +819,9 @@ export default function App() {
 
   async function loadMessages(id) {
     // Persist read state per user, including when read receipts are disabled.
-    const { error: markReadError } = await supabase.rpc('mark_atlantic_conversation_read', { p_conversation_id: id });
-    if (markReadError) console.warn('Atlantic mark read:', markReadError.message);
+    void supabase.rpc('mark_atlantic_conversation_read', { p_conversation_id: id })
+      .then(({ error }) => { if (error) console.warn('Atlantic mark read:', error.message); })
+      .catch(error => console.warn('Atlantic mark read:', error?.message || error));
     const { data, error } = await supabase
       .from('messages')
       .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at,media_url,media_type,media_name,e2ee_key_id')
@@ -887,19 +888,35 @@ export default function App() {
       replyMap = Object.fromEntries(decodedOriginals.map(item => [item.id, item]));
     }
     const incomingIds = visibleMessages.filter(m => m.sender_id !== session.user.id).map(m => m.id);
-    if (incomingIds.length) {
-      await supabase.rpc('record_atlantic_message_receipts', {
-        p_conversation_ids: null,
-        p_message_ids: incomingIds,
-        p_mark_read: myProfile?.read_receipts_enabled !== false
-      });
-    }
-    const { data: reactionRows, error: reactionError } = messageIds.length ? await supabase.from('message_reactions').select('id,message_id,user_id,emoji,created_at').in('message_id', messageIds) : { data: [], error: null };
-    if (reactionError) console.warn('Atlantic message reactions:', reactionError.message);
-    setMessageReactions(reactionRows || []);
-    setMessages(messagesWithMedia.map(m => ({ ...m, senderProfile: senderMap[m.sender_id] || null, replyPreview: replyMap[m.reply_to] ? { ...replyMap[m.reply_to], body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body, senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null } : null })));
-    void refreshInboxSummaries();
+    const readyMessages = messagesWithMedia.map(m => ({
+      ...m,
+      senderProfile: senderMap[m.sender_id] || null,
+      replyPreview: replyMap[m.reply_to] ? {
+        ...replyMap[m.reply_to],
+        body: hiddenIds.has(m.reply_to) ? 'Pesan dihapus untuk kamu' : replyMap[m.reply_to].body,
+        senderProfile: senderMap[replyMap[m.reply_to].sender_id] || null
+      } : null
+    }));
+    // Show the conversation as soon as message content is ready; receipts and
+    // reactions are secondary metadata and should not delay the first render.
+    setMessages(readyMessages);
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    void (async () => {
+      if (incomingIds.length) {
+        const { error: receiptError } = await supabase.rpc('record_atlantic_message_receipts', {
+          p_conversation_ids: null,
+          p_message_ids: incomingIds,
+          p_mark_read: myProfile?.read_receipts_enabled !== false
+        });
+        if (receiptError) console.warn('Atlantic message receipts:', receiptError.message);
+      }
+      const { data: reactionRows, error: reactionError } = messageIds.length
+        ? await supabase.from('message_reactions').select('id,message_id,user_id,emoji,created_at').in('message_id', messageIds)
+        : { data: [], error: null };
+      if (reactionError) console.warn('Atlantic message reactions:', reactionError.message);
+      else setMessageReactions(reactionRows || []);
+      void refreshInboxSummaries();
+    })().catch(error => console.warn('Atlantic chat metadata:', error?.message || error));
   }
 
   useEffect(() => {
