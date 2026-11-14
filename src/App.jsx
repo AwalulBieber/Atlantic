@@ -178,6 +178,7 @@ export default function App() {
   const liveWatchRef = useRef(null);
   const liveWriteBusyRef = useRef(false);
   const liveLastWriteAtRef = useRef(0);
+  const liveExpiryTimerRef = useRef(null);
 
   const seenMessages = useRef(new Set());
   const handledInviteToken = useRef('');
@@ -1230,6 +1231,8 @@ export default function App() {
         const sessionInfo = { id: row.id, conversationId, keyId, expiresAt };
         liveShareSessionRef.current = sessionInfo;
         liveLastWriteAtRef.current = Date.now();
+        if (liveExpiryTimerRef.current) clearTimeout(liveExpiryTimerRef.current);
+        liveExpiryTimerRef.current = window.setTimeout(() => { void stopLiveLocation(row.id); }, liveShareDuration * 60000);
         liveWatchRef.current = navigator.geolocation.watchPosition(
           nextPosition => { void updateLiveLocation(sessionInfo, nextPosition); },
           error => setNotice('Pembaruan live location terhenti: ' + getLocationError(error)),
@@ -1249,6 +1252,8 @@ export default function App() {
       if (liveWatchRef.current !== null && liveWatchRef.current !== undefined) navigator.geolocation.clearWatch(liveWatchRef.current);
       liveWatchRef.current = null;
       liveShareSessionRef.current = null;
+      if (liveExpiryTimerRef.current) clearTimeout(liveExpiryTimerRef.current);
+      liveExpiryTimerRef.current = null;
     }
     const { error } = await supabase.from('atlantic_live_locations').update({ stopped_at: new Date().toISOString() })
       .eq('id', locationId).eq('user_id', session.user.id).is('stopped_at', null);
@@ -1258,6 +1263,7 @@ export default function App() {
 
   useEffect(() => () => {
     if (liveWatchRef.current !== null && liveWatchRef.current !== undefined && navigator.geolocation) navigator.geolocation.clearWatch(liveWatchRef.current);
+    if (liveExpiryTimerRef.current) clearTimeout(liveExpiryTimerRef.current);
   }, []);
 
   useEffect(() => {
