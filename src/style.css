@@ -1728,7 +1728,7 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 
 
 /* Atlantic location sharing */
-.atl-location-card{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:center;min-width:230px;max-width:330px;padding:10px;border:1px solid color-mix(in srgb,var(--ink) 18%,transparent);border-radius:14px;background:color-mix(in srgb,var(--surface,var(--panel)) 92%,var(--accent) 8%);color:var(--ink)}
+.atl-location-card{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:center;min-width:230px;max-width:330px;padding:10px;border:1px solid color-mix(in srgb,var(--ink) 18%,transparent);border-radius:14px;background:color-mix(in srgb,var(--paper) 92%,var(--accent) 8%);color:var(--ink)}
 .atl-location-map-preview{height:62px;border-radius:10px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 28%,var(--panel)),color-mix(in srgb,var(--accent) 8%,var(--panel)));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink)}
 .atl-location-map-preview span{font-size:8px;font-weight:900;letter-spacing:.12em}
 .atl-location-details{display:flex;flex-direction:column;gap:3px;min-width:0}
@@ -1739,7 +1739,7 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-location-open{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 10px;border-radius:9px;background:var(--accent);color:#161616;font-size:12px;font-weight:850;text-decoration:none}
 .atl-location-stop{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;border:1px solid #dc5555;border-radius:9px;background:transparent;color:#dc5555;font-size:11px;font-weight:800}
 .atl-live-share-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:18px;background:rgba(10,15,25,.58);backdrop-filter:blur(8px)}
-.atl-live-share-modal{width:min(100%,390px);padding:18px;border:2px solid var(--ink);border-radius:18px;background:var(--panel);color:var(--ink);box-shadow:7px 7px 0 var(--ink)}
+.atl-live-share-modal{width:min(100%,390px);padding:18px;border:2px solid var(--ink);border-radius:18px;background:#fffdf5;color:var(--ink);box-shadow:7px 7px 0 var(--ink)}
 .atl-live-share-modal header{display:flex;align-items:center;gap:10px}
 .atl-live-share-modal header>div{display:flex;flex:1;flex-direction:column;gap:3px}
 .atl-live-share-modal header b{font-size:15px}
