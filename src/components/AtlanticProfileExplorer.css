@@ -15,3 +15,5 @@
 @media(max-width:600px){.atl-profile-explorer-overlay{padding:0}.atl-profile-explorer{width:100%;max-height:100%;border:0;border-radius:0}.atl-profile-photo{width:92px;height:92px}}
 
 .profile-avatar-trigger{padding:0;flex:0 0 auto;cursor:pointer;color:inherit;appearance:none;-webkit-appearance:none}.profile-avatar-trigger:disabled{cursor:default;opacity:1}.profile-avatar-trigger:not(:disabled):focus-visible{outline:2px solid var(--accent,#2584ed);outline-offset:3px}
+
+.atl-profile-user-verified{color:#e53935}.atl-profile-badge-user{background:color-mix(in srgb,#e53935 12%,transparent);color:#e53935}
