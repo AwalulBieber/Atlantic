@@ -29,21 +29,47 @@ export default function AtlanticProfileExplorer({ userId, onClose }) {
         return;
       }
       setProfile(data);
-      const { data: badgeRows } = await supabase.rpc("get_atlantic_public_badges", { target_users: [userId] });
-      if (alive) setIsAdmin(badgeRows?.[0]?.badge_type === "admin");
+      setStories([]);
+      setContacts([]);
+      setStoryError("");
+      setIsAdmin(false);
 
-      // Story visibility is enforced by the existing mutual-contact RLS policy.
-      const { data: storyRows, error: storiesError } = await supabase.from("atlantic_stories")
-        .select("id,body,media_url,created_at,expires_at")
-        .eq("user_id", userId).gt("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false }).limit(20);
+      const [{ data: badgeRows }, { data: storyRows, error: storiesError }] = await Promise.all([
+        supabase.rpc("get_atlantic_public_badges", { target_users: [userId] }),
+        // Story visibility is enforced by the existing mutual-contact RLS policy.
+        supabase.from("atlantic_stories")
+          .select("id,body,media_url,created_at,expires_at")
+          .eq("user_id", userId).gt("expires_at", new Date().toISOString())
+          .order("created_at", { ascending: false }).limit(20)
+      ]);
       if (!alive) return;
-      setStories(storyRows || []);
-      if (storiesError) setStoryError("Story hanya ditampilkan jika kebijakan privasi mengizinkan.");
+      setIsAdmin(badgeRows?.[0]?.badge_type === "admin");
+      if (storiesError) {
+        setStoryError("Story hanya ditampilkan jika kebijakan privasi mengizinkan.");
+      } else {
+        // Story media is stored in a private bucket; resolve short-lived URLs
+        // just like the Community feed instead of exposing storage paths as img src.
+        const hydratedStories = await Promise.all((storyRows || []).map(async story => {
+          if (!story.media_url) return story;
+          const expiresIn = Math.max(1, Math.floor((new Date(story.expires_at).getTime() - Date.now()) / 1000));
+          const { data: signed, error: signedError } = await supabase.storage
+            .from("atlantic-stories").createSignedUrl(story.media_url, expiresIn);
+          if (signedError || !signed?.signedUrl) {
+            return { ...story, media_url: null, media_error: true };
+          }
+          return { ...story, media_url: signed.signedUrl };
+        }));
+        if (!alive) return;
+        setStories(hydratedStories);
+        if (hydratedStories.some(story => story.media_error)) {
+          setStoryError("Sebagian media Story tidak dapat dimuat.");
+        }
+      }
 
       if (!data.is_private && data.show_contacts) {
-        const { data: contactRows } = await supabase.rpc("get_public_profile_contacts", { target_user: userId });
-        if (alive) setContacts(contactRows || []);
+        const { data: contactRows, error: contactsError } = await supabase.rpc("get_public_profile_contacts", { target_user: userId });
+        if (!alive) return;
+        if (!contactsError) setContacts(contactRows || []);
       }
       if (alive) setLoading(false);
     }
