@@ -9,6 +9,7 @@ const AtlanticContacts = lazy(() => import('./components/AtlanticContacts'));
 const AtlanticGroupInfo = lazy(() => import('./components/AtlanticGroupInfo'));
 const AtlanticProfileExplorer = lazy(() => import('./components/AtlanticProfileExplorer'));
 import AtlanticPolls from './components/AtlanticPolls';
+import AtlanticLocationCard from './components/AtlanticLocationCard';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
@@ -169,6 +170,14 @@ export default function App() {
   const typingActiveRef = useRef(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [liveLocations, setLiveLocations] = useState({});
+  const [liveShareDialog, setLiveShareDialog] = useState(false);
+  const [liveShareDuration, setLiveShareDuration] = useState(15);
+  const [liveShareBusy, setLiveShareBusy] = useState(false);
+  const liveShareSessionRef = useRef(null);
+  const liveWatchRef = useRef(null);
+  const liveWriteBusyRef = useRef(false);
+  const liveLastWriteAtRef = useRef(0);
 
   const seenMessages = useRef(new Set());
   const handledInviteToken = useRef('');
@@ -1154,24 +1163,130 @@ export default function App() {
     window.setTimeout(() => attachmentInputRef.current?.click(), 0);
   }
 
-  async function shareCurrentLocation(label = 'Lokasi') {
+  function getLocationError(error) {
+    if (error?.code === 1) return 'Izin lokasi ditolak. Aktifkan izin lokasi untuk Atlantic.';
+    if (error?.code === 2) return 'Lokasi belum tersedia. Coba aktifkan GPS.';
+    if (error?.code === 3) return 'Permintaan lokasi terlalu lama. Coba lagi.';
+    return 'Lokasi gagal didapatkan.';
+  }
+
+  async function shareCurrentLocation() {
+    if (!active || active.is_saved_chat) return;
     if (!navigator.geolocation) { setNotice('Perangkat ini tidak mendukung berbagi lokasi.'); return; }
+    setShowAttachmentMenu(false);
     navigator.geolocation.getCurrentPosition(async position => {
-      const { latitude, longitude } = position.coords;
-      const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-      let encryptedLocation;
       try {
         const freshKey = await ensureConversationE2EE(supabase, active.conversation_id, active.members?.map(member => member.id) || [active.person?.id], session.user.id);
         e2eeKeyRef.current = freshKey;
         e2eeKeyIdRef.current = await getCurrentConversationE2EEKeyId(supabase, active.conversation_id);
-        encryptedLocation = await encryptE2EEMessage(freshKey, { text: `${label}: ${mapUrl}` });
-      } catch (encryptionError) { setNotice(encryptionError.message); return; }
-      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedLocation, e2ee_key_id:e2eeKeyIdRef.current });
-      if (error) setNotice('Lokasi gagal dikirim: ' + error.message);
-      else setShowAttachmentMenu(false);
-    }, error => setNotice(error.code === 1 ? 'Izin lokasi ditolak. Aktifkan izin lokasi untuk Atlantic.' : 'Lokasi gagal didapatkan.'), { enableHighAccuracy:true, timeout:12000, maximumAge:10000 });
+        const location = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: Math.round(position.coords.accuracy || 0) };
+        const encryptedLocation = await encryptE2EEMessage(freshKey, { text: '[[ATLANTIC_LOCATION:' + JSON.stringify(location) + ']]' });
+        const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedLocation, e2ee_key_id:e2eeKeyIdRef.current });
+        if (error) throw error;
+        setNotice('Lokasi berhasil dibagikan.');
+      } catch (error) { setNotice('Lokasi gagal dikirim: ' + (error.message || 'Coba lagi.')); }
+    }, error => setNotice(getLocationError(error)), { enableHighAccuracy:true, timeout:15000, maximumAge:10000 });
   }
 
+  async function updateLiveLocation(sessionInfo, position) {
+    if (!sessionInfo?.id || liveWriteBusyRef.current) return;
+    const now = Date.now();
+    if (now - liveLastWriteAtRef.current < 5000) return;
+    liveWriteBusyRef.current = true;
+    try {
+      const key = await getConversationE2EEKeyById(supabase, sessionInfo.conversationId, sessionInfo.keyId, session.user.id);
+      const location = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: Math.round(position.coords.accuracy || 0), captured_at: new Date().toISOString() };
+      const encrypted = await encryptE2EEMessage(key, { text: JSON.stringify(location) });
+      const { error } = await supabase.from('atlantic_live_locations').update({ location_payload: encrypted, updated_at: new Date().toISOString() }).eq('id', sessionInfo.id).eq('user_id', session.user.id).is('stopped_at', null);
+      if (error) throw error;
+      liveLastWriteAtRef.current = now;
+    } catch (error) { console.warn('Atlantic live location update:', error.message || error); }
+    finally { liveWriteBusyRef.current = false; }
+  }
+
+  async function startLiveLocation() {
+    if (!active || active.is_saved_chat || liveShareBusy) return;
+    if (!navigator.geolocation) { setNotice('Perangkat ini tidak mendukung berbagi lokasi.'); return; }
+    if (liveShareSessionRef.current) { setNotice('Kamu masih membagikan live location. Hentikan sesi sebelumnya dulu.'); return; }
+    setLiveShareBusy(true);
+    navigator.geolocation.getCurrentPosition(async position => {
+      try {
+        const conversationId = active.conversation_id;
+        const freshKey = await ensureConversationE2EE(supabase, conversationId, active.members?.map(member => member.id) || [active.person?.id], session.user.id);
+        const keyId = await getCurrentConversationE2EEKeyId(supabase, conversationId);
+        const location = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: Math.round(position.coords.accuracy || 0), captured_at: new Date().toISOString() };
+        const encrypted = await encryptE2EEMessage(freshKey, { text: JSON.stringify(location) });
+        const expiresAt = new Date(Date.now() + liveShareDuration * 60000).toISOString();
+        const { data: row, error } = await supabase.from('atlantic_live_locations').insert({
+          conversation_id: conversationId, user_id: session.user.id, e2ee_key_id: keyId, location_payload: encrypted, expires_at: expiresAt
+        }).select('id,conversation_id,user_id,e2ee_key_id,started_at,expires_at,stopped_at,updated_at,location_payload').single();
+        if (error) throw error;
+        const messageBody = await encryptE2EEMessage(freshKey, { text: '[[ATLANTIC_LIVE_LOCATION:' + row.id + ']]' });
+        const { error: messageError } = await supabase.from('messages').insert({ conversation_id: conversationId, sender_id: session.user.id, body: messageBody, e2ee_key_id: keyId });
+        if (messageError) {
+          await supabase.from('atlantic_live_locations').update({ stopped_at: new Date().toISOString() }).eq('id', row.id);
+          throw messageError;
+        }
+        const sessionInfo = { id: row.id, conversationId, keyId, expiresAt };
+        liveShareSessionRef.current = sessionInfo;
+        liveLastWriteAtRef.current = Date.now();
+        liveWatchRef.current = navigator.geolocation.watchPosition(
+          nextPosition => { void updateLiveLocation(sessionInfo, nextPosition); },
+          error => setNotice('Pembaruan live location terhenti: ' + getLocationError(error)),
+          { enableHighAccuracy:true, maximumAge:3000, timeout:20000 }
+        );
+        setLiveShareDialog(false);
+        setShowAttachmentMenu(false);
+        setNotice('Live location dibagikan selama ' + (liveShareDuration >= 60 ? (liveShareDuration / 60) + ' jam' : liveShareDuration + ' menit') + '.');
+      } catch (error) { setNotice('Live location gagal dimulai: ' + (error.message || 'Coba lagi.')); }
+      finally { setLiveShareBusy(false); }
+    }, error => { setLiveShareBusy(false); setNotice(getLocationError(error)); }, { enableHighAccuracy:true, timeout:15000, maximumAge:5000 });
+  }
+
+  async function stopLiveLocation(locationId = liveShareSessionRef.current?.id) {
+    if (!locationId) return;
+    if (liveShareSessionRef.current?.id === locationId) {
+      if (liveWatchRef.current !== null && liveWatchRef.current !== undefined) navigator.geolocation.clearWatch(liveWatchRef.current);
+      liveWatchRef.current = null;
+      liveShareSessionRef.current = null;
+    }
+    const { error } = await supabase.from('atlantic_live_locations').update({ stopped_at: new Date().toISOString() })
+      .eq('id', locationId).eq('user_id', session.user.id).is('stopped_at', null);
+    if (error) setNotice('Live location gagal dihentikan: ' + error.message);
+    else setNotice('Live location dihentikan.');
+  }
+
+  useEffect(() => () => {
+    if (liveWatchRef.current !== null && liveWatchRef.current !== undefined && navigator.geolocation) navigator.geolocation.clearWatch(liveWatchRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!active?.conversation_id || e2eeStatus.state !== 'active' || !session?.user?.id) { setLiveLocations({}); return; }
+    let cancelled = false;
+    const conversationId = active.conversation_id;
+    async function refresh() {
+      const { data, error } = await supabase.from('atlantic_live_locations')
+        .select('id,conversation_id,user_id,e2ee_key_id,location_payload,started_at,expires_at,stopped_at,updated_at')
+        .eq('conversation_id', conversationId).order('started_at', { ascending:false }).limit(50);
+      if (error) { console.warn('Atlantic live locations:', error.message); return; }
+      const decoded = await Promise.all((data || []).map(async row => {
+        try {
+          const key = row.e2ee_key_id === e2eeKeyIdRef.current ? e2eeKeyRef.current : await getConversationE2EEKeyById(supabase, conversationId, row.e2ee_key_id, session.user.id);
+          const payload = await decryptE2EEMessage(key, row.location_payload);
+          return [row.id, { ...row, ...JSON.parse(payload.text || '{}') }];
+        } catch (error) {
+          console.warn('Atlantic live location decrypt:', error.message || error);
+          return [row.id, { ...row, location_error:true }];
+        }
+      }));
+      if (!cancelled) setLiveLocations(Object.fromEntries(decoded));
+    }
+    void refresh();
+    const channel = supabase.channel('atlantic-live-location-' + conversationId)
+      .on('postgres_changes', { event:'*', schema:'public', table:'atlantic_live_locations', filter:'conversation_id=eq.' + conversationId }, () => { void refresh(); })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [active?.conversation_id, e2eeStatus.state, session?.user?.id]);
   async function sendMessage(e) {
     e.preventDefault();
     const body = draft.trim();
@@ -1604,7 +1719,7 @@ export default function App() {
                     {m.replyPreview && <button type="button" className="reply-quote" onClick={() => document.getElementById(`message-${m.reply_to}`)?.scrollIntoView({behavior:'smooth',block:'center'})}><b>{m.replyPreview.sender_id === session.user.id ? 'Kamu' : (active.is_group ? (m.replyPreview.senderProfile?.display_name || m.replyPreview.senderProfile?.username || 'Anggota grup') : (active.person.display_name || active.person.username))}</b><span>{m.replyPreview.body || 'Pesan'}</span></button>}
                     {active.is_group && <b className="group-sender-name">{m.senderProfile?.display_name || m.senderProfile?.username || (m.sender_id === session.user.id ? 'Kamu' : 'Anggota grup')}</b>}
                     {m.media_url && (m.media_type?.startsWith('image/') ? <img className="atl-message-media" src={m.media_url} alt={m.media_name || 'Foto'} loading="lazy"/> : m.media_type?.startsWith('video/') ? <video className="atl-message-media" src={m.media_url} controls playsInline preload="metadata"/> : <a className="atl-message-file" href={m.media_url} target="_blank" rel="noreferrer">📎 {m.media_name || 'Buka lampiran'}</a>)}
-                    {m.body?.startsWith('[[ATLANTIC_POLL:') && active.is_group ? <AtlanticPolls targetType="group" targetId={active.conversation_id} pollId={m.body.match(/^\[\[ATLANTIC_POLL:([0-9a-f-]+)\]\]$/i)?.[1]} user={session.user} canCreate={false} inline e2eeKey={e2eeKeyRef.current} e2eeKeyId={e2eeKeyIdRef.current} onKeyReady={(key, keyId) => { e2eeKeyRef.current = key; e2eeKeyIdRef.current = keyId; }}/> : m.body && <div>{m.body}</div>}
+                    {m.body?.startsWith('[[ATLANTIC_LOCATION:') ? (() => { try { const location = JSON.parse(m.body.slice('[[ATLANTIC_LOCATION:'.length, -2)); return <AtlanticLocationCard location={location}/>; } catch { return <div>Lokasi tidak dapat dibuka.</div>; } })() : m.body?.startsWith('[[ATLANTIC_LIVE_LOCATION:') ? (() => { const id = m.body.slice('[[ATLANTIC_LIVE_LOCATION:'.length, -2); const location = liveLocations[id]; return location ? <AtlanticLocationCard location={location} live mine={location.user_id === session.user.id} onStop={() => stopLiveLocation(id)}/> : <div className="atl-location-card"><Crosshair size={18}/> Memuat live location…</div>; })() : m.body?.startsWith('[[ATLANTIC_POLL:') && active.is_group ? <AtlanticPolls targetType="group" targetId={active.conversation_id} pollId={m.body.match(/^\\[\\[ATLANTIC_POLL:([0-9a-f-]+)\\]\\]$/i)?.[1]} user={session.user} canCreate={false} inline e2eeKey={e2eeKeyRef.current} e2eeKeyId={e2eeKeyIdRef.current} onKeyReady={(key, keyId) => { e2eeKeyRef.current = key; e2eeKeyIdRef.current = keyId; }}/> : m.body && <div>{m.body}</div>}
                     {(() => {
                       const reactions = messageReactions.filter(row => row.message_id === m.id);
                       const grouped = Object.values(reactions.reduce((acc, row) => {
@@ -1653,8 +1768,8 @@ export default function App() {
               <button type="button" role="menuitem" onClick={() => pickChatAttachment('image/*')}><ImageIcon className="atl-menu-photo"/><b>Foto</b></button>
               <button type="button" role="menuitem" onClick={() => pickChatAttachment('video/*')}><Video className="atl-menu-video"/><b>Video</b></button>
               <button type="button" role="menuitem" onClick={() => pickChatAttachment('.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx')}><FileText className="atl-menu-document"/><b>Dokumen</b></button>
-              <button type="button" role="menuitem" onClick={() => shareCurrentLocation('Lokasi')}><MapPin className="atl-menu-location"/><b>Lokasi</b></button>
-              <button type="button" role="menuitem" onClick={() => setNotice('Live Share sedang disiapkan untuk pembaruan lokasi secara langsung.')}><Crosshair className="atl-menu-live"/><b>Live Share</b></button>
+              <button type="button" role="menuitem" onClick={shareCurrentLocation}><MapPin className="atl-menu-location"/><b>Lokasi</b></button>
+              <button type="button" role="menuitem" onClick={() => { setShowAttachmentMenu(false); setLiveShareDialog(true); }}><Crosshair className="atl-menu-live"/><b>Live Share</b></button>
               {active.is_group && <button type="button" role="menuitem" onClick={() => { setShowChatPolls(true); setShowAttachmentMenu(false); }}><BarChart3 className="atl-menu-poll"/><b>Polling</b></button>}
               <button type="button" className="atl-attachment-tools" role="menuitem" onClick={() => setNotice('Efek Pesan, Spoiler, dan Jadwal sedang disiapkan.')}><WandSparkles/><b>Efek Pesan, Spoiler &amp; Jadwal</b></button>
             </div>}
@@ -1675,6 +1790,7 @@ export default function App() {
       </section>
 
       {notice && <button className="toast" onClick={() => setNotice('')}>{notice}　×</button>}
+      {liveShareDialog && <div className="atl-live-share-backdrop" onClick={() => !liveShareBusy && setLiveShareDialog(false)}><section className="atl-live-share-modal" role="dialog" aria-modal="true" aria-label="Bagikan live location" onClick={event => event.stopPropagation()}><header><Crosshair size={22}/><div><b>Bagikan live location</b><small>Lokasi terenkripsi dan hanya terlihat anggota chat ini</small></div><button type="button" onClick={() => setLiveShareDialog(false)} aria-label="Tutup">×</button></header><p>Pilih berapa lama orang lain dapat melihat pergerakan lokasimu.</p><div className="atl-live-duration-options">{[[15,'15 menit'],[60,'1 jam'],[480,'8 jam']].map(([minutes,label]) => <button type="button" key={minutes} className={liveShareDuration===minutes?'selected':''} onClick={() => setLiveShareDuration(minutes)}>{label}</button>)}</div><footer><button type="button" onClick={() => setLiveShareDialog(false)} disabled={liveShareBusy}>Batal</button><button type="button" className="primary" onClick={startLiveLocation} disabled={liveShareBusy}>{liveShareBusy?'Memulai…':'Mulai berbagi'}</button></footer></section></div>}
       {atlanticDialog && <div className="atl-dialog-backdrop" onMouseDown={event => { if(event.target===event.currentTarget) closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false); }}><section className="atl-dialog-card" role="dialog" aria-modal="true" aria-labelledby="atl-dialog-title"><span className="atl-dialog-eyebrow">ATLANTIC / CONFIRMATION</span><h2 id="atl-dialog-title">{atlanticDialog.title || 'Konfirmasi'}</h2><p>{atlanticDialog.message}</p>{atlanticDialog.type==='prompt' && <textarea autoFocus value={atlanticDialogValue} onChange={event=>setAtlanticDialogValue(event.target.value)} placeholder={atlanticDialog.placeholder || 'Tulis di sini…'} maxLength={atlanticDialog.maxLength || 1000}/>}<footer><button type="button" className="atl-dialog-cancel" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false)}>{atlanticDialog.cancelLabel || 'Batal'}</button><button type="button" className="atl-dialog-confirm" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?atlanticDialogValue:true)}>{atlanticDialog.confirmLabel || 'Lanjutkan'}</button></footer></section></div>}
       {messageInfoTarget && <div className="atl-message-info-backdrop" onClick={() => setMessageInfoTarget(null)}><section className="atl-message-info-card" role="dialog" aria-modal="true" aria-label="Info pesan" onClick={event => event.stopPropagation()}><header><b>Info pesan</b><button type="button" onClick={() => setMessageInfoTarget(null)} aria-label="Tutup">×</button></header><dl><dt>Pengirim</dt><dd>{messageInfoTarget.sender_id === session.user.id ? 'Kamu' : (messageInfoTarget.senderProfile?.display_name || messageInfoTarget.senderProfile?.username || 'Anggota')}</dd><dt>Dikirim</dt><dd>{new Date(messageInfoTarget.created_at).toLocaleString('id-ID')}</dd><dt>Status</dt><dd>{messageInfoTarget.read_at ? 'Dibaca' : messageInfoTarget.delivered_at ? 'Terkirim' : 'Dikirim'}</dd><dt>Enkripsi</dt><dd>{messageInfoTarget.is_e2ee ? 'End-to-end encrypted' : 'Pesan lama / belum terenkripsi'}</dd><dt>Lampiran</dt><dd>{messageInfoTarget.media_name || (messageInfoTarget.media_url ? 'Ada lampiran' : 'Tidak ada')}</dd></dl></section></div>}
       {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={() => confirmDeleteMessage('me')}>UNTUK SAYA</button>{deleteTarget.sender_id === session.user.id && <button type="button" onClick={() => confirmDeleteMessage('everyone')}>UNTUK SEMUA</button>}</div></section></div>}
