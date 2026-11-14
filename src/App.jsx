@@ -10,6 +10,7 @@ const AtlanticGroupInfo = lazy(() => import('./components/AtlanticGroupInfo'));
 const AtlanticProfileExplorer = lazy(() => import('./components/AtlanticProfileExplorer'));
 import AtlanticPolls from './components/AtlanticPolls';
 import AtlanticLocationCard from './components/AtlanticLocationCard';
+import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
   Sparkles, MessageSquarePlus, Settings, UserRound, X, Check, ShieldCheck,
