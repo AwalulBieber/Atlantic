@@ -3,6 +3,7 @@ const DB_VERSION = 1;
 const IDENTITY_STORE = 'identities';
 const CONVERSATION_STORE = 'conversation-keys';
 const PREFIX = 'ATL-E2EE1:';
+const conversationKeyIdCache = new Map();
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -271,8 +272,15 @@ export function ensureE2EEIdentity(supabase, userId, password) {
 
 export async function ensureConversationE2EE(supabase, conversationId, memberIds, userId) {
   const identity = await ensureE2EEIdentity(supabase, userId);
-  const { data: liveMembers, error: memberError } = await supabase
-    .from('conversation_members').select('user_id').eq('conversation_id', conversationId);
+  // Membership and current key are independent reads; fetch them in parallel to
+  // remove one full network round-trip from the send/open-chat path.
+  const [membersResult, keyResult] = await Promise.all([
+    supabase.from('conversation_members').select('user_id').eq('conversation_id', conversationId),
+    supabase.from('conversation_e2ee_keys')
+      .select('conversation_id,key_id,shares,created_by,member_ids')
+      .eq('conversation_id', conversationId).maybeSingle()
+  ]);
+  const { data: liveMembers, error: memberError } = membersResult;
   if (memberError) throw new Error('Daftar anggota chat gagal diverifikasi: ' + memberError.message);
   const verifiedMemberIds = (liveMembers || []).map(member => member.user_id);
   const ids = [...new Set([userId, ...(verifiedMemberIds.length ? verifiedMemberIds : (memberIds || []))].filter(Boolean))];
@@ -285,11 +293,7 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
     throw new Error('Menunggu anggota chat mendaftarkan kunci keamanan di perangkatnya. E2EE belum aktif untuk chat ini.');
   }
 
-  let { data: keyRow, error: keyError } = await supabase
-    .from('conversation_e2ee_keys')
-    .select('conversation_id,key_id,shares,created_by,member_ids')
-    .eq('conversation_id', conversationId)
-    .maybeSingle();
+  let { data: keyRow, error: keyError } = keyResult;
   if (keyError) throw new Error('Kunci percakapan gagal dimuat: ' + keyError.message);
 
   if (!keyRow) {
@@ -311,6 +315,7 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
     if (!insertError) {
       const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
       await writeLocalKey(CONVERSATION_STORE, conversationCacheId(conversationId, keyId), key);
+      conversationKeyIdCache.set(conversationId, keyId);
       return key;
     }
     // A concurrent member may have initialized this conversation first.
@@ -323,6 +328,7 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
     keyRow = racedRow;
   }
 
+  conversationKeyIdCache.set(conversationId, keyRow.key_id);
   const cacheId = conversationCacheId(conversationId, keyRow.key_id);
   let conversationKey = await readLocalKey(CONVERSATION_STORE, cacheId);
 
@@ -389,10 +395,12 @@ export async function ensureConversationE2EE(supabase, conversationId, memberIds
         latestEnvelope, identity, latestSender.e2ee_public_key, conversationId, latest.key_id
       );
       await writeLocalKey(CONVERSATION_STORE, conversationCacheId(conversationId, latest.key_id), concurrentKey);
+      conversationKeyIdCache.set(conversationId, latest.key_id);
       return concurrentKey;
     }
     const nextKey = await crypto.subtle.importKey('raw', nextRawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
     await writeLocalKey(CONVERSATION_STORE, conversationCacheId(conversationId, nextKeyId), nextKey);
+    conversationKeyIdCache.set(conversationId, nextKeyId);
     return nextKey;
   }
 
@@ -449,9 +457,12 @@ export async function decryptE2EEMessage(key, value) {
 }
 
 export async function getCurrentConversationE2EEKeyId(supabase, conversationId) {
+  const cachedKeyId = conversationKeyIdCache.get(conversationId);
+  if (cachedKeyId) return cachedKeyId;
   const { data, error } = await supabase.from('conversation_e2ee_keys')
     .select('key_id').eq('conversation_id', conversationId).maybeSingle();
   if (error || !data?.key_id) throw new Error('ID kunci percakapan belum tersedia.');
+  conversationKeyIdCache.set(conversationId, data.key_id);
   return data.key_id;
 }
 
