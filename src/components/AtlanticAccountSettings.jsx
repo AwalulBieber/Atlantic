@@ -316,7 +316,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
           {tab === "profile" && <>
             <div className="atl-admin-status">
               <div><strong>{profile.display_name || profile.username || "Pengguna Atlantic"}</strong><small>{profile.username ? "@" + profile.username : user?.email}</small></div>
-              {isAdmin && <span className="atl-blue-verified">✓ Atlantic Verified</span>}
+              {isAdmin ? <span className="atl-blue-verified">✓ Atlantic Verified</span> : profile.is_verified ? <span className="atl-red-verified">✓ Verified User</span> : null}
             </div>
             <div className="atl-avatar-editor">
               <div className="atl-avatar-preview">
