@@ -97,13 +97,18 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
       const groupMap = Object.fromEntries((groupRows||[]).map(item=>[item.id,item]));
       const requesterMap = Object.fromEntries((requesterRows||[]).map(item=>[item.id,item]));
       setGroupVerificationRequests(requests.map(item=>({...item,group:groupMap[item.conversation_id]||{},requester:requesterMap[item.requester_id]||{}})));
+      const { data: recentBadgeRows, error: recentBadgeError } = (recent.data || []).length
+        ? await supabase.rpc("get_atlantic_public_badges", { target_users: recent.data.map(person => person.id) })
+        : { data: [], error: null };
+      if (recentBadgeError) setDashboardError("Status badge pengguna gagal dimuat: " + recentBadgeError.message);
+      const recentBadgeMap = Object.fromEntries((recentBadgeRows || []).map(item => [item.user_id, item.badge_type]));
       setDashboard({
       users: users.count || 0,
       groups: groups.count || 0,
       privateChats: privateChats.count || 0,
       calls: calls.count || 0,
       pending: pending.count || 0,
-      recentUsers: recent.data || []
+      recentUsers: (recent.data || []).map(person => ({ ...person, is_admin: recentBadgeMap[person.id] === "admin" }))
     });
     }
     setDashboardBusy(false);
@@ -374,7 +379,7 @@ export default function AtlanticAccountSettings({ user, onClose, onSaved }) {
                 {dashboard.recentUsers.filter(person => ((person.display_name || "") + " " + (person.username || "")).toLowerCase().includes(userSearch.toLowerCase())).map(person => <article key={person.id}>
                   <div className="atl-admin-user-avatar">{person.avatar_url ? <img src={person.avatar_url} alt=""/> : (person.display_name || person.username || "A").slice(0,1).toUpperCase()}</div>
                   <div><b>{person.display_name || person.username || "Pengguna Atlantic"}</b><small>{person.username ? "@" + person.username : "Tanpa username"} · Bergabung {person.created_at ? new Date(person.created_at).toLocaleDateString("id-ID") : "—"}</small></div>
-                  {person.is_verified && <span className="atl-blue-verified">✓ Atlantic Verified</span>}
+                  {(person.is_verified || person.is_admin) && <span className={person.is_admin ? "atl-blue-verified" : "atl-red-verified"}>✓ {person.is_admin ? "Atlantic Verified" : "Verified User"}</span>}
                 </article>)}
                 {dashboard.recentUsers.filter(person => ((person.display_name || "") + " " + (person.username || "")).toLowerCase().includes(userSearch.toLowerCase())).length === 0 && <p className="atl-muted">Pengguna tidak ditemukan.</p>}
               </div>
