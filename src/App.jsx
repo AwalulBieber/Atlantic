@@ -154,6 +154,7 @@ export default function App() {
   const [communityCreateRequest, setCommunityCreateRequest] = useState(0);
   const [replyTarget, setReplyTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [chatActionTarget, setChatActionTarget] = useState(null);
   const chatLongPressTimer = useRef(null);
   const chatLongPressTriggered = useRef(false);
@@ -1430,31 +1431,56 @@ export default function App() {
     setNotice('');
   }
 
+  function openDeleteMessageDialog(message) {
+    if (!message?.id) return;
+    // Close the floating action menu first, then open the confirmation
+    // on the next paint so the mobile backdrop cannot swallow the tap.
+    setMessageActionTarget(null);
+    setMessageFocusActive(false);
+    setDeleteTarget(message);
+    setDeleteBusy(false);
+  }
+
   async function confirmDeleteMessage(scope) {
     const message = deleteTarget;
-    if (!message) return;
-    let error = null;
-    if (scope === 'everyone') {
-      if (message.sender_id !== session.user.id) return;
-      const result = await supabase.from('messages').delete().eq('id', message.id).eq('sender_id', session.user.id).select('id').maybeSingle();
-      error = result.error || (!result.data ? new Error('Pesan tidak terhapus. Pastikan kamu pengirim pesan dan masih menjadi anggota chat.') : null);
-    } else {
-      const result = await supabase.from('message_user_states').upsert({
-        message_id: message.id,
-        user_id: session.user.id,
-        is_deleted: true
-      }, { onConflict: 'message_id,user_id' }).select('id').maybeSingle();
-      error = result.error || (!result.data ? new Error('Status hapus tidak tersimpan. Coba muat ulang lalu ulangi.') : null);
+    if (!message?.id || deleteBusy) return;
+    if (scope === 'everyone' && message.sender_id !== session?.user?.id) {
+      setNotice('Kamu hanya bisa menghapus pesan sendiri untuk semua orang.');
+      return;
     }
-    if (error) setNotice('Pesan gagal dihapus: ' + error.message);
-    else {
+    setDeleteBusy(true);
+    try {
+      if (scope === 'everyone') {
+        const { data, error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', message.id)
+          .eq('sender_id', session.user.id)
+          .select('id')
+          .maybeSingle();
+        if (error) throw error;
+        if (!data?.id) throw new Error('Pesan tidak terhapus. Periksa izin atau koneksi, lalu coba lagi.');
+      } else {
+        const { error } = await supabase
+          .from('message_user_states')
+          .upsert({
+            message_id: message.id,
+            user_id: session.user.id,
+            is_deleted: true
+          }, { onConflict: 'message_id,user_id' });
+        if (error) throw error;
+      }
       setMessages(old => old.filter(m => m.id !== message.id).map(m => m.reply_to === message.id
         ? { ...m, reply_to: null, replyPreview: { ...(m.replyPreview || {}), body: 'Pesan dihapus' } }
         : m));
       if (replyTarget?.id === message.id) setReplyTarget(null);
       setNotice(scope === 'everyone' ? 'Pesan dihapus untuk semua orang.' : 'Pesan dihapus dari chat kamu.');
+      setDeleteTarget(null);
+    } catch (error) {
+      setNotice('Pesan gagal dihapus: ' + (error?.message || 'Terjadi kesalahan. Coba lagi.'));
+    } finally {
+      setDeleteBusy(false);
     }
-    setDeleteTarget(null);
   }
 
   async function logout() {
@@ -1750,7 +1776,7 @@ export default function App() {
                       <button type="button" role="menuitem" onClick={() => translateMessage(m)}><Languages/>Terjemahkan</button>
                       <button type="button" role="menuitem" onClick={() => editMessage(m)} disabled={m.sender_id !== session.user.id || Boolean(m.media_url)}><Pencil/>Edit</button>
                       <button type="button" role="menuitem" onClick={() => { setMessageInfoTarget(m); setMessageActionTarget(null); }}><Info/>Info pesan</button>
-                      <button type="button" role="menuitem" onClick={() => { setDeleteTarget(m); setMessageActionTarget(null); }}><Trash2/>Hapus</button>
+                      <button type="button" role="menuitem" onClick={e => { e.preventDefault(); e.stopPropagation(); openDeleteMessageDialog(m); }}><Trash2/>Hapus</button>
                       <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><BookmarkCheck/>Simpan ke Cloud</button>
                     </div>}
                     <div className="bubble-meta"><time>{time(m.created_at)}</time></div>
@@ -1803,7 +1829,7 @@ export default function App() {
       {liveShareDialog && <div className="atl-live-share-backdrop" onClick={() => !liveShareBusy && setLiveShareDialog(false)}><section className="atl-live-share-modal" role="dialog" aria-modal="true" aria-label="Bagikan live location" onClick={event => event.stopPropagation()}><header><Crosshair size={22}/><div><b>Bagikan live location</b><small>Lokasi terenkripsi dan hanya terlihat anggota chat ini</small></div><button type="button" onClick={() => setLiveShareDialog(false)} aria-label="Tutup">×</button></header><p>Pilih berapa lama orang lain dapat melihat pergerakan lokasimu.</p><div className="atl-live-duration-options">{[[15,'15 menit'],[60,'1 jam'],[480,'8 jam']].map(([minutes,label]) => <button type="button" key={minutes} className={liveShareDuration===minutes?'selected':''} onClick={() => setLiveShareDuration(minutes)}>{label}</button>)}</div><footer><button type="button" onClick={() => setLiveShareDialog(false)} disabled={liveShareBusy}>Batal</button><button type="button" className="primary" onClick={startLiveLocation} disabled={liveShareBusy}>{liveShareBusy?'Memulai…':'Mulai berbagi'}</button></footer></section></div>}
       {atlanticDialog && <div className="atl-dialog-backdrop" onMouseDown={event => { if(event.target===event.currentTarget) closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false); }}><section className="atl-dialog-card" role="dialog" aria-modal="true" aria-labelledby="atl-dialog-title"><span className="atl-dialog-eyebrow">ATLANTIC / CONFIRMATION</span><h2 id="atl-dialog-title">{atlanticDialog.title || 'Konfirmasi'}</h2><p>{atlanticDialog.message}</p>{atlanticDialog.type==='prompt' && <textarea autoFocus value={atlanticDialogValue} onChange={event=>setAtlanticDialogValue(event.target.value)} placeholder={atlanticDialog.placeholder || 'Tulis di sini…'} maxLength={atlanticDialog.maxLength || 1000}/>}<footer><button type="button" className="atl-dialog-cancel" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false)}>{atlanticDialog.cancelLabel || 'Batal'}</button><button type="button" className="atl-dialog-confirm" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?atlanticDialogValue:true)}>{atlanticDialog.confirmLabel || 'Lanjutkan'}</button></footer></section></div>}
       {messageInfoTarget && <div className="atl-message-info-backdrop" onClick={() => setMessageInfoTarget(null)}><section className="atl-message-info-card" role="dialog" aria-modal="true" aria-label="Info pesan" onClick={event => event.stopPropagation()}><header><b>Info pesan</b><button type="button" onClick={() => setMessageInfoTarget(null)} aria-label="Tutup">×</button></header><dl><dt>Pengirim</dt><dd>{messageInfoTarget.sender_id === session.user.id ? 'Kamu' : (messageInfoTarget.senderProfile?.display_name || messageInfoTarget.senderProfile?.username || 'Anggota')}</dd><dt>Dikirim</dt><dd>{new Date(messageInfoTarget.created_at).toLocaleString('id-ID')}</dd><dt>Status</dt><dd>{messageInfoTarget.read_at ? 'Dibaca' : messageInfoTarget.delivered_at ? 'Terkirim' : 'Dikirim'}</dd><dt>Enkripsi</dt><dd>{messageInfoTarget.is_e2ee ? 'End-to-end encrypted' : 'Pesan lama / belum terenkripsi'}</dd><dt>Lampiran</dt><dd>{messageInfoTarget.media_name || (messageInfoTarget.media_url ? 'Ada lampiran' : 'Tidak ada')}</dd></dl></section></div>}
-      {deleteTarget && <div className="neo-delete-backdrop" onClick={() => setDeleteTarget(null)}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" onClick={() => confirmDeleteMessage('me')}>UNTUK SAYA</button>{deleteTarget.sender_id === session.user.id && <button type="button" onClick={() => confirmDeleteMessage('everyone')}>UNTUK SEMUA</button>}</div></section></div>}
+      {deleteTarget && <div className="neo-delete-backdrop" onClick={() => { if (!deleteBusy) setDeleteTarget(null); }}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" disabled={deleteBusy} onClick={() => confirmDeleteMessage('me')}>{deleteBusy ? 'MEMPROSES…' : 'UNTUK SAYA'}</button>{deleteTarget.sender_id === session.user.id && <button type="button" disabled={deleteBusy} onClick={() => confirmDeleteMessage('everyone')}>{deleteBusy ? 'MEMPROSES…' : 'UNTUK SEMUA'}</button>}</div></section></div>}
       {incomingNotice && (
         <button className="toast incoming-message-toast" onClick={() => {
           const notice = incomingNotice;
