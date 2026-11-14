@@ -1436,13 +1436,15 @@ export default function App() {
     let error = null;
     if (scope === 'everyone') {
       if (message.sender_id !== session.user.id) return;
-      ({ error } = await supabase.from('messages').delete().eq('id', message.id).eq('sender_id', session.user.id));
+      const result = await supabase.from('messages').delete().eq('id', message.id).eq('sender_id', session.user.id).select('id').maybeSingle();
+      error = result.error || (!result.data ? new Error('Pesan tidak terhapus. Pastikan kamu pengirim pesan dan masih menjadi anggota chat.') : null);
     } else {
-      ({ error } = await supabase.from('message_user_states').upsert({
+      const result = await supabase.from('message_user_states').upsert({
         message_id: message.id,
         user_id: session.user.id,
         is_deleted: true
-      }, { onConflict: 'message_id,user_id' }));
+      }, { onConflict: 'message_id,user_id' }).select('id').maybeSingle();
+      error = result.error || (!result.data ? new Error('Status hapus tidak tersimpan. Coba muat ulang lalu ulangi.') : null);
     }
     if (error) setNotice('Pesan gagal dihapus: ' + error.message);
     else {
@@ -1450,6 +1452,7 @@ export default function App() {
         ? { ...m, reply_to: null, replyPreview: { ...(m.replyPreview || {}), body: 'Pesan dihapus' } }
         : m));
       if (replyTarget?.id === message.id) setReplyTarget(null);
+      setNotice(scope === 'everyone' ? 'Pesan dihapus untuk semua orang.' : 'Pesan dihapus dari chat kamu.');
     }
     setDeleteTarget(null);
   }
@@ -1676,7 +1679,7 @@ export default function App() {
                   key={m.id}
                   id={`message-${m.id}`}
                   style={swipeState.id === m.id ? { transform: `translateX(${swipeState.offset}px)` } : undefined}
-                  onContextMenu={e => { e.preventDefault(); setMessageActionTarget(m.id); setMessageFocusActive(false); }}
+                  onContextMenu={e => { e.preventDefault(); setMessageActionTarget(m.id); setMessageFocusActive(true); }}
                   onTouchStart={e => {
                     touchStartX.current = e.touches[0].clientX;
                     touchStartY.current = e.touches[0].clientY;
@@ -1693,7 +1696,7 @@ export default function App() {
                   onTouchMove={e => {
                     const dx = e.touches[0].clientX - touchStartX.current;
                     const dy = e.touches[0].clientY - touchStartY.current;
-                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                    if (Math.abs(dx) > 18 || Math.abs(dy) > 18) {
                       if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
                     }
                     if (!longPressTriggered.current && dx > 6 && dx > Math.abs(dy)) setSwipeState({ id: m.id, offset: Math.min(dx, 92) });
@@ -1708,7 +1711,7 @@ export default function App() {
                   onTouchEnd={e => {
                     if (messageLongPressTimer.current) clearTimeout(messageLongPressTimer.current);
                     messageLongPressTimer.current = null;
-                    setMessageFocusActive(false);
+                    if (!longPressTriggered.current) setMessageFocusActive(false);
                     const dx = e.changedTouches[0].clientX - touchStartX.current;
                     const dy = e.changedTouches[0].clientY - touchStartY.current;
                     if (!longPressTriggered.current && dx > 65 && dx > Math.abs(dy)) {
