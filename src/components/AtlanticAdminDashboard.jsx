@@ -39,16 +39,21 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
       ]);
       const firstError = [usersResult, userRequestsResult, groupRequestsResult, reportsResult, channelsResult].find(result => result.error);
       if (firstError) throw firstError.error;
-      const { data: moderationRows, error: moderationError } = await supabase.rpc('admin_get_profile_moderation', {
-        p_user_ids: (usersResult.data || []).map(profile => profile.id)
-      });
+      const userIds = (usersResult.data || []).map(profile => profile.id);
+      const [{ data: moderationRows, error: moderationError }, { data: publicBadges, error: badgeError }] = await Promise.all([
+        supabase.rpc('admin_get_profile_moderation', { p_user_ids: userIds }),
+        supabase.rpc('get_atlantic_public_badges', { target_users: userIds })
+      ]);
       if (moderationError) throw moderationError;
+      if (badgeError) throw badgeError;
       const moderationById = Object.fromEntries((moderationRows || []).map(item => [item.user_id, item]));
+      const badgeTypeById = Object.fromEntries((publicBadges || []).map(item => [item.user_id, item.badge_type]));
       setUserTotal(userCount.count || 0);
       setConversationTotal(conversationCount.count || 0);
       setMessageTotal(messageCount.count || 0);
       setUsers((usersResult.data || []).map(profile => ({
         ...profile,
+        is_admin: badgeTypeById[profile.id] === 'admin',
         is_blocked: moderationById[profile.id]?.is_blocked === true,
         blocked_reason: moderationById[profile.id]?.blocked_reason || null
       })));
@@ -187,7 +192,7 @@ export default function AtlanticAdminDashboard({ user, onClose, onNotice, onDial
           {loading && <div className="atl-admin-loading"><span className="atl-admin-spinner"/> Memperbarui data…</div>}
           {!loading && tab === 'users' && <>
             <div className="atl-admin-section-heading"><div><h3>Daftar pengguna</h3><p>Menampilkan hingga 100 akun terbaru.</p></div><label className="atl-admin-search"><Search size={16}/><input value={userSearch} onChange={event => setUserSearch(event.target.value)} placeholder="Cari nama atau username"/></label></div>
-            <div className="atl-admin-user-list">{filteredUsers.map(profile => <article key={profile.id} className="atl-admin-user"><div className="atl-admin-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt=""/> : (profile.display_name || profile.username || 'A').slice(0,1).toUpperCase()}</div><div className="atl-admin-user-info"><b>{profile.display_name || profile.username || 'Pengguna'} {profile.is_verified && <BadgeCheck size={15}/>}</b><span>@{profile.username || 'tanpa-username'}</span><small>Bergabung {dateLabel(profile.created_at)}</small></div><div className="atl-admin-user-actions"><span className={profile.is_blocked ? 'atl-admin-status rejected' : profile.is_verified ? 'atl-admin-status verified' : 'atl-admin-status'}>{profile.is_blocked ? 'Diblokir' : profile.is_verified ? 'Verified User' : 'Pengguna'}</span><button className={profile.is_blocked ? 'unblock' : 'block'} disabled={busyId === 'block:' + profile.id} onClick={() => toggleAdminBlock(profile)}>{profile.is_blocked ? 'Buka blokir' : 'Blokir'}</button></div></article>)}
+            <div className="atl-admin-user-list">{filteredUsers.map(profile => <article key={profile.id} className="atl-admin-user"><div className="atl-admin-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt=""/> : (profile.display_name || profile.username || 'A').slice(0,1).toUpperCase()}</div><div className="atl-admin-user-info"><b>{profile.display_name || profile.username || 'Pengguna'} {(profile.is_verified || profile.is_admin) && <BadgeCheck className={profile.is_admin ? 'atl-admin-badge-icon' : 'atl-user-badge-icon'} size={15}/>}</b><span>@{profile.username || 'tanpa-username'}</span><small>Bergabung {dateLabel(profile.created_at)}</small></div><div className="atl-admin-user-actions"><span className={profile.is_blocked ? 'atl-admin-status rejected' : profile.is_verified ? 'atl-admin-status verified' : 'atl-admin-status'}>{profile.is_blocked ? 'Diblokir' : profile.is_admin ? 'Admin Verified' : profile.is_verified ? 'Verified User' : 'Pengguna'}</span><button className={profile.is_blocked ? 'unblock' : 'block'} disabled={busyId === 'block:' + profile.id} onClick={() => toggleAdminBlock(profile)}>{profile.is_blocked ? 'Buka blokir' : 'Blokir'}</button></div></article>)}
               {!filteredUsers.length && <p className="atl-admin-empty">Pengguna tidak ditemukan.</p>}</div>
           </>}
           {!loading && tab === 'verification' && <>
