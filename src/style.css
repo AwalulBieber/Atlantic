@@ -383,8 +383,10 @@ html[data-theme="dark"] .neo-delete-actions button{border-color:#fff;box-shadow:
   .bubble-row.reply-swipe-confirmed .bubble { animation:none !important; }
 }
 
-.atl-inline-verified.atl-user-verified{color:#f28a22}
-.atl-inline-verified.atl-user-verified svg{fill:#f28a22;stroke:#fff;stroke-width:2.5}
+.atl-inline-verified.atl-user-verified{color:#e53935}
+.atl-inline-verified.atl-user-verified svg{fill:#e53935;stroke:#fff;stroke-width:2.5}
+.atl-inline-verified.atl-admin-verified,.atl-inline-verified.atl-group-verified{color:#1677e8}
+.atl-inline-verified.atl-admin-verified svg,.atl-inline-verified.atl-group-verified svg{fill:#1677e8;stroke:#fff;stroke-width:2.5}
 
 
 /* Atlantic live typing and message delivery/read states */
