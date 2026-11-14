@@ -1050,7 +1050,16 @@ export default function App() {
       }, async payload => {
         const message = payload.new;
         if (!message) return;
-        void loadLatestMessages([message.conversation_id]);
+        // The active-chat realtime listener handles the full message. For the inbox preview,
+        // use the event payload directly instead of refetching up to 1,000 rows on every message.
+        const previewMessage = typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')
+          ? { ...message, body: '🔒 Pesan terenkripsi', is_e2ee: true }
+          : message;
+        setLatestMessages(current => {
+          const previous = current[message.conversation_id];
+          if (previous && new Date(previous.created_at).getTime() > new Date(message.created_at).getTime()) return current;
+          return { ...current, [message.conversation_id]: previewMessage };
+        });
         if (message.sender_id === session.user.id || seenMessages.current.has(message.id)) return;
         seenMessages.current.add(message.id);
         if (active?.conversation_id === message.conversation_id) return;
