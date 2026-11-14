@@ -1,14 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { ensureE2EEIdentity, ensureConversationE2EE, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById, getE2EEFingerprint } from './e2ee';
 import { supabase, configReady } from './supabase';
-import AtlanticAccountSettings from './components/AtlanticAccountSettings';
-import AtlanticCommunity from './components/AtlanticCommunity';
-import AtlanticCallManager from './components/AtlanticCallManager';
-import AtlanticAdminDashboard from './components/AtlanticAdminDashboard';
-import AtlanticContacts from './components/AtlanticContacts';
-import AtlanticGroupInfo from './components/AtlanticGroupInfo';
-import AtlanticProfileExplorer from './components/AtlanticProfileExplorer';
-import AtlanticGroupInvitations from './components/AtlanticGroupInvitations';
+const AtlanticAccountSettings = lazy(() => import('./components/AtlanticAccountSettings'));
+const AtlanticCommunity = lazy(() => import('./components/AtlanticCommunity'));
+const AtlanticCallManager = lazy(() => import('./components/AtlanticCallManager'));
+const AtlanticAdminDashboard = lazy(() => import('./components/AtlanticAdminDashboard'));
+const AtlanticContacts = lazy(() => import('./components/AtlanticContacts'));
+const AtlanticGroupInfo = lazy(() => import('./components/AtlanticGroupInfo'));
+const AtlanticProfileExplorer = lazy(() => import('./components/AtlanticProfileExplorer'));
 import AtlanticPolls from './components/AtlanticPolls';
 import {
   MessageCircle, Search, Plus, Send, LogOut, ArrowLeft, Waves, Archive, ArchiveRestore, Bookmark, BookmarkCheck, Users, Ban,
@@ -1862,12 +1861,12 @@ export default function App() {
         </div>
       )}
 
-      {adminDashboardOpen && <AtlanticAdminDashboard user={session.user} onClose={() => setAdminDashboardOpen(false)} onNotice={setNotice} onDialog={openAtlanticDialog} />}
-      {contactsOpen && <AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} onDialog={openAtlanticDialog} />}
-      {groupInfoOpen && active?.is_group && <AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onNotice={setNotice} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} />}
+      {adminDashboardOpen && <Suspense fallback={null}><AtlanticAdminDashboard user={session.user} onClose={() => setAdminDashboardOpen(false)} onNotice={setNotice} onDialog={openAtlanticDialog} /></Suspense>}
+      {contactsOpen && <Suspense fallback={null}><AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} onDialog={openAtlanticDialog} /></Suspense>}
+      {groupInfoOpen && active?.is_group && <Suspense fallback={null}><AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onNotice={setNotice} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} /></Suspense>}
 
       {activeTab !== 'chat' && (
-        <AtlanticCommunity
+        <Suspense fallback={<div className="center">Memuat…</div>}><AtlanticCommunity
           tab={activeTab}
           user={session.user}
           profile={myProfile}
@@ -1875,7 +1874,7 @@ export default function App() {
           onProfileRefresh={loadMyProfile}
           onNotice={setNotice}
           onDialog={openAtlanticDialog}
-        />
+        /></Suspense>
       )}
 
       {!(activeTab === 'chat' && mobileChat) && (
@@ -1888,20 +1887,20 @@ export default function App() {
         </nav>
       )}
 
-      <AtlanticCallManager
+      <Suspense fallback={null}><AtlanticCallManager
         user={session.user}
         intent={callIntent}
         onIntentHandled={() => setCallIntent(null)}
-      />
+      /></Suspense>
 
-      {profileExplorerUserId && <AtlanticProfileExplorer userId={profileExplorerUserId} onClose={() => setProfileExplorerUserId(null)} />}
+      {profileExplorerUserId && <Suspense fallback={null}><AtlanticProfileExplorer userId={profileExplorerUserId} onClose={() => setProfileExplorerUserId(null)} /></Suspense>}
 
       {accountSettingsOpen && (
-        <AtlanticAccountSettings
+        <Suspense fallback={null}><AtlanticAccountSettings
           user={session.user}
           onClose={() => setAccountSettingsOpen(false)}
           onSaved={profile => { setMyProfile(profile); loadMyProfile(); }}
-        />
+        /></Suspense>
       )}
     </main>
   );
