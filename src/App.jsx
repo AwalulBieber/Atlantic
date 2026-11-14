@@ -132,6 +132,7 @@ export default function App() {
   const attachmentInputRef = useRef(null);
   const [sending, setSending] = useState(false);
   const [forwardingMessageId, setForwardingMessageId] = useState(null);
+  const [forwardTargetMessage, setForwardTargetMessage] = useState(null);
   const [editingMessage, setEditingMessage] = useState(null);
   const [messageReactions, setMessageReactions] = useState([]);
   const [messageActionTarget, setMessageActionTarget] = useState(null);
@@ -1368,11 +1369,15 @@ export default function App() {
   }
 
 
-  async function forwardToSavedMessages(message) {
-    if (!message?.id || !active || active.is_saved_chat || forwardingMessageId) return;
-    const savedChat = chats.find(chat => chat.is_saved_chat);
-    if (!savedChat?.conversation_id) {
-      setNotice('Ruang Pesan Tersimpan belum tersedia. Muat ulang daftar chat lalu coba lagi.');
+  async function forwardToSavedMessages(message, targetConversationId = null) {
+    if (!message?.id || !active || forwardingMessageId) return;
+    const targetChat = chats.find(chat => chat.conversation_id === targetConversationId) || chats.find(chat => chat.is_saved_chat);
+    if (!targetChat?.conversation_id) {
+      setNotice('Tujuan penerusan tidak ditemukan.');
+      return;
+    }
+    if (targetChat.conversation_id === active.conversation_id) {
+      setNotice('Pilih percakapan lain sebagai tujuan.');
       return;
     }
     if (message.decrypt_error) {
@@ -1395,8 +1400,12 @@ export default function App() {
     setForwardingMessageId(message.id);
     let uploadedPath = null;
     try {
-      const targetConversationId = savedChat.conversation_id;
-      const targetKey = await ensureConversationE2EE(supabase, targetConversationId, [session.user.id], session.user.id);
+      const destinationMemberIds = targetChat.is_saved_chat
+        ? [session.user.id]
+        : targetChat.is_group
+          ? (targetChat.members || []).map(member => member.id).filter(Boolean)
+          : [targetChat.person?.id].filter(Boolean);
+      const targetKey = await ensureConversationE2EE(supabase, targetConversationId, destinationMemberIds, session.user.id);
       const targetKeyId = await getCurrentConversationE2EEKeyId(supabase, targetConversationId);
       let attachmentEnvelope = null;
 
@@ -1425,7 +1434,7 @@ export default function App() {
         if (uploadError) throw new Error('Lampiran gagal disimpan: ' + uploadError.message);
       }
 
-      const sourceName = active.is_group
+      const sourceName = active.is_saved_chat ? 'Pesan Tersimpan' : active.is_group
         ? (active.title || 'Grup Atlantic')
         : (active.person?.display_name || active.person?.username || 'Chat Atlantic');
       const forwardedText = '↪ Diteruskan dari ' + sourceName + (message.body ? '\n\n' + message.body : '');
@@ -1443,7 +1452,8 @@ export default function App() {
         media_name: null
       });
       if (insertError) throw new Error('Pesan gagal diteruskan: ' + insertError.message);
-      setNotice('Pesan berhasil diteruskan ke Pesan Tersimpan.');
+      setNotice('Pesan berhasil diteruskan ke ' + (targetChat.is_saved_chat ? 'Pesan Tersimpan' : targetChat.title || targetChat.person?.display_name || targetChat.person?.username || 'percakapan tujuan') + '.');
+      setForwardTargetMessage(null);
       void loadLatestMessages([targetConversationId]);
     } catch (forwardError) {
       if (uploadedPath) await supabase.storage.from('atlantic-chat-media').remove([uploadedPath]);
@@ -1804,13 +1814,13 @@ export default function App() {
                       <button type="button" role="menuitem" onClick={() => { setReplyTarget(m); setMessageActionTarget(null); }}><Reply/>Balas</button>
                       {active.is_group && <button type="button" role="menuitem" onClick={() => pinMessage(m)}><Pin/>{active.pinned_message_id === m.id ? 'Lepas sematan' : 'Sematkan'}</button>}
                       <button type="button" role="menuitem" onClick={() => { toggleSavedMessage(m); setMessageActionTarget(null); }}><Bookmark/>Beri bintang</button>
-                      <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><Forward/>Teruskan</button>
+                      <button type="button" role="menuitem" onClick={() => { setForwardTargetMessage(m); setMessageActionTarget(null); setMessageFocusActive(false); }}><Forward/>Teruskan</button>
                       <button type="button" role="menuitem" onClick={() => copyMessage(m)}><Copy/>Salin</button>
                       <button type="button" role="menuitem" onClick={() => translateMessage(m)}><Languages/>Terjemahkan</button>
                       <button type="button" role="menuitem" onClick={() => editMessage(m)} disabled={m.sender_id !== session.user.id || Boolean(m.media_url)}><Pencil/>Edit</button>
                       <button type="button" role="menuitem" onClick={() => { setMessageInfoTarget(m); setMessageActionTarget(null); }}><Info/>Info pesan</button>
                       <button type="button" role="menuitem" onClick={e => { e.preventDefault(); e.stopPropagation(); openDeleteMessageDialog(m); }}><Trash2/>Hapus</button>
-                      <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><BookmarkCheck/>Simpan ke Cloud</button>
+                      <button type="button" role="menuitem" onClick={() => forwardToSavedMessages(m)}><BookmarkCheck/>Simpan ke Cloud</button>
                     </div>}
                     <div className="bubble-meta"><time>{time(m.created_at)}</time></div>
                   </div>
@@ -1862,6 +1872,7 @@ export default function App() {
       {notice && <button className="toast" onClick={() => setNotice('')}>{notice}　×</button>}
       {liveShareDialog && <div className="atl-live-share-backdrop" onClick={() => !liveShareBusy && setLiveShareDialog(false)}><section className="atl-live-share-modal" role="dialog" aria-modal="true" aria-label="Bagikan live location" onClick={event => event.stopPropagation()}><header><Crosshair size={22}/><div><b>Bagikan live location</b><small>Lokasi terenkripsi dan hanya terlihat anggota chat ini</small></div><button type="button" onClick={() => setLiveShareDialog(false)} aria-label="Tutup">×</button></header><p>Pilih berapa lama orang lain dapat melihat pergerakan lokasimu.</p><div className="atl-live-duration-options">{[[15,'15 menit'],[60,'1 jam'],[480,'8 jam']].map(([minutes,label]) => <button type="button" key={minutes} className={liveShareDuration===minutes?'selected':''} onClick={() => setLiveShareDuration(minutes)}>{label}</button>)}</div><footer><button type="button" onClick={() => setLiveShareDialog(false)} disabled={liveShareBusy}>Batal</button><button type="button" className="primary" onClick={startLiveLocation} disabled={liveShareBusy}>{liveShareBusy?'Memulai…':'Mulai berbagi'}</button></footer></section></div>}
       {atlanticDialog && <div className="atl-dialog-backdrop" onMouseDown={event => { if(event.target===event.currentTarget) closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false); }}><section className="atl-dialog-card" role="dialog" aria-modal="true" aria-labelledby="atl-dialog-title"><span className="atl-dialog-eyebrow">ATLANTIC / CONFIRMATION</span><h2 id="atl-dialog-title">{atlanticDialog.title || 'Konfirmasi'}</h2><p>{atlanticDialog.message}</p>{atlanticDialog.type==='prompt' && <textarea autoFocus value={atlanticDialogValue} onChange={event=>setAtlanticDialogValue(event.target.value)} placeholder={atlanticDialog.placeholder || 'Tulis di sini…'} maxLength={atlanticDialog.maxLength || 1000}/>}<footer><button type="button" className="atl-dialog-cancel" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?null:false)}>{atlanticDialog.cancelLabel || 'Batal'}</button><button type="button" className="atl-dialog-confirm" onClick={()=>closeAtlanticDialog(atlanticDialog.type==='prompt'?atlanticDialogValue:true)}>{atlanticDialog.confirmLabel || 'Lanjutkan'}</button></footer></section></div>}
+      {forwardTargetMessage && <div className="atl-message-info-backdrop" onClick={() => setForwardTargetMessage(null)}><section className="atl-message-info-card atl-forward-picker" role="dialog" aria-modal="true" aria-label="Teruskan pesan" onClick={event => event.stopPropagation()}><header><b>Teruskan ke…</b><button type="button" onClick={() => setForwardTargetMessage(null)} aria-label="Tutup">×</button></header><div className="atl-forward-destinations">{chats.filter(chat => chat.conversation_id !== active?.conversation_id).map(chat => <button type="button" key={chat.conversation_id} disabled={forwardingMessageId === forwardTargetMessage.id} onClick={() => forwardToSavedMessages(forwardTargetMessage, chat.conversation_id)}><span className="avatar">{chat.is_saved_chat ? <Bookmark size={17}/> : chat.is_group ? <Users size={17}/> : initials(chat.person?.display_name || chat.person?.username || 'A')}</span><span><b>{chat.is_saved_chat ? 'Pesan Tersimpan' : chat.title || chat.person?.display_name || chat.person?.username || 'Percakapan'}</b><small>{chat.is_group ? 'Grup' : chat.is_saved_chat ? 'Cloud pribadi' : 'Chat pribadi'}</small></span><Forward size={16}/></button>)}</div>{forwardingMessageId === forwardTargetMessage.id && <p>Menyiapkan pesan…</p>}</section></div>}
       {messageInfoTarget && <div className="atl-message-info-backdrop" onClick={() => setMessageInfoTarget(null)}><section className="atl-message-info-card" role="dialog" aria-modal="true" aria-label="Info pesan" onClick={event => event.stopPropagation()}><header><b>Info pesan</b><button type="button" onClick={() => setMessageInfoTarget(null)} aria-label="Tutup">×</button></header><dl><dt>Pengirim</dt><dd>{messageInfoTarget.sender_id === session.user.id ? 'Kamu' : (messageInfoTarget.senderProfile?.display_name || messageInfoTarget.senderProfile?.username || 'Anggota')}</dd><dt>Dikirim</dt><dd>{new Date(messageInfoTarget.created_at).toLocaleString('id-ID')}</dd><dt>Status</dt><dd>{messageInfoTarget.read_at ? 'Dibaca' : messageInfoTarget.delivered_at ? 'Terkirim' : 'Dikirim'}</dd><dt>Enkripsi</dt><dd>{messageInfoTarget.is_e2ee ? 'End-to-end encrypted' : 'Pesan lama / belum terenkripsi'}</dd><dt>Lampiran</dt><dd>{messageInfoTarget.media_name || (messageInfoTarget.media_url ? 'Ada lampiran' : 'Tidak ada')}</dd></dl></section></div>}
       {deleteTarget && <div className="neo-delete-backdrop" onClick={() => { if (!deleteBusy) setDeleteTarget(null); }}><section className="neo-delete-modal" role="dialog" aria-modal="true" aria-label="Pilihan hapus pesan" onClick={e => e.stopPropagation()}><span className="neo-delete-tag">ATLANTIC / MESSAGE</span><h2>HAPUS PESAN?</h2><p>Pilih apakah pesan hanya dihapus dari chat kamu atau untuk semua orang.</p><div className="neo-delete-actions"><button type="button" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>BATAL</button><button type="button" disabled={deleteBusy} onClick={() => confirmDeleteMessage('me')}>{deleteBusy ? 'MEMPROSES…' : 'UNTUK SAYA'}</button>{deleteTarget.sender_id === session.user.id && <button type="button" disabled={deleteBusy} onClick={() => confirmDeleteMessage('everyone')}>{deleteBusy ? 'MEMPROSES…' : 'UNTUK SEMUA'}</button>}</div></section></div>}
       {incomingNotice && (
