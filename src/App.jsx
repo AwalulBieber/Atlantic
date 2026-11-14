@@ -132,6 +132,7 @@ export default function App() {
   const attachmentInputRef = useRef(null);
   const [sending, setSending] = useState(false);
   const [forwardingMessageId, setForwardingMessageId] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
   const [messageReactions, setMessageReactions] = useState([]);
   const [messageActionTarget, setMessageActionTarget] = useState(null);
   const [messageFocusActive, setMessageFocusActive] = useState(false);
@@ -681,9 +682,20 @@ export default function App() {
 
   function editMessage(message) {
     setMessageActionTarget(null);
-    setNotice(message.sender_id === session.user.id
-      ? 'Edit belum tersedia karena pesan Atlantic dibuat immutable untuk menjaga integritas E2EE. Kirim pesan koreksi baru ya.'
-      : 'Kamu hanya bisa mengedit pesan milik sendiri.');
+    if (!message?.id || message.sender_id !== session.user.id) {
+      setNotice('Kamu hanya bisa mengedit pesan milik sendiri.');
+      return;
+    }
+    if (message.media_url || message.e2eeAttachment || message.decrypt_error || !message.body || message.body.startsWith('[[ATLANTIC_')) {
+      setNotice('Pesan ini belum bisa diedit. Edit hanya tersedia untuk pesan teks biasa.');
+      return;
+    }
+    setEditingMessage(message);
+    setDraft(message.body);
+    setReplyTarget(null);
+    setAttachmentFile(null);
+    setAttachmentPreview('');
+    setNotice('Mode edit aktif. Ubah teks lalu tekan kirim untuk menyimpan.');
   }
 
   async function toggleSavedMessage(message) {
@@ -1299,6 +1311,7 @@ export default function App() {
     e.preventDefault();
     const body = draft.trim();
     if ((!body && !attachmentFile) || !active || sending) return;
+    if (editingMessage && (!body || attachmentFile)) { setNotice('Edit hanya mendukung teks.'); return; }
     if (e2eeStatus.state !== 'active' || !e2eeKeyRef.current) { setNotice(e2eeStatus.error || 'Menyiapkan kunci enkripsi. Coba lagi sebentar.'); return; }
     setSending(true); setDraft('');
     try {
@@ -1306,6 +1319,26 @@ export default function App() {
       e2eeKeyIdRef.current = await getCurrentConversationE2EEKeyId(supabase, active.conversation_id);
     } catch (keyError) {
       setDraft(body); setNotice(keyError.message || 'Rotasi kunci E2EE belum selesai.'); setSending(false); return;
+    }
+    if (editingMessage) {
+      try {
+        const encryptedBody = await encryptE2EEMessage(e2eeKeyRef.current, { text: body, attachment: null });
+        const { data, error } = await supabase.from('messages').update({ body: encryptedBody, e2ee_key_id: e2eeKeyIdRef.current })
+          .eq('id', editingMessage.id).eq('sender_id', session.user.id).select('id').maybeSingle();
+        if (error) throw error;
+        if (!data?.id) throw new Error('Pesan tidak berubah. Periksa izin edit atau koneksi.');
+        setMessages(rows => rows.map(item => item.id === editingMessage.id ? { ...item, body, is_e2ee: true, decrypt_error: false } : item));
+        setLatestMessages(rows => rows);
+        setEditingMessage(null);
+        setDraft('');
+        setNotice('Pesan berhasil diedit.');
+      } catch (editError) {
+        setDraft(body);
+        setNotice('Pesan gagal diedit: ' + (editError?.message || 'Terjadi kesalahan.'));
+      } finally {
+        setSending(false);
+      }
+      return;
     }
     let mediaPath = null;
     let attachmentEnvelope = null;
@@ -1769,7 +1802,7 @@ export default function App() {
                     {messageActionTarget === m.id && <div className="atl-message-action-menu" role="menu" aria-label="Aksi pesan">
                       <div className="atl-reaction-picker" aria-label="Pilih reaksi">{['👍','❤️','😂','😮','😢','🙏','🔥','👏'].map(emoji => <button type="button" key={emoji} onClick={() => toggleMessageReaction(m, emoji)} aria-label={'Reaksi ' + emoji}>{emoji}</button>)}</div>
                       <button type="button" role="menuitem" onClick={() => { setReplyTarget(m); setMessageActionTarget(null); }}><Reply/>Balas</button>
-                      <button type="button" role="menuitem" onClick={() => pinMessage(m)}><Pin/>{active.pinned_message_id === m.id ? 'Lepas sematan' : 'Sematkan'}</button>
+                      {active.is_group && <button type="button" role="menuitem" onClick={() => pinMessage(m)}><Pin/>{active.pinned_message_id === m.id ? 'Lepas sematan' : 'Sematkan'}</button>}
                       <button type="button" role="menuitem" onClick={() => { toggleSavedMessage(m); setMessageActionTarget(null); }}><Bookmark/>Beri bintang</button>
                       <button type="button" role="menuitem" onClick={() => { forwardToSavedMessages(m); setMessageActionTarget(null); }}><Forward/>Teruskan</button>
                       <button type="button" role="menuitem" onClick={() => copyMessage(m)}><Copy/>Salin</button>
@@ -1809,10 +1842,11 @@ export default function App() {
               {active.is_group && <button type="button" role="menuitem" onClick={() => { setShowChatPolls(true); setShowAttachmentMenu(false); }}><BarChart3 className="atl-menu-poll"/><b>Polling</b></button>}
               <button type="button" className="atl-attachment-tools" role="menuitem" onClick={() => setNotice('Efek Pesan, Spoiler, dan Jadwal sedang disiapkan.')}><WandSparkles/><b>Efek Pesan, Spoiler &amp; Jadwal</b></button>
             </div>}
+            {editingMessage && <div className="reply-composer-preview atl-edit-composer-preview"><div><b>Mengedit pesan</b><span>{editingMessage.body}</span></div><button type="button" onClick={() => { setEditingMessage(null); setDraft(''); }} aria-label="Batalkan edit"><X size={17}/></button></div>}
             <form className="composer" onSubmit={sendMessage}>
               <input ref={attachmentInputRef} type="file" accept={attachmentAccept} onChange={chooseChatAttachment} hidden />
               <button type="button" className={`atl-chat-attach${showAttachmentMenu ? ' is-active' : ''}`} onClick={() => setShowAttachmentMenu(value => !value)} aria-label="Buka menu lampiran" aria-expanded={showAttachmentMenu}><Plus size={21}/></button>
-              <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder={active.is_group ? 'Pesan ke ' + active.title + '…' : 'Tulis pesan…'} autoComplete="off" />
+              <input value={draft} onChange={e => updateDraft(e.target.value)} placeholder={editingMessage ? 'Edit pesan…' : active.is_group ? 'Pesan ke ' + active.title + '…' : 'Tulis pesan…'} autoComplete="off" />
               <button className="send" disabled={(!draft.trim() && !attachmentFile) || sending} aria-label="Kirim pesan">{sending ? <span className="button-spinner" /> : <Send size={19} />}</button>
             </form>
           </>
