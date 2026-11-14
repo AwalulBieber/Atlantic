@@ -416,8 +416,11 @@ export default function App() {
 
   // Fetch independent sidebar datasets together so the chat list does not wait
   // for several avoidable network round trips in sequence.
-  const [archiveResult, memberResult, conversationResult] = await Promise.all([
+  const [archiveResult, hiddenResult, memberResult, conversationResult] = await Promise.all([
     supabase.from('archived_conversations')
+      .select('conversation_id')
+      .eq('user_id', session.user.id),
+    supabase.from('hidden_conversations')
       .select('conversation_id')
       .eq('user_id', session.user.id),
     supabase.from('conversation_members')
@@ -432,6 +435,9 @@ export default function App() {
   const { data: archived, error: archiveError } = archiveResult;
   if (archiveError) setNotice('Arsip chat: ' + archiveError.message);
   else setArchivedIds((archived || []).map(row => row.conversation_id));
+  const { data: hidden, error: hiddenError } = hiddenResult;
+  if (hiddenError) setNotice('Daftar chat tersembunyi: ' + hiddenError.message);
+  const hiddenIds = new Set((hidden || []).map(row => row.conversation_id));
 
   const { data: members, error: memberError } = memberResult;
   if (memberError) { setNotice(memberError.message); return; }
@@ -488,7 +494,7 @@ export default function App() {
     const other = conversationMembers.map(member => peopleById.get(member.user_id)).find(Boolean);
     return other ? { conversation_id: conversation.id, created_by: conversation.created_by, person: other, is_group: false } : null;
   }));
-  const validChatRows=chatRows.filter(Boolean);
+  const validChatRows=chatRows.filter(chat => chat && !hiddenIds.has(chat.conversation_id));
   setChats(validChatRows);
   void refreshInboxSummaries();
   void loadLatestMessages(ids);
