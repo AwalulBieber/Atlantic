@@ -62,9 +62,9 @@ export default function AtlanticProfileExplorer({ userId, onClose }) {
         {loading ? <div className="atl-profile-explorer-loading">Memuat profil…</div> : !profile ? <div className="atl-profile-explorer-loading">Profil tidak dapat ditemukan.</div> : <>
           <div className="atl-profile-hero">
             <div className="atl-profile-photo">{profile.avatar_url ? <img src={profile.avatar_url} alt={profile.display_name || profile.username}/> : initials(profile.display_name || profile.username)}</div>
-            <h2>{profile.display_name || profile.username}{(profile.is_verified || isAdmin) && <BadgeCheck className="atl-profile-verified" size={19}/>}</h2>
+            <h2>{profile.display_name || profile.username}{(profile.is_verified || isAdmin) && <BadgeCheck className={profile.is_verified ? "atl-profile-verified atl-profile-user-verified" : "atl-profile-verified"} size={19}/>}</h2>
             <div className="atl-profile-username">@{profile.username}</div>
-            {(profile.is_verified || isAdmin) && <span className="atl-profile-badge"><BadgeCheck size={14}/> Atlantic Verified</span>}
+            {(profile.is_verified || isAdmin) && <span className={profile.is_verified ? "atl-profile-badge atl-profile-badge-user" : "atl-profile-badge"}><BadgeCheck size={14}/> {profile.is_verified ? "Verified User" : "Atlantic Verified"}</span>}
             {profile.bio && !profile.is_private && <p>{profile.bio}</p>}
             <div className="atl-profile-meta"><CalendarDays size={14}/> Bergabung {profile.created_at ? new Date(profile.created_at).toLocaleDateString("id-ID",{month:"long",year:"numeric"}) : "di Atlantic"}</div>
           </div>
