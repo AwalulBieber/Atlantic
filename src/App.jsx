@@ -1046,6 +1046,10 @@ export default function App() {
         if (deleted?.id) setMessages(old => old.filter(m => m.id !== deleted.id).map(m => m.reply_to === deleted.id ? { ...m, reply_to: null, replyPreview: null } : m));
       })
       .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'messages',
+        filter: `conversation_id=eq.${active.conversation_id}`
+      }, () => { void loadMessages(active.conversation_id); })
+      .on('postgres_changes', {
         event: '*', schema: 'public', table: 'message_reactions'
       }, payload => {
         const row = payload.new?.id ? payload.new : payload.old;
@@ -1329,7 +1333,6 @@ export default function App() {
         if (error) throw error;
         if (!data?.id) throw new Error('Pesan tidak berubah. Periksa izin edit atau koneksi.');
         setMessages(rows => rows.map(item => item.id === editingMessage.id ? { ...item, body, is_e2ee: true, decrypt_error: false } : item));
-        setLatestMessages(rows => rows);
         setEditingMessage(null);
         setDraft('');
         setNotice('Pesan berhasil diedit.');
@@ -1371,7 +1374,9 @@ export default function App() {
 
   async function forwardToSavedMessages(message, targetConversationId = null) {
     if (!message?.id || !active || forwardingMessageId) return;
-    const targetChat = chats.find(chat => chat.conversation_id === targetConversationId) || chats.find(chat => chat.is_saved_chat);
+    const targetChat = targetConversationId
+      ? chats.find(chat => chat.conversation_id === targetConversationId)
+      : chats.find(chat => chat.is_saved_chat);
     if (!targetChat?.conversation_id) {
       setNotice('Tujuan penerusan tidak ditemukan.');
       return;
@@ -1820,7 +1825,7 @@ export default function App() {
                       <button type="button" role="menuitem" onClick={() => editMessage(m)} disabled={m.sender_id !== session.user.id || Boolean(m.media_url)}><Pencil/>Edit</button>
                       <button type="button" role="menuitem" onClick={() => { setMessageInfoTarget(m); setMessageActionTarget(null); }}><Info/>Info pesan</button>
                       <button type="button" role="menuitem" onClick={e => { e.preventDefault(); e.stopPropagation(); openDeleteMessageDialog(m); }}><Trash2/>Hapus</button>
-                      <button type="button" role="menuitem" onClick={() => forwardToSavedMessages(m)}><BookmarkCheck/>Simpan ke Cloud</button>
+                      {!active.is_saved_chat && <button type="button" role="menuitem" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); void forwardToSavedMessages(m); }}><BookmarkCheck/>Simpan ke Cloud</button>}
                     </div>}
                     <div className="bubble-meta"><time>{time(m.created_at)}</time></div>
                   </div>
