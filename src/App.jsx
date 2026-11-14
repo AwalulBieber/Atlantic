@@ -457,10 +457,14 @@ export default function App() {
     return;
   }
 
-  const peopleWithBadges = await Promise.all((people || []).map(async person => {
-    const { data: isAdmin, error: badgeError } = await supabase.rpc('is_atlantic_admin', { target_user: person.id });
-    return { ...person, is_admin: !badgeError && isAdmin === true };
-  }));
+  const { data: publicBadges } = userIds.length
+    ? await supabase.rpc('get_atlantic_public_badges', { target_users: userIds })
+    : { data: [] };
+  const badgeTypesById = new Map((publicBadges || []).map(item => [item.user_id, item.badge_type]));
+  const peopleWithBadges = (people || []).map(person => {
+    const badgeType = badgeTypesById.get(person.id) || 'none';
+    return { ...person, is_admin: badgeType === 'admin', is_verified: badgeType === 'user' || badgeType === 'admin' };
+  });
   const membersByConversation = new Map();
   (members || []).forEach(member => {
     const list = membersByConversation.get(member.conversation_id) || [];
