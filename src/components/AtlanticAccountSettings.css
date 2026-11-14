@@ -102,3 +102,5 @@ html[data-skin="cyberpunk"] .atl-settings{--panel:#111a2d;color:#e7f8ff}
 html[data-skin="cyberpunk"] .atl-settings-head{color:#e7f8ff}
 html[data-skin="cyberpunk"] .atl-settings-tabs button{color:#e7f8ff}
 html[data-skin="cyberpunk"] .atl-settings-tabs button.active{color:#07111f}
+
+.atl-red-verified{display:inline-flex;align-items:center;white-space:nowrap;border-radius:99px;background:#e53935;color:#fff;padding:6px 10px;font-size:11px;font-weight:900}.atl-verification-note{display:grid;gap:6px;font-size:12px;font-weight:800}.atl-verification-note textarea{width:100%;box-sizing:border-box;resize:vertical;padding:11px;border:1.5px solid #888;border-radius:9px;background:transparent;color:inherit;font:inherit;line-height:1.45}
