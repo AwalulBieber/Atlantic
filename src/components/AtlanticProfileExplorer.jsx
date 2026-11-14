@@ -100,7 +100,7 @@ export default function AtlanticProfileExplorer({ userId, onClose }) {
           {!profile.is_private && <section className="atl-profile-section">
             <h3>Story</h3>
             {stories.length ? <div className="atl-profile-stories">{stories.map(story => <article key={story.id}>
-              {story.media_url && (/\\.(mp4|webm)(?:$|\\?)/i.test(story.media_path || "") ? <video src={story.media_url} controls playsInline preload="metadata"/> : <img src={story.media_url} alt="Story" loading="lazy" decoding="async"/>)}
+              {story.media_url && (/\.(mp4|webm)(?:$|\?)/i.test(story.media_path || "") ? <video src={story.media_url} controls playsInline preload="metadata"/> : <img src={story.media_url} alt="Story" loading="lazy" decoding="async"/>)}
               {story.media_error && <p className="atl-profile-empty">Media Story tidak dapat dimuat.</p>}
               {story.body && <p>{story.body}</p>}
               <small>{new Date(story.created_at).toLocaleString("id-ID",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</small>
