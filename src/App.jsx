@@ -1816,7 +1816,16 @@ export default function App() {
                     })()}
                     <div className="bubble-meta"><time>{time(m.created_at)}</time></div>
                   </div>
-                  {messageActionTarget === m.id && <div className="atl-message-action-menu" role="menu" aria-label="Aksi pesan">
+                  {messageActionTarget === m.id && <div
+                    className="atl-message-action-menu"
+                    role="menu"
+                    aria-label="Aksi pesan"
+                    onTouchStart={event => event.stopPropagation()}
+                    onTouchEnd={event => event.stopPropagation()}
+                    onTouchMove={event => event.stopPropagation()}
+                    onClick={event => event.stopPropagation()}
+                    onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
+                  >
                       <div className="atl-reaction-picker" aria-label="Pilih reaksi">{['👍','❤️','😂','😮','😢','🙏','🔥','👏'].map(emoji => <button type="button" key={emoji} onClick={() => toggleMessageReaction(m, emoji)} aria-label={'Reaksi ' + emoji}>{emoji}</button>)}</div>
                       <button type="button" role="menuitem" onClick={() => { setReplyTarget(m); setMessageActionTarget(null); }}><Reply/>Balas</button>
                       {active.is_group && <button type="button" role="menuitem" onClick={() => pinMessage(m)}><Pin/>{active.pinned_message_id === m.id ? 'Lepas sematan' : 'Sematkan'}</button>}
