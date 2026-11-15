@@ -1779,3 +1779,21 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
   user-select: none;
   -webkit-touch-callout: none;
 }
+
+
+/* Keep long-press actions outside each touch/swipe-enabled bubble row. */
+.messages.has-message-focus .atl-message-action-menu-detached{
+  position:fixed!important;
+  z-index:1002!important;
+  top:50%!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:auto!important;
+  width:min(290px,calc(100vw - 32px));
+  max-height:min(68dvh,520px);
+  overflow-y:auto;
+  transform:translate(-50%,-50%);
+  touch-action:pan-y;
+  pointer-events:auto;
+}
+.messages.has-message-focus .atl-message-focus-backdrop{z-index:1000}
