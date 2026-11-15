@@ -1756,3 +1756,26 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-live-share-modal footer{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
 .atl-live-share-modal footer button{padding:9px 13px;border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:9px;background:transparent;color:inherit;font-weight:800}
 .atl-live-share-modal footer button.primary{background:var(--accent);color:#161616;border-color:var(--ink)}
+
+
+/* Fix message action menu stacking and Android native text selection. */
+.bubble-row { position: relative; }
+.bubble-row.message-focused { z-index: 25; }
+.bubble-row.message-focused > .atl-message-action-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 12px);
+  bottom: auto;
+  left: 0;
+  right: auto;
+  pointer-events: auto;
+}
+.bubble-row.message-focused.mine > .atl-message-action-menu {
+  left: auto;
+  right: 0;
+}
+.bubble-row, .bubble-row * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
