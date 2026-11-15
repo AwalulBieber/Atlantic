@@ -1786,15 +1786,23 @@ export default function App() {
           {chatPreferences.pinned.includes(c.conversation_id) && <Pin size={13} aria-label="Chat disematkan"/>}
         </div>
       </button>
-      {chatActionTarget === c.conversation_id && <div className="chat-row-action-menu" role="menu" aria-label="Aksi percakapan">
-        <button type="button" role="menuitem" onClick={() => { updateChatPreference('pinned', c.conversation_id); setChatActionTarget(null); }}><Pin size={15}/> {chatPreferences.pinned.includes(c.conversation_id) ? 'Lepas sematan' : 'Sematkan chat'}</button>
-        <button type="button" role="menuitem" onClick={() => { updateChatPreference('muted', c.conversation_id); setChatActionTarget(null); }}><EyeOff size={15}/> {chatPreferences.muted.includes(c.conversation_id) ? 'Aktifkan notifikasi' : 'Bisukan notifikasi'}</button>
-        <button type="button" role="menuitem" onClick={() => { updateChatPreference('manualUnread', c.conversation_id); setUnread(current => ({ ...current, [c.conversation_id]: chatPreferences.manualUnread.includes(c.conversation_id) ? 0 : Math.max(1, Number(current[c.conversation_id]) || 0) })); setChatActionTarget(null); }}><CheckCheck size={15}/> {chatPreferences.manualUnread.includes(c.conversation_id) ? 'Tandai sudah dibaca' : 'Tandai belum dibaca'}</button>
-        <button type="button" role="menuitem" onClick={() => { setChatActionTarget(null); void toggleArchive(c.conversation_id); }}><Archive size={15}/> {showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'}</button>
-        <button type="button" role="menuitem" onClick={() => removeChat(c, false)}><Trash2 size={15}/> Hapus untuk saya</button>
-        {c.created_by === session?.user?.id && <button type="button" role="menuitem" onClick={() => removeChat(c, true)}><Trash2 size={15}/> Hapus untuk semua orang</button>}
-        <button type="button" onClick={() => setChatActionTarget(null)}>Batal</button>
-      </div>}
+      {chatActionTarget === c.conversation_id && <>
+        {createPortal(<button type="button" className="atl-chat-action-backdrop" aria-label="Tutup menu chat" onClick={() => setChatActionTarget(null)}/>, document.body)}
+        {createPortal(<div className="chat-row-action-menu chat-row-action-menu-detached" role="menu" aria-label="Aksi percakapan"
+          onClick={event => event.stopPropagation()}
+          onTouchStart={event => event.stopPropagation()}
+          onTouchEnd={event => event.stopPropagation()}
+          onTouchMove={event => event.stopPropagation()}>
+          <b className="chat-action-heading">{c.person?.display_name || c.title || 'Percakapan'}</b>
+          <button type="button" role="menuitem" onClick={() => { updateChatPreference('pinned', c.conversation_id); setChatActionTarget(null); }}><Pin size={15}/> {chatPreferences.pinned.includes(c.conversation_id) ? 'Lepas sematan' : 'Sematkan chat'}</button>
+          <button type="button" role="menuitem" onClick={() => { updateChatPreference('muted', c.conversation_id); setChatActionTarget(null); }}><EyeOff size={15}/> {chatPreferences.muted.includes(c.conversation_id) ? 'Aktifkan notifikasi' : 'Bisukan notifikasi'}</button>
+          <button type="button" role="menuitem" onClick={() => { updateChatPreference('manualUnread', c.conversation_id); setUnread(current => ({ ...current, [c.conversation_id]: chatPreferences.manualUnread.includes(c.conversation_id) ? 0 : Math.max(1, Number(current[c.conversation_id]) || 0) })); setChatActionTarget(null); }}><CheckCheck size={15}/> {chatPreferences.manualUnread.includes(c.conversation_id) ? 'Tandai sudah dibaca' : 'Tandai belum dibaca'}</button>
+          <button type="button" role="menuitem" onClick={() => { setChatActionTarget(null); void toggleArchive(c.conversation_id); }}><Archive size={15}/> {showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'}</button>
+          <button type="button" role="menuitem" onClick={() => removeChat(c, false)}><Trash2 size={15}/> Hapus untuk saya</button>
+          {c.created_by === session?.user?.id && <button type="button" role="menuitem" onClick={() => removeChat(c, true)}><Trash2 size={15}/> Hapus untuk semua orang</button>}
+          <button type="button" onClick={() => setChatActionTarget(null)}>Batal</button>
+        </div>, document.body)}
+      </>}
       <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
     </div>
   ))}
