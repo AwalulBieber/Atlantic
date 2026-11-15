@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ensureE2EEIdentity, ensureConversationE2EE, encryptE2EEBytes, decryptE2EEBytes, encryptE2EEMessage, decryptE2EEMessage, getCurrentConversationE2EEKeyId, getConversationE2EEKeyById, getE2EEFingerprint } from './e2ee';
 import { supabase, configReady } from './supabase';
 const AtlanticAccountSettings = lazy(() => import('./components/AtlanticAccountSettings'));
@@ -1744,7 +1745,7 @@ export default function App() {
             </header>
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
             <div className={`messages ${messageFocusActive && messageActionTarget ? 'has-message-focus' : ''}`}>
-              {messageActionTarget && <button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/>}
+              {messageActionTarget && createPortal(<button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/>, document.body)}
               {messages.map((m, messageIndex) => (
                 <React.Fragment key={m.id}>
                   {(messageIndex === 0 || new Date(m.created_at).toDateString() !== new Date(messages[messageIndex - 1].created_at).toDateString()) && <div className="atl-chat-day-separator">{chatDayLabel(m.created_at)}</div>}
@@ -1824,7 +1825,7 @@ export default function App() {
                 const selectedMessage = messages.find(item => item.id === messageActionTarget);
                 if (!selectedMessage) return null;
                 const closeMenu = () => { setMessageActionTarget(null); setMessageFocusActive(false); };
-                return <div
+                return createPortal(<div
                   className="atl-message-action-menu atl-message-action-menu-detached"
                   role="menu"
                   aria-label="Aksi pesan"
@@ -1845,7 +1846,7 @@ export default function App() {
                   <button type="button" role="menuitem" onClick={() => { setMessageInfoTarget(selectedMessage); closeMenu(); }}><Info/>Info pesan</button>
                   <button type="button" role="menuitem" onClick={() => openDeleteMessageDialog(selectedMessage)}><Trash2/>Hapus</button>
                   {!active.is_saved_chat && <button type="button" role="menuitem" onClick={() => { closeMenu(); void forwardToSavedMessages(selectedMessage); }}><BookmarkCheck/>Simpan ke Cloud</button>}
-                </div>;
+                </div>, document.body);
               })()}
 
               {otherTyping && messages.length > 0 && (
