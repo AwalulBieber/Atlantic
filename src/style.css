@@ -1797,3 +1797,27 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
   pointer-events:auto;
 }
 .messages.has-message-focus .atl-message-focus-backdrop{z-index:1000}
+
+
+/* Message actions are portaled to body so the chat scroller cannot clip them. */
+.atl-message-focus-backdrop{
+  position:fixed!important;
+  inset:0!important;
+  z-index:10000!important;
+  width:100vw!important;
+  height:100dvh!important;
+}
+.atl-message-action-menu.atl-message-action-menu-detached{
+  position:fixed!important;
+  z-index:10001!important;
+  top:50%!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:auto!important;
+  width:min(290px,calc(100vw - 32px))!important;
+  max-height:min(68dvh,calc(100dvh - 32px))!important;
+  overflow-y:auto!important;
+  transform:translate(-50%,-50%)!important;
+  touch-action:pan-y;
+  pointer-events:auto!important;
+}
