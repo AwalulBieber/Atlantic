@@ -1816,31 +1816,38 @@ export default function App() {
                     })()}
                     <div className="bubble-meta"><time>{time(m.created_at)}</time></div>
                   </div>
-                  {messageActionTarget === m.id && <div
-                    className="atl-message-action-menu"
-                    role="menu"
-                    aria-label="Aksi pesan"
-                    onTouchStart={event => event.stopPropagation()}
-                    onTouchEnd={event => event.stopPropagation()}
-                    onTouchMove={event => event.stopPropagation()}
-                    onClick={event => event.stopPropagation()}
-                    onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
-                  >
-                      <div className="atl-reaction-picker" aria-label="Pilih reaksi">{['👍','❤️','😂','😮','😢','🙏','🔥','👏'].map(emoji => <button type="button" key={emoji} onClick={() => toggleMessageReaction(m, emoji)} aria-label={'Reaksi ' + emoji}>{emoji}</button>)}</div>
-                      <button type="button" role="menuitem" onClick={() => { setReplyTarget(m); setMessageActionTarget(null); }}><Reply/>Balas</button>
-                      {active.is_group && <button type="button" role="menuitem" onClick={() => pinMessage(m)}><Pin/>{active.pinned_message_id === m.id ? 'Lepas sematan' : 'Sematkan'}</button>}
-                      <button type="button" role="menuitem" onClick={() => { toggleSavedMessage(m); setMessageActionTarget(null); }}><Bookmark/>Beri bintang</button>
-                      <button type="button" role="menuitem" onClick={() => { setForwardTargetMessage(m); setMessageActionTarget(null); setMessageFocusActive(false); }}><Forward/>Teruskan</button>
-                      <button type="button" role="menuitem" onClick={() => copyMessage(m)}><Copy/>Salin</button>
-                      <button type="button" role="menuitem" onClick={() => translateMessage(m)}><Languages/>Terjemahkan</button>
-                      <button type="button" role="menuitem" onClick={() => editMessage(m)} disabled={m.sender_id !== session.user.id || Boolean(m.media_url)}><Pencil/>Edit</button>
-                      <button type="button" role="menuitem" onClick={() => { setMessageInfoTarget(m); setMessageActionTarget(null); }}><Info/>Info pesan</button>
-                      <button type="button" role="menuitem" onClick={e => { e.preventDefault(); e.stopPropagation(); openDeleteMessageDialog(m); }}><Trash2/>Hapus</button>
-                      {!active.is_saved_chat && <button type="button" role="menuitem" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); void forwardToSavedMessages(m); }}><BookmarkCheck/>Simpan ke Cloud</button>}
-                    </div>}
+
                 </div>
                 </React.Fragment>
               ))}
+              {messageActionTarget && (() => {
+                const selectedMessage = messages.find(item => item.id === messageActionTarget);
+                if (!selectedMessage) return null;
+                const closeMenu = () => { setMessageActionTarget(null); setMessageFocusActive(false); };
+                return <div
+                  className="atl-message-action-menu atl-message-action-menu-detached"
+                  role="menu"
+                  aria-label="Aksi pesan"
+                  onTouchStart={event => event.stopPropagation()}
+                  onTouchEnd={event => event.stopPropagation()}
+                  onTouchMove={event => event.stopPropagation()}
+                  onClick={event => event.stopPropagation()}
+                  onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
+                >
+                  <div className="atl-reaction-picker" aria-label="Pilih reaksi">{['👍','❤️','😂','😮','😢','🙏','🔥','👏'].map(emoji => <button type="button" key={emoji} onClick={() => void toggleMessageReaction(selectedMessage, emoji)} aria-label={'Reaksi ' + emoji}>{emoji}</button>)}</div>
+                  <button type="button" role="menuitem" onClick={() => { setReplyTarget(selectedMessage); closeMenu(); }}><Reply/>Balas</button>
+                  {active.is_group && <button type="button" role="menuitem" onClick={() => void pinMessage(selectedMessage)}><Pin/>{active.pinned_message_id === selectedMessage.id ? 'Lepas sematan' : 'Sematkan'}</button>}
+                  <button type="button" role="menuitem" onClick={() => { closeMenu(); void toggleSavedMessage(selectedMessage); }}><Bookmark/>Beri bintang</button>
+                  <button type="button" role="menuitem" onClick={() => { setForwardTargetMessage(selectedMessage); closeMenu(); }}><Forward/>Teruskan</button>
+                  <button type="button" role="menuitem" onClick={() => void copyMessage(selectedMessage)}><Copy/>Salin</button>
+                  <button type="button" role="menuitem" onClick={() => translateMessage(selectedMessage)}><Languages/>Terjemahkan</button>
+                  <button type="button" role="menuitem" onClick={() => { closeMenu(); editMessage(selectedMessage); }} disabled={selectedMessage.sender_id !== session.user.id || Boolean(selectedMessage.media_url)}><Pencil/>Edit</button>
+                  <button type="button" role="menuitem" onClick={() => { setMessageInfoTarget(selectedMessage); closeMenu(); }}><Info/>Info pesan</button>
+                  <button type="button" role="menuitem" onClick={() => openDeleteMessageDialog(selectedMessage)}><Trash2/>Hapus</button>
+                  {!active.is_saved_chat && <button type="button" role="menuitem" onClick={() => { closeMenu(); void forwardToSavedMessages(selectedMessage); }}><BookmarkCheck/>Simpan ke Cloud</button>}
+                </div>;
+              })()}
+
               {otherTyping && messages.length > 0 && (
                 <div className="atl-typing-row" aria-live="polite">
                   <span className="typing-indicator"><i/><i/><i/> sedang mengetik…</span>
