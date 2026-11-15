@@ -903,7 +903,7 @@ export default function App() {
     const { data: hiddenStates, error: hiddenError } = messageIds.length
       ? await supabase.from('message_user_states').select('message_id').eq('user_id', session.user.id).eq('is_deleted', true).in('message_id', messageIds)
       : { data: [], error: null };
-    if (hiddenError) { setNotice('Status hapus pesan gagal dimuat: ' + hiddenError.message); return; }
+    if (hiddenError) { setNotice('Status hapus pesan gagal dimuat: ' + hiddenError.message); if (appendOlder) setLoadingOlderMessages(false); return; }
     const hiddenIds = new Set((hiddenStates || []).map(row => row.message_id));
     const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id));
     const messagesWithMedia = await Promise.all(visibleMessages.map(async message => {
