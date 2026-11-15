@@ -1864,3 +1864,47 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
   font-size:12px;
   text-align:left;
 }
+
+
+/* Portal chat long-press menu above all scroll and stacking contexts. */
+.atl-chat-action-backdrop{
+  position:fixed!important;
+  inset:0!important;
+  z-index:11000!important;
+  width:100vw!important;
+  height:100dvh!important;
+  border:0!important;
+  border-radius:0!important;
+  background:rgba(12,16,24,.34)!important;
+  cursor:default;
+}
+.chat-row-action-menu.chat-row-action-menu-detached{
+  position:fixed!important;
+  z-index:11001!important;
+  top:50%!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:auto!important;
+  width:min(310px,calc(100vw - 32px))!important;
+  max-height:min(72dvh,560px)!important;
+  overflow-y:auto!important;
+  transform:translate(-50%,-50%)!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:7px!important;
+  padding:12px!important;
+  touch-action:pan-y;
+}
+.chat-row-action-menu-detached .chat-action-heading{
+  padding:4px 5px 8px;
+  overflow-wrap:anywhere;
+  font-size:13px;
+  font-weight:950;
+}
+.chat-row-action-menu.chat-row-action-menu-detached button{
+  width:100%;
+  min-height:40px;
+  justify-content:flex-start;
+  padding:9px 11px;
+  font-size:12px;
+}
