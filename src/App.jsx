@@ -119,6 +119,8 @@ export default function App() {
   const [chatFilterMenuOpen, setChatFilterMenuOpen] = useState(false);
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [e2eeStatus, setE2eeStatus] = useState({ state: 'loading', error: '' });
   const e2eeKeyRef = useRef(null);
   const e2eeKeyIdRef = useRef(null);
@@ -645,6 +647,7 @@ export default function App() {
   async function openGroupChat(group) {
     setNotice('');
     setUnread(old => { const next = { ...old }; delete next[group.conversation_id]; return next; });
+    if (chatPreferences.manualUnread.includes(group.conversation_id)) updateChatPreference('manualUnread', group.conversation_id);
     setIncomingNotice(null);
     setActive({ conversation_id: group.conversation_id, person: group.person, is_group: true, title: group.title, pinned_message_id:group.pinned_message_id, members: group.members || [] });
     setReplyTarget(null);
@@ -808,6 +811,7 @@ export default function App() {
         delete next[conversationId];
         return next;
       });
+      if (chatPreferences.manualUnread.includes(conversationId)) updateChatPreference('manualUnread', conversationId);
       setIncomingNotice(null);
       setReplyTarget(null);
       setActive({ conversation_id: conversationId, person });
@@ -872,21 +876,26 @@ export default function App() {
     return () => { cancelled = true; };
   }, [active?.conversation_id, e2eeStatus.state, session?.user?.id]);
 
-  async function loadMessages(id) {
+  async function loadMessages(id, options = {}) {
+    const appendOlder = options.append === true;
+    if (appendOlder) setLoadingOlderMessages(true);
     // Persist read state per user, including when read receipts are disabled.
     void supabase.rpc('mark_atlantic_conversation_read', { p_conversation_id: id })
       .then(({ error }) => { if (error) console.warn('Atlantic mark read:', error.message); })
       .catch(error => console.warn('Atlantic mark read:', error?.message || error));
-    const { data, error } = await supabase
-      .from('messages')
+    let historyQuery = supabase.from('messages')
       .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at,media_url,media_type,media_name,e2ee_key_id')
       .eq('conversation_id', id)
       .order('created_at', { ascending: false })
       .limit(60);
+    if (options.before) historyQuery = historyQuery.lt('created_at', options.before);
+    const { data, error } = await historyQuery;
     if (error) {
       setNotice(error.message);
+      if (appendOlder) setLoadingOlderMessages(false);
       return;
     }
+    setHasOlderMessages((data || []).length === 60);
     // Ambil 60 pesan terbaru saja agar membuka chat tidak menunggu seluruh riwayat.
     // Balik urutannya agar tampilan tetap kronologis.
     if (data) data.reverse();
@@ -958,8 +967,13 @@ export default function App() {
     }));
     // Show the conversation as soon as message content is ready; receipts and
     // reactions are secondary metadata and should not delay the first render.
-    setMessages(readyMessages);
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    if (appendOlder) {
+      setMessages(current => [...readyMessages, ...current]);
+      setLoadingOlderMessages(false);
+    } else {
+      setMessages(readyMessages);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    }
     void (async () => {
       if (incomingIds.length) {
         const { error: receiptError } = await supabase.rpc('record_atlantic_message_receipts', {
@@ -1768,7 +1782,7 @@ export default function App() {
         <div className="person-meta">
           <small>{inboxDate(latestMessages[c.conversation_id]?.created_at)}</small>
           {chatPreferences.muted.includes(c.conversation_id) && <EyeOff size={13} aria-label="Notifikasi dibisukan"/>}
-          {(unread[c.conversation_id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.conversation_id] || 0) + ' pesan belum dibaca'}>{(unread[c.conversation_id] || 0) > 99 ? '99+' : unread[c.conversation_id]}</span>}
+          {Math.max(Number(unread[c.conversation_id]) || 0, chatPreferences.manualUnread.includes(c.conversation_id) ? 1 : 0) > 0 && <span className="atl-unread-badge" aria-label={Math.max(Number(unread[c.conversation_id]) || 0, chatPreferences.manualUnread.includes(c.conversation_id) ? 1 : 0) + ' pesan belum dibaca'}>{Math.max(Number(unread[c.conversation_id]) || 0, chatPreferences.manualUnread.includes(c.conversation_id) ? 1 : 0) > 99 ? '99+' : Math.max(Number(unread[c.conversation_id]) || 0, chatPreferences.manualUnread.includes(c.conversation_id) ? 1 : 0)}</span>}
           {chatPreferences.pinned.includes(c.conversation_id) && <Pin size={13} aria-label="Chat disematkan"/>}
         </div>
       </button>
@@ -1809,6 +1823,7 @@ export default function App() {
             {active.is_group&&active.pinned_message_id&&messages.find(message=>message.id===active.pinned_message_id)&&<button type="button" className="atl-pinned-message" onClick={()=>document.getElementById('message-'+active.pinned_message_id)?.scrollIntoView({behavior:'smooth',block:'center'})}><span>📌 Pesan disematkan</span><b>{(messages.find(message=>message.id===active.pinned_message_id)?.body||'Lampiran').slice(0,110)}</b></button>}
             <div className={`messages ${messageFocusActive && messageActionTarget ? 'has-message-focus' : ''}`}>
               {messageActionTarget && createPortal(<button type="button" className={`atl-message-focus-backdrop ${messageFocusActive ? 'is-blurred' : ''}`} aria-label="Tutup menu pesan" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); }}/>, document.body)}
+                      {hasOlderMessages && <button type="button" className="atl-load-older" disabled={loadingOlderMessages} onClick={() => { const firstMessage = messages[0]; if (firstMessage?.created_at) void loadMessages(active.conversation_id, { before: firstMessage.created_at, append: true }); }}>{loadingOlderMessages ? 'Memuat pesan lama…' : 'Muat pesan sebelumnya'}</button>}
               {messages.map((m, messageIndex) => (
                 <React.Fragment key={m.id}>
                   {(messageIndex === 0 || new Date(m.created_at).toDateString() !== new Date(messages[messageIndex - 1].created_at).toDateString()) && <div className="atl-chat-day-separator">{chatDayLabel(m.created_at)}</div>}
