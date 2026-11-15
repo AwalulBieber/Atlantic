@@ -159,6 +159,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [chatActionTarget, setChatActionTarget] = useState(null);
+  const [chatPreferences, setChatPreferences] = useState({ pinned: [], muted: [], manualUnread: [] });
   const chatLongPressTimer = useRef(null);
   const chatLongPressTriggered = useRef(false);
   const [swipeState, setSwipeState] = useState({ id: null, offset: 0 });
@@ -312,6 +313,25 @@ export default function App() {
       clearInviteFromUrl();
     })();
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('atlantic-chat-preferences:' + session.user.id) || '{}');
+        setChatPreferences({ pinned: Array.isArray(stored.pinned) ? stored.pinned : [], muted: Array.isArray(stored.muted) ? stored.muted : [], manualUnread: Array.isArray(stored.manualUnread) ? stored.manualUnread : [] });
+      } catch { setChatPreferences({ pinned: [], muted: [], manualUnread: [] }); }
+    } else setChatPreferences({ pinned: [], muted: [], manualUnread: [] });
+  }, [session?.user?.id]);
+
+  function updateChatPreference(kind, conversationId) {
+    setChatPreferences(current => {
+      const values = current[kind] || [];
+      const nextValues = values.includes(conversationId) ? values.filter(id => id !== conversationId) : [...values, conversationId];
+      const next = { ...current, [kind]: nextValues };
+      try { if (session?.user?.id) localStorage.setItem('atlantic-chat-preferences:' + session.user.id, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (session) {
@@ -861,11 +881,15 @@ export default function App() {
       .from('messages')
       .select('id,conversation_id,sender_id,body,created_at,reply_to,delivered_at,read_at,media_url,media_type,media_name,e2ee_key_id')
       .eq('conversation_id', id)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .limit(60);
     if (error) {
       setNotice(error.message);
       return;
     }
+    // Ambil 60 pesan terbaru saja agar membuka chat tidak menunggu seluruh riwayat.
+    // Balik urutannya agar tampilan tetap kronologis.
+    if (data) data.reverse();
     const messageIds = (data || []).map(message => message.id);
     const { data: hiddenStates, error: hiddenError } = messageIds.length
       ? await supabase.from('message_user_states').select('message_id').eq('user_id', session.user.id).eq('is_deleted', true).in('message_id', messageIds)
@@ -1122,7 +1146,7 @@ export default function App() {
         const notificationBody = typeof message.body === 'string' && message.body.startsWith('ATL-E2EE1:')
           ? '🔒 Pesan terenkripsi baru'
           : (message.media_url ? 'Mengirim lampiran' : 'Mengirim pesan');
-        setIncomingNotice({ person, body: notificationBody, conversationId: message.conversation_id, isGroup: Boolean(targetChat?.is_group), groupTitle: targetChat?.title });
+        if (!chatPreferences.muted.includes(message.conversation_id)) setIncomingNotice({ person, body: notificationBody, conversationId: message.conversation_id, isGroup: Boolean(targetChat?.is_group), groupTitle: targetChat?.title });
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
@@ -1321,8 +1345,12 @@ export default function App() {
     if (e2eeStatus.state !== 'active' || !e2eeKeyRef.current) { setNotice(e2eeStatus.error || 'Menyiapkan kunci enkripsi. Coba lagi sebentar.'); return; }
     setSending(true); setDraft('');
     try {
-      e2eeKeyRef.current = await ensureConversationE2EE(supabase, active.conversation_id, active.members?.map(member => member.id) || [active.person?.id], session.user.id);
-      e2eeKeyIdRef.current = await getCurrentConversationE2EEKeyId(supabase, active.conversation_id);
+      // Gunakan kunci E2EE yang sudah siap. Jangan melakukan round-trip database
+      // tambahan pada setiap pengiriman pesan.
+      if (!e2eeKeyRef.current || !e2eeKeyIdRef.current) {
+        e2eeKeyRef.current = await ensureConversationE2EE(supabase, active.conversation_id, active.members?.map(member => member.id) || [active.person?.id], session.user.id);
+        e2eeKeyIdRef.current = await getCurrentConversationE2EEKeyId(supabase, active.conversation_id);
+      }
     } catch (keyError) {
       setDraft(body); setNotice(keyError.message || 'Rotasi kunci E2EE belum selesai.'); setSending(false); return;
     }
@@ -1361,11 +1389,33 @@ export default function App() {
       typingActiveRef.current = false;
       typingLastSentAt.current = 0;
       const encryptedBody = await encryptE2EEMessage(e2eeKeyRef.current, { text: body, attachment: attachmentEnvelope });
-      const { error } = await supabase.from('messages').insert({ conversation_id:active.conversation_id, sender_id:session.user.id, body:encryptedBody, e2ee_key_id:e2eeKeyIdRef.current, media_url:mediaPath, media_type:mediaPath ? 'application/octet-stream' : null, media_name:null, reply_to:replyTarget?.id || null });
+      const conversationId = active.conversation_id;
+      const optimisticId = 'atlantic-pending-' + crypto.randomUUID();
+      const optimisticMessage = {
+        id: optimisticId, conversation_id: conversationId, sender_id: session.user.id,
+        body, created_at: new Date().toISOString(), reply_to: replyTarget?.id || null,
+        replyPreview: replyTarget ? { ...replyTarget } : null, is_e2ee: true,
+        media_url: attachmentPreview || null,
+        media_type: attachmentFile?.type || null,
+        media_name: attachmentFile?.name || null, optimistic: true
+      };
+      // Tampilkan pesan lokal segera; server tetap hanya menerima ciphertext E2EE.
+      setMessages(rows => [...rows, optimisticMessage]);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
+      const { data: inserted, error } = await supabase.from('messages').insert({
+        conversation_id:conversationId, sender_id:session.user.id, body:encryptedBody,
+        e2ee_key_id:e2eeKeyIdRef.current, media_url:mediaPath,
+        media_type:mediaPath ? 'application/octet-stream' : null,
+        media_name:null, reply_to:replyTarget?.id || null
+      }).select('id,conversation_id,sender_id,created_at,reply_to,media_url,media_type,e2ee_key_id').single();
       if (error) throw new Error('Pesan gagal dikirim: ' + error.message);
+      const confirmedMessage = { ...optimisticMessage, ...inserted, body, media_url: attachmentPreview || null, media_type: attachmentFile?.type || null, media_name: attachmentFile?.name || null, optimistic: false };
+      setMessages(rows => [...rows.filter(item => item.id !== optimisticId && item.id !== inserted.id), confirmedMessage]);
+      setLatestMessages(current => ({ ...current, [conversationId]: { ...confirmedMessage } }));
       setReplyTarget(null); setAttachmentFile(null); setAttachmentPreview('');
     } catch (sendError) {
       if (mediaPath) await supabase.storage.from('atlantic-chat-media').remove([mediaPath]);
+      setMessages(rows => rows.filter(item => !String(item.id).startsWith('atlantic-pending-')));
       setDraft(body);
       setNotice(sendError.message || 'Pesan gagal dienkripsi atau dikirim.');
     }
@@ -1616,6 +1666,9 @@ export default function App() {
     if (chatFilter === "group") return c.is_group;
     return true;
   }).sort((a, b) => {
+    const aPinned = chatPreferences.pinned.includes(a.conversation_id);
+    const bPinned = chatPreferences.pinned.includes(b.conversation_id);
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
     if (a.is_saved_chat) return -1;
     if (b.is_saved_chat) return 1;
     return new Date(latestMessages[b.conversation_id]?.created_at || 0).getTime() - new Date(latestMessages[a.conversation_id]?.created_at || 0).getTime();
@@ -1714,10 +1767,20 @@ export default function App() {
         </div>
         <div className="person-meta">
           <small>{inboxDate(latestMessages[c.conversation_id]?.created_at)}</small>
+          {chatPreferences.muted.includes(c.conversation_id) && <EyeOff size={13} aria-label="Notifikasi dibisukan"/>}
           {(unread[c.conversation_id] || 0) > 0 && <span className="atl-unread-badge" aria-label={(unread[c.conversation_id] || 0) + ' pesan belum dibaca'}>{(unread[c.conversation_id] || 0) > 99 ? '99+' : unread[c.conversation_id]}</span>}
+          {chatPreferences.pinned.includes(c.conversation_id) && <Pin size={13} aria-label="Chat disematkan"/>}
         </div>
       </button>
-      {chatActionTarget === c.conversation_id && <div className="chat-row-action-menu"><button type="button" onClick={() => removeChat(c, false)}><Trash2 size={15}/> Hapus untuk saya</button>{c.created_by === session?.user?.id && <button type="button" onClick={() => removeChat(c, true)}><Trash2 size={15}/> Hapus untuk semua orang</button>}<button type="button" onClick={() => setChatActionTarget(null)}>Batal</button></div>}
+      {chatActionTarget === c.conversation_id && <div className="chat-row-action-menu" role="menu" aria-label="Aksi percakapan">
+        <button type="button" role="menuitem" onClick={() => { updateChatPreference('pinned', c.conversation_id); setChatActionTarget(null); }}><Pin size={15}/> {chatPreferences.pinned.includes(c.conversation_id) ? 'Lepas sematan' : 'Sematkan chat'}</button>
+        <button type="button" role="menuitem" onClick={() => { updateChatPreference('muted', c.conversation_id); setChatActionTarget(null); }}><EyeOff size={15}/> {chatPreferences.muted.includes(c.conversation_id) ? 'Aktifkan notifikasi' : 'Bisukan notifikasi'}</button>
+        <button type="button" role="menuitem" onClick={() => { updateChatPreference('manualUnread', c.conversation_id); setUnread(current => ({ ...current, [c.conversation_id]: chatPreferences.manualUnread.includes(c.conversation_id) ? 0 : Math.max(1, Number(current[c.conversation_id]) || 0) })); setChatActionTarget(null); }}><CheckCheck size={15}/> {chatPreferences.manualUnread.includes(c.conversation_id) ? 'Tandai sudah dibaca' : 'Tandai belum dibaca'}</button>
+        <button type="button" role="menuitem" onClick={() => { setChatActionTarget(null); void toggleArchive(c.conversation_id); }}><Archive size={15}/> {showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'}</button>
+        <button type="button" role="menuitem" onClick={() => removeChat(c, false)}><Trash2 size={15}/> Hapus untuk saya</button>
+        {c.created_by === session?.user?.id && <button type="button" role="menuitem" onClick={() => removeChat(c, true)}><Trash2 size={15}/> Hapus untuk semua orang</button>}
+        <button type="button" onClick={() => setChatActionTarget(null)}>Batal</button>
+      </div>}
       <button type="button" className="archive-chat-btn" title={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} aria-label={showArchived ? 'Keluarkan dari arsip' : 'Arsipkan chat'} onClick={() => toggleArchive(c.conversation_id)}>{showArchived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
     </div>
   ))}
