@@ -1814,7 +1814,9 @@ export default function App() {
                       }, {}));
                       return grouped.length ? <div className="atl-message-reactions">{grouped.map(item => <button type="button" key={item.emoji} className={item.mine ? 'is-mine' : ''} onClick={() => toggleMessageReaction(m, item.emoji)} title={item.count + ' reaksi'}><span>{item.emoji}</span><b>{item.count}</b></button>)}</div> : null;
                     })()}
-                    {messageActionTarget === m.id && <div className="atl-message-action-menu" role="menu" aria-label="Aksi pesan">
+                    <div className="bubble-meta"><time>{time(m.created_at)}</time></div>
+                  </div>
+                  {messageActionTarget === m.id && <div className="atl-message-action-menu" role="menu" aria-label="Aksi pesan">
                       <div className="atl-reaction-picker" aria-label="Pilih reaksi">{['👍','❤️','😂','😮','😢','🙏','🔥','👏'].map(emoji => <button type="button" key={emoji} onClick={() => toggleMessageReaction(m, emoji)} aria-label={'Reaksi ' + emoji}>{emoji}</button>)}</div>
                       <button type="button" role="menuitem" onClick={() => { setReplyTarget(m); setMessageActionTarget(null); }}><Reply/>Balas</button>
                       {active.is_group && <button type="button" role="menuitem" onClick={() => pinMessage(m)}><Pin/>{active.pinned_message_id === m.id ? 'Lepas sematan' : 'Sematkan'}</button>}
@@ -1827,8 +1829,6 @@ export default function App() {
                       <button type="button" role="menuitem" onClick={e => { e.preventDefault(); e.stopPropagation(); openDeleteMessageDialog(m); }}><Trash2/>Hapus</button>
                       {!active.is_saved_chat && <button type="button" role="menuitem" onClick={() => { setMessageActionTarget(null); setMessageFocusActive(false); void forwardToSavedMessages(m); }}><BookmarkCheck/>Simpan ke Cloud</button>}
                     </div>}
-                    <div className="bubble-meta"><time>{time(m.created_at)}</time></div>
-                  </div>
                 </div>
                 </React.Fragment>
               ))}
