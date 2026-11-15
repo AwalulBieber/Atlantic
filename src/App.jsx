@@ -7,6 +7,7 @@ const AtlanticCommunity = lazy(() => import('./components/AtlanticCommunity'));
 const AtlanticCallManager = lazy(() => import('./components/AtlanticCallManager'));
 const AtlanticAdminDashboard = lazy(() => import('./components/AtlanticAdminDashboard'));
 const AtlanticContacts = lazy(() => import('./components/AtlanticContacts'));
+const AtlanticNewChat = lazy(() => import('./components/AtlanticNewChat'));
 const AtlanticGroupInfo = lazy(() => import('./components/AtlanticGroupInfo'));
 const AtlanticProfileExplorer = lazy(() => import('./components/AtlanticProfileExplorer'));
 import AtlanticPolls from './components/AtlanticPolls';
@@ -148,6 +149,7 @@ export default function App() {
   const [profileExplorerUserId, setProfileExplorerUserId] = useState(null);
   const [adminDashboardOpen, setAdminDashboardOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
   const [groupInfoOpen, setGroupInfoOpen] = useState(false);
   const [unread, setUnread] = useState({});
   const [inboxSummaries, setInboxSummaries] = useState([]);
@@ -2157,7 +2159,7 @@ export default function App() {
         <div className="create-menu-backdrop" onClick={() => setCreateMenuOpen(false)}>
           <section className="create-menu" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Buat baru">
             <header><div><small>ATLANTIC CREATE</small><b>Buat sesuatu</b></div><button className="icon-btn" onClick={() => setCreateMenuOpen(false)} aria-label="Tutup"><X size={18}/></button></header>
-            <button onClick={() => { setActiveTab('chat'); setCreateMenuOpen(false); setNotice('Pilih pengguna dari daftar chat untuk membuka percakapan.'); }}><MessageSquarePlus/><span><b>Chat baru</b><small>Mulai percakapan</small></span></button>
+            <button onClick={() => { setActiveTab('chat'); setCreateMenuOpen(false); setNewChatOpen(true); setNotice(''); }}><MessageSquarePlus/><span><b>Chat baru</b><small>Pilih pengguna untuk mulai chat</small></span></button>
             <button onClick={loadGroupUsers}><Users/><span><b>Grup baru</b><small>Buat grup dan pilih anggota</small></span></button>
             <button onClick={() => { setContactsOpen(true); setCreateMenuOpen(false); }}><UserRound/><span><b>Tambah kontak</b><small>Cari dan tambahkan teman Atlantic</small></span></button>
             <button onClick={() => { setActiveTab('updates'); setCommunityCreateRequest(v => v + 1); setCreateMenuOpen(false); setNotice(''); }}><ImagePlus/><span><b>Story</b><small>Bagikan momen singkat</small></span></button>
@@ -2168,6 +2170,7 @@ export default function App() {
 
       {adminDashboardOpen && <Suspense fallback={null}><AtlanticAdminDashboard user={session.user} onClose={() => setAdminDashboardOpen(false)} onNotice={setNotice} onDialog={openAtlanticDialog} /></Suspense>}
       {contactsOpen && <Suspense fallback={null}><AtlanticContacts user={session.user} onClose={() => setContactsOpen(false)} onOpenChat={person => { setContactsOpen(false); if(person) openChat(person); }} onDialog={openAtlanticDialog} /></Suspense>}
+      {newChatOpen && <Suspense fallback={null}><AtlanticNewChat user={session.user} onClose={() => setNewChatOpen(false)} onOpenChat={person => { setNewChatOpen(false); if(person) openChat(person); }} /></Suspense>}
       {groupInfoOpen && active?.is_group && <Suspense fallback={null}><AtlanticGroupInfo conversationId={active.conversation_id} user={session.user} onClose={() => setGroupInfoOpen(false)} onNotice={setNotice} onUpdated={updated => { setActive(current => current ? {...current,title:updated.title,pinned_message_id:updated.pinned_message_id,person:{...current.person,display_name:updated.title,avatar_url:updated.avatar_signed_url||current.person.avatar_url,is_verified:current.is_verified}} : current); loadProfiles(); }} /></Suspense>}
 
       {activeTab !== 'chat' && (
