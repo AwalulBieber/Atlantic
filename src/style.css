@@ -1821,3 +1821,46 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
   touch-action:pan-y;
   pointer-events:auto!important;
 }
+
+
+/* Faster chat history controls and compact, touch-friendly long-press actions. */
+.atl-load-older{
+  display:block;
+  margin:10px auto 14px;
+  padding:8px 14px;
+  border:1.5px solid var(--ink,#171717);
+  border-radius:999px;
+  background:var(--surface,#fff);
+  color:var(--ink,#171717);
+  box-shadow:2px 2px 0 var(--ink,#171717);
+  font-size:11px;
+  font-weight:850;
+  cursor:pointer;
+}
+.atl-load-older:disabled{opacity:.6;cursor:wait}
+.person-row{position:relative}
+.chat-row-action-menu{
+  position:absolute;
+  z-index:80;
+  top:calc(100% + 5px);
+  left:42px;
+  right:42px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:5px;
+  max-height:min(55dvh,390px);
+  overflow-y:auto;
+  padding:8px;
+  border:1.5px solid var(--ink,#171717);
+  border-radius:12px;
+  background:var(--surface,#fff);
+  box-shadow:4px 5px 0 var(--ink,#171717);
+}
+.chat-row-action-menu button{
+  width:100%;
+  justify-content:flex-start;
+  min-height:36px;
+  padding:8px 10px;
+  font-size:12px;
+  text-align:left;
+}
