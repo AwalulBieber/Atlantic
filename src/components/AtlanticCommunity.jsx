@@ -260,13 +260,32 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
   }
 
   async function joinChannel(channel) {
+    if(!joinedChannelIds.includes(channel.id)){
+      onNotice?.('Ikuti saluran ini terlebih dahulu untuk melihat pembaruannya.');
+      return;
+    }
     const {data:existing,error:checkError}=await supabase.from('atlantic_channel_members').select('user_id,role').eq('channel_id',channel.id).eq('user_id',user.id).maybeSingle();
     if(checkError){setError(checkError.message);return;}
-    if(!existing){const {error:e}=await supabase.from('atlantic_channel_members').insert({channel_id:channel.id,user_id:user.id,role:'member'});if(e){setError(e.message);return;}}
-    let readyChannel={...channel,avatar_path:channel.avatar_url||null,member_role:existing?.role||'member'};
-    if(channel.avatar_url){const {data:signed,error:signedError}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(channel.avatar_url,3600);if(signedError)setError('Foto saluran: '+signedError.message);else readyChannel.avatar_url=signed?.signedUrl||null;}
-    setJoinedChannelIds(v=>[...new Set([...v,channel.id])]);
+    if(!existing){setError('Keanggotaan saluran belum ditemukan. Tekan Ikuti terlebih dahulu.');setJoinedChannelIds(ids=>ids.filter(id=>id!==channel.id));return;}
+    let readyChannel={...channel,avatar_path:channel.avatar_path||channel.avatar_url||null,member_role:existing.role};
+    if(channel.avatar_path||channel.avatar_url){const {data:signed,error:signedError}=await supabase.storage.from('atlantic-channel-media').createSignedUrl(channel.avatar_path||channel.avatar_url,3600);if(signedError)setError('Foto saluran: '+signedError.message);else readyChannel.avatar_url=signed?.signedUrl||null;}
     setSelectedChannel(readyChannel);loadPosts(channel.id);
+  }
+
+  async function followChannel(channel) {
+    if(joinedChannelIds.includes(channel.id)||busy)return;
+    setBusy(true);setError('');
+    const {error:e}=await supabase.from('atlantic_channel_members').insert({channel_id:channel.id,user_id:user.id,role:'member'});
+    if(e){
+      if(e.code==='23505'){
+        setJoinedChannelIds(ids=>[...new Set([...ids,channel.id])]);
+      }else setError('Gagal mengikuti saluran: '+e.message);
+    }else{
+      setJoinedChannelIds(ids=>[...new Set([...ids,channel.id])]);
+      setChannels(items=>items.map(item=>item.id===channel.id?{...item,member_count:(item.member_count||0)+1}:item));
+      onNotice?.('Berhasil mengikuti saluran '+channel.name+'.');
+    }
+    setBusy(false);
   }
 
   async function loadPosts(id) {
@@ -448,7 +467,7 @@ export default function AtlanticCommunity({ tab, user, profile, createRequest = 
           </div>
         </header>
         <label className="atl-channel-home-search"><Search size={18}/><input value={communitySearch} onChange={e=>setCommunitySearch(e.target.value)} placeholder="Cari saluran…"/></label>
-        {(()=>{const matches=channels.filter(c=>!searchTerm||String(c.name||'').toLowerCase().includes(searchTerm)||String(c.description||'').toLowerCase().includes(searchTerm));const followed=matches.filter(c=>joinedChannelIds.includes(c.id));const discover=matches.filter(c=>!joinedChannelIds.includes(c.id));const channelRow=c=><article className="atl-channel-wa-row" key={c.id}><button type="button" className="atl-channel-wa-main" onClick={()=>joinChannel(c)}><span className="atl-channel-wa-avatar">{c.avatar_url?<img src={c.avatar_url} alt=""/>:<Radio size={22}/>}</span><span className="atl-channel-wa-copy"><b>{c.name} {people[c.owner_id]?.is_verified&&<BadgeCheck size={14} className="atl-inline-verified"/>}</b><small>{c.description||'Saluran komunitas Atlantic'}</small><small className="atl-channel-wa-meta">{c.member_count} pengikut · {people[c.owner_id]?.display_name||people[c.owner_id]?.username||'Kreator Atlantic'}</small></span><small className="atl-channel-wa-time">{dateLabel(c.created_at)}</small></button><button type="button" className={joinedChannelIds.includes(c.id)?'is-following':''} onClick={()=>joinChannel(c)}>{joinedChannelIds.includes(c.id)?'Buka':'Ikuti'}</button></article>;return <><section className="atl-channel-wa-section" id="atl-channel-followed"><header><div><h3>Saluran yang diikuti</h3></div><span>{followed.length}</span></header>{followed.length?followed.map(channelRow):<div className="atl-channel-home-empty">Saluran yang kamu ikuti akan muncul di sini.</div>}</section><section className="atl-channel-wa-section" id="atl-channel-discover"><header><div><h3>Temukan saluran</h3></div><span>{discover.length}</span></header>{discover.length?discover.map(channelRow):<div className="atl-channel-home-empty">{channels.length?'Tidak ada saluran yang cocok.':'Belum ada saluran publik. Jadilah yang pertama membuat saluran.'}</div>}</section></>;})()}
+        {(()=>{const matches=channels.filter(c=>!searchTerm||String(c.name||'').toLowerCase().includes(searchTerm)||String(c.description||'').toLowerCase().includes(searchTerm));const followed=matches.filter(c=>joinedChannelIds.includes(c.id));const discover=matches.filter(c=>!joinedChannelIds.includes(c.id));const channelRow=c=><article className="atl-channel-wa-row" key={c.id}><button type="button" className="atl-channel-wa-main" onClick={()=>joinedChannelIds.includes(c.id)?joinChannel(c):onNotice?.('Ikuti saluran ini terlebih dahulu untuk melihat pembaruannya.')}><span className="atl-channel-wa-avatar">{c.avatar_url?<img src={c.avatar_url} alt=""/>:<Radio size={22}/>}</span><span className="atl-channel-wa-copy"><b>{c.name} {people[c.owner_id]?.is_verified&&<BadgeCheck size={14} className="atl-inline-verified"/>}</b><small>{c.description||'Saluran komunitas Atlantic'}</small><small className="atl-channel-wa-meta">{c.member_count} pengikut · {people[c.owner_id]?.display_name||people[c.owner_id]?.username||'Kreator Atlantic'}</small></span><small className="atl-channel-wa-time">{dateLabel(c.created_at)}</small></button><button type="button" className={joinedChannelIds.includes(c.id)?'is-following':''} onClick={()=>joinedChannelIds.includes(c.id)?joinChannel(c):followChannel(c)} disabled={busy}>{joinedChannelIds.includes(c.id)?'Buka':'Ikuti'}</button></article>;return <><section className="atl-channel-wa-section" id="atl-channel-followed"><header><div><h3>Saluran yang diikuti</h3></div><span>{followed.length}</span></header>{followed.length?followed.map(channelRow):<div className="atl-channel-home-empty">Saluran yang kamu ikuti akan muncul di sini.</div>}</section><section className="atl-channel-wa-section" id="atl-channel-discover"><header><div><h3>Temukan saluran</h3></div><span>{discover.length}</span></header>{discover.length?discover.map(channelRow):<div className="atl-channel-home-empty">{channels.length?'Tidak ada saluran yang cocok.':'Belum ada saluran publik. Jadilah yang pertama membuat saluran.'}</div>}</section></>;})()}
         <button type="button" className="atl-channel-directory-create" onClick={()=>setShowCreate(true)}><Plus size={18}/> Buat saluran</button>
       </div>}
     </div>}
