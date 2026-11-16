@@ -2163,3 +2163,37 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
  .atl-story-viewer-close{top:12px;right:12px}
  .atl-community-modal-actions{grid-template-columns:1fr}
 }
+
+
+/* Live audio/video call surfaces */
+.atl-call-mini-overlay{border:1px solid var(--line,#e5e7eb);border-radius:15px;background:var(--panel,#fff);color:var(--ink);box-shadow:0 12px 40px #0003;backdrop-filter:blur(16px)}
+.atl-call-mini-main{gap:10px;padding:10px 12px}
+.atl-call-mini-icon{width:40px;height:40px;border:0;border-radius:50%;background:var(--paper,#f1f3f5)}
+.atl-call-mini-copy b{font-size:12px;font-weight:850}
+.atl-call-mini-copy small{font-size:10px;color:var(--muted,#777)}
+.atl-call-mini-end{width:36px;height:36px;border:0;border-radius:50%;background:#ef4444;color:#fff;box-shadow:none}
+.atl-call-peer{width:min(100%,520px);max-height:94dvh;overflow:hidden;border:0;border-radius:22px;background:var(--panel,#171a21);color:#fff;box-shadow:0 24px 80px #0007}
+.atl-call-peer>header{padding:16px 18px;border-bottom:1px solid #ffffff20}
+.atl-call-peer>header b{font-size:14px;font-weight:850}
+.atl-call-incoming-icon{width:88px;height:88px;display:grid;place-items:center;margin:28px auto 14px;border:1px solid #ffffff24;border-radius:50%;background:#ffffff12;color:#fff}
+.atl-call-peer>h2{text-align:center;font-size:19px;font-weight:850}
+.atl-call-peer>p{text-align:center;font-size:11px;color:#ffffff9c}
+.atl-call-actions{display:flex;justify-content:center;align-items:center;gap:18px;padding:22px 16px 26px}
+.atl-call-actions button{width:56px;height:56px;display:grid;place-items:center;border:0;border-radius:50%;background:#ffffff20;color:#fff;box-shadow:none}
+.atl-call-actions button.accept{background:#16a34a;color:#fff}
+.atl-call-actions button.decline{background:#ef4444;color:#fff}
+.atl-call-video-grid{position:relative;min-height: min(68dvh,560px);background:#090b10}
+.atl-call-remote-video{width:100%;height:100%;min-height:300px;object-fit:cover;background:#090b10}
+.atl-call-local-video{position:absolute;right:14px;bottom:14px;width:clamp(92px,27%,150px);aspect-ratio:3/4;object-fit:cover;border:2px solid #fff;border-radius:13px;background:#20242b;box-shadow:0 5px 20px #0006}
+.atl-call-audio-art{width:112px;height:112px;display:grid;place-items:center;margin:34px auto 12px;border:1px solid #ffffff25;border-radius:50%;background:#ffffff12;color:#fff}
+.atl-call-error{margin:10px 14px;padding:10px 12px;border:1px solid #f87171;border-radius:10px;background:#7f1d1d33;color:#fecaca;font-size:11px}
+.atl-call-video-settings{padding:12px 15px;border-top:1px solid #ffffff20;background:#171a21;color:#fff}
+.atl-call-header-actions{display:flex;align-items:center;gap:7px}
+.atl-call-header-actions button{width:36px;height:36px;border:1px solid #ffffff24;border-radius:50%;background:#ffffff12;color:#fff}
+@media(max-width:560px){
+ .atl-call-peer{width:100%;height:100dvh;max-height:100dvh;border-radius:0}
+ .atl-call-video-grid{min-height:calc(100dvh - 170px)}
+ .atl-call-remote-video{min-height:calc(100dvh - 170px)}
+ .atl-call-actions{gap:22px;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+ .atl-call-mini-overlay{left:10px;right:10px;bottom:calc(12px + env(safe-area-inset-bottom))}
+}
