@@ -1950,7 +1950,7 @@ export default function App() {
               )}
               <div ref={bottomRef} />
             </div>
-            {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.person.display_name || active.person.username)}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
+            {replyTarget && <div className="reply-composer-preview"><div><b>Membalas {replyTarget.sender_id === session.user.id ? 'pesan sendiri' : (active.is_group ? (replyTarget.senderProfile?.display_name || replyTarget.senderProfile?.username || 'anggota grup') : (active.person?.display_name || active.person?.username || 'pesan'))}</b><span>{replyTarget.body || 'Pesan'}</span></div><button type="button" onClick={() => setReplyTarget(null)} aria-label="Batal membalas"><X size={17}/></button></div>}
             {attachmentPreview && <div className="atl-chat-attachment-preview"><span>{attachmentFile?.name}</span><button type="button" onClick={() => {setAttachmentFile(null);setAttachmentPreview('');}}>Hapus</button></div>}
             {showChatPolls && active.is_group && <div className="atl-chat-polls-panel"><AtlanticPolls targetType="group" targetId={active.conversation_id} user={session.user} canCreate createOnly e2eeKey={e2eeKeyRef.current} e2eeKeyId={e2eeKeyIdRef.current} onKeyReady={(key, keyId) => { e2eeKeyRef.current = key; e2eeKeyIdRef.current = keyId; }} onCreated={() => setShowChatPolls(false)} onNotice={setNotice}/></div>}
             {showAttachmentMenu && <div className="atl-attachment-menu" role="menu" aria-label="Menu lampiran">
