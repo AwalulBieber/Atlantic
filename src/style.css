@@ -2343,3 +2343,11 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-channel-comments form input{flex:1;min-width:0;border:1px solid var(--line,#ddd);border-radius:999px;padding:9px 12px;background:var(--panel,#fff);color:var(--ink);font:inherit;font-size:12px}
 .atl-channel-comments form button{border:0;border-radius:999px;padding:0 14px;background:var(--accent,#ffd84d);color:#171717;font-size:11px;font-weight:900;cursor:pointer}
 .atl-channel-comments form button:disabled{opacity:.5;cursor:not-allowed}
+
+
+/* Channel comment moderation actions */
+.atl-channel-comment-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.atl-channel-comment-heading b{min-width:0;overflow-wrap:anywhere}
+.atl-channel-comment-heading button{border:0;background:transparent;color:var(--muted,#777);font-size:10px;font-weight:700;padding:3px 5px;border-radius:6px;cursor:pointer}
+.atl-channel-comment-heading button:hover{background:var(--surface,#f1f5f9);color:var(--danger,#dc2626)}
+.atl-channel-comment-heading button:disabled{opacity:.45;cursor:not-allowed}
