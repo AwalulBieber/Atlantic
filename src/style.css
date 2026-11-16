@@ -2320,3 +2320,10 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-channel-profile-member-list article small{font-size:10px;color:var(--muted)}
 .atl-channel-profile-member-list article em{margin-left:auto;font-size:10px;font-style:normal;font-weight:800;color:var(--muted)}
 .atl-channel-profile-done{margin:12px;padding:10px;border:2px solid var(--ink);border-radius:9px;background:var(--accent,#ffd84d);color:var(--ink);font-weight:900;box-shadow:2px 2px 0 var(--ink)}
+
+/* Channel post share and moderation actions */
+.atl-channel-message-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.atl-channel-post-actions{display:flex;align-items:center;gap:7px}
+.atl-channel-share-post{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--panel,#fff);color:var(--ink);font-size:10px;font-weight:800;cursor:pointer}
+.atl-channel-share-post:hover{background:var(--accent,#ffd84d);color:var(--ink)}
+.atl-channel-post-actions .atl-channel-delete-post{padding:5px 8px;border-radius:8px;font-size:10px}
