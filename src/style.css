@@ -2076,3 +2076,34 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-profile-photo{width:92px;height:92px;border:0;box-shadow:none}
 .atl-profile-section{padding:16px 18px;border-top:1px solid var(--line,#eee)}
 @media(max-width:560px){.atl-settings-backdrop,.atl-profile-explorer-overlay{padding:0;align-items:end}.atl-settings,.atl-profile-explorer{width:100%;height:94dvh;max-height:94dvh;border-radius:20px 20px 0 0}.atl-settings-tabs{top:61px}}
+
+
+/* Groups, contacts and call history: consistent compact mobile surfaces */
+.group-create-backdrop,.atl-contacts-backdrop,.atl-group-info-backdrop{padding:10px;background:rgba(12,16,24,.42);backdrop-filter:blur(5px)}
+.group-create-modal,.atl-contacts-modal,.atl-group-info{width:min(100%,540px);max-height:min(92dvh,820px);border:0;border-radius:19px;background:var(--panel,#fff);color:var(--ink);box-shadow:0 18px 60px #0003}
+.group-create-modal>header,.atl-contacts-modal>header,.atl-group-info>header{padding:16px 18px;border-bottom:1px solid var(--line,#e5e7eb);background:var(--panel,#fff)}
+.group-create-modal>header h2,.atl-contacts-modal>header h2{font-size:19px;font-weight:850}
+.group-create-modal>label,.atl-contacts-search{border:1px solid var(--line,#ddd);border-radius:11px;background:var(--paper,#f7f8fa)}
+.group-create-modal>label input,.atl-contacts-search input{background:transparent}
+.group-user-list,.atl-contacts-section{border-top:1px solid var(--line,#eee)}
+.group-user-option,.atl-contact-row{padding:11px 13px;border-bottom:1px solid var(--line,#eee);background:transparent}
+.group-user-option:hover,.atl-contact-row:hover{background:color-mix(in srgb,var(--accent,#3478f6) 7%,transparent)}
+.group-create-modal>footer button,.atl-contacts-modal>footer button{border:1px solid var(--line,#ddd);border-radius:10px;box-shadow:none;background:var(--paper,#f7f8fa)}
+.group-create-modal>footer button.primary,.atl-contacts-modal>footer button.primary,.atl-contact-add{border:0;background:var(--accent,#3478f6);color:#fff;box-shadow:none}
+.atl-contacts-section h3{padding:12px 14px 7px;font-size:12px;font-weight:850}
+.atl-contact-avatar{width:43px;height:43px;flex-basis:43px;border:0;border-radius:50%;background:var(--paper,#f1f2f4)}
+.atl-contact-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.atl-contact-person b{font-size:12px;font-weight:800}
+.atl-contact-person small{font-size:10px;color:var(--muted,#777)}
+.atl-contact-actions button{border-radius:99px;box-shadow:none}
+.atl-group-profile{padding:22px 18px 16px}
+.atl-group-avatar{width:86px;height:86px;border:0;box-shadow:none}
+.atl-group-info h2{font-size:19px;font-weight:850}
+.atl-group-members article{padding:10px 14px;border-bottom:1px solid var(--line,#eee)}
+.atl-group-member-avatar{width:39px;height:39px;border:0;border-radius:50%}
+.atl-call-list{display:grid;gap:0;border-top:1px solid var(--line,#e5e7eb)}
+.atl-call-list article{display:flex;align-items:center;gap:12px;padding:13px 5px;border:0;border-bottom:1px solid var(--line,#e5e7eb);border-radius:0;background:transparent;box-shadow:none}
+.atl-call-icon{width:42px;height:42px;display:grid;place-items:center;border:0;border-radius:50%;background:var(--paper,#f1f3f5)}
+.atl-call-list article b{font-size:12px;font-weight:800}
+.atl-call-list article small{font-size:10px;color:var(--muted,#777)}
+@media(max-width:560px){.group-create-backdrop,.atl-contacts-backdrop,.atl-group-info-backdrop{padding:0;align-items:end}.group-create-modal,.atl-contacts-modal,.atl-group-info{width:100%;max-height:94dvh;border-radius:20px 20px 0 0}}
