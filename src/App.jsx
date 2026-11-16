@@ -808,6 +808,18 @@ export default function App() {
       }
       if (!conversationId) throw new Error('Database tidak mengembalikan ID percakapan.');
 
+      // Make a newly created direct conversation visible in the home inbox
+      // immediately, even before the first message is sent.
+      if (!existingChat) {
+        const refreshedChats = await loadProfiles();
+        if (!refreshedChats?.some(chat => chat.conversation_id === conversationId)) {
+          setChats(current => [
+            { conversation_id: conversationId, person, is_group: false },
+            ...current.filter(chat => chat.conversation_id !== conversationId)
+          ]);
+        }
+      }
+
       setUnread(old => {
         const next = { ...old };
         delete next[conversationId];
