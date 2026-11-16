@@ -2107,3 +2107,59 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-call-list article b{font-size:12px;font-weight:800}
 .atl-call-list article small{font-size:10px;color:var(--muted,#777)}
 @media(max-width:560px){.group-create-backdrop,.atl-contacts-backdrop,.atl-group-info-backdrop{padding:0;align-items:end}.group-create-modal,.atl-contacts-modal,.atl-group-info{width:100%;max-height:94dvh;border-radius:20px 20px 0 0}}
+
+
+/* Story composer and full-screen viewer */
+.atl-community-modal-backdrop{padding:12px;background:rgba(12,16,24,.48);backdrop-filter:blur(6px)}
+.atl-community-modal{width:min(100%,500px);max-height:92dvh;overflow:auto;padding:18px;border:0;border-radius:20px;background:var(--panel,#fff);color:var(--ink);box-shadow:0 20px 70px #0004}
+.atl-community-modal header{position:sticky;top:-18px;z-index:2;margin:-18px -18px 15px;padding:16px 18px;background:var(--panel,#fff);border-bottom:1px solid var(--line,#e5e7eb);font-size:17px;font-weight:850}
+.atl-community-modal header button{width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:50%;background:var(--paper,#f4f5f7);color:var(--ink)}
+.atl-community-modal label{gap:8px;margin:13px 0;font-size:12px;font-weight:800}
+.atl-community-modal input,.atl-community-modal textarea{border:1px solid var(--line,#ddd);border-radius:12px;background:var(--paper,#f8f8f8);padding:12px;font-size:13px}
+.atl-story-upload{display:grid;gap:9px;padding:12px;border:1px dashed var(--line,#bbb);border-radius:13px;background:var(--paper,#fafafa)}
+.atl-story-upload>button{justify-self:start;display:flex;align-items:center;gap:7px;padding:9px 12px;border:0;border-radius:10px;background:var(--accent,#3478f6);color:white;font-size:12px;font-weight:800}
+.atl-story-upload>small{font-size:10px;color:var(--muted,#777)}
+.atl-story-preview{display:grid;gap:8px}
+.atl-story-preview img,.atl-story-preview video{width:100%;max-height:340px;object-fit:contain;border-radius:12px;background:#111}
+.atl-story-preview>button{justify-self:start;border:0;border-radius:8px;padding:7px 10px;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:800}
+.atl-community-modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.atl-community-modal-actions button,.atl-community-submit{min-height:42px;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border:0;border-radius:11px;background:var(--accent,#3478f6);color:white;font-size:11px;font-weight:850;box-shadow:none}
+.atl-community-modal-actions button+button{background:var(--paper,#f1f3f5);color:var(--ink)}
+.atl-community-modal-actions button:disabled,.atl-community-submit:disabled{opacity:.5}
+.atl-story-viewer{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:16px;background:#07090fef;backdrop-filter:blur(12px)}
+.atl-story-viewer>article{position:relative;display:flex;flex-direction:column;width:min(100%,430px);height:min(88dvh,780px);overflow:hidden;border-radius:19px;background:#17191f;color:#fff;box-shadow:0 20px 70px #0008}
+.atl-story-viewer>article>header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;background:linear-gradient(#0008,transparent)}
+.atl-story-viewer>article>header b{font-size:13px;font-weight:850}
+.atl-story-viewer>article>header small{font-size:10px;opacity:.7}
+.atl-story-viewer>article>img,.atl-story-viewer>article>video{width:100%;min-height:0;flex:1;object-fit:contain;background:#090a0d}
+.atl-story-viewer>article>p{margin:0;padding:12px 16px;font-size:13px;line-height:1.5;white-space:pre-wrap}
+.atl-story-viewer>article>footer{display:flex;gap:7px;padding:11px;background:#17191f}
+.atl-story-viewer>article>footer button{flex:1;padding:9px 7px;border:1px solid #ffffff38;border-radius:9px;background:#ffffff12;color:#fff;font-size:11px;font-weight:750;box-shadow:none}
+.atl-story-viewer>article>footer button:first-child{background:#7f1d1d;color:#fff;border-color:transparent}
+.atl-story-viewer-close{position:absolute;top:16px;right:16px;z-index:2;width:38px;height:38px;border:1px solid #ffffff55;border-radius:50%;background:#17191f;color:white;font-size:24px;line-height:1}
+
+/* Group invite inbox and account image cropper */
+.atl-group-invites-widget{padding:8px 12px 10px;border-bottom:1px solid var(--line,#e5e7eb)}
+.atl-group-invites-trigger{border:1px solid var(--line,#ddd);border-radius:11px;background:var(--panel,#fff);box-shadow:none;color:var(--ink);font-size:11px}
+.atl-group-invites-trigger b{background:var(--accent,#3478f6);border:0;color:#fff}
+.atl-group-invites-backdrop{padding:12px;background:rgba(12,16,24,.45);backdrop-filter:blur(6px)}
+.atl-group-invites-modal{width:min(100%,500px);max-height:90dvh;border:0;border-radius:19px;background:var(--panel,#fff);color:var(--ink);box-shadow:0 20px 70px #0004}
+.atl-group-invites-modal>header{padding:15px 17px;background:var(--panel,#fff);border-bottom:1px solid var(--line,#e5e7eb)}
+.atl-group-invites-modal>header button{border:1px solid var(--line,#ddd);border-radius:50%;background:var(--paper,#f5f6f8)}
+.atl-group-invites-modal>article{padding:12px 14px;border-bottom:1px solid var(--line,#eee)}
+.atl-group-invites-avatar{width:43px;height:43px;border:0;border-radius:50%;background:var(--paper,#f2f3f5)}
+.atl-group-invites-actions button{border:0;border-radius:9px;background:var(--accent,#3478f6);color:#fff;box-shadow:none}
+.atl-group-invites-actions button+button{background:#fee2e2;color:#991b1b}
+.atl-image-cropper-backdrop{background:rgba(8,12,20,.65);backdrop-filter:blur(8px)}
+.atl-image-cropper{width:min(100%,520px);border:0;border-radius:20px;background:var(--panel,#fff);color:var(--ink);box-shadow:0 20px 70px #0005}
+.atl-image-cropper-stage{border-radius:15px;background:#10131a}
+.atl-image-cropper-controls button,.atl-image-cropper-cancel,.atl-image-cropper-apply{border-radius:10px;box-shadow:none}
+.atl-image-cropper-apply{border:0;background:var(--accent,#3478f6);color:#fff}
+@media(max-width:560px){
+ .atl-community-modal-backdrop,.atl-group-invites-backdrop{padding:0;align-items:end}
+ .atl-community-modal,.atl-group-invites-modal{width:100%;max-height:94dvh;border-radius:20px 20px 0 0}
+ .atl-story-viewer{padding:0}
+ .atl-story-viewer>article{width:100%;height:100dvh;max-height:100dvh;border-radius:0}
+ .atl-story-viewer-close{top:12px;right:12px}
+ .atl-community-modal-actions{grid-template-columns:1fr}
+}
