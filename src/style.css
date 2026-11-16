@@ -2327,3 +2327,19 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-channel-share-post{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--panel,#fff);color:var(--ink);font-size:10px;font-weight:800;cursor:pointer}
 .atl-channel-share-post:hover{background:var(--accent,#ffd84d);color:var(--ink)}
 .atl-channel-post-actions .atl-channel-delete-post{padding:5px 8px;border-radius:8px;font-size:10px}
+
+/* Channel post reactions and comments */
+.atl-channel-post-engagement{display:flex;align-items:center;gap:8px;padding:9px 0 3px;border-top:1px solid var(--line,#e5e7eb);margin-top:10px}
+.atl-channel-reaction,.atl-channel-comments-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 10px;border:1px solid var(--line,#ddd);border-radius:999px;background:var(--panel,#fff);color:var(--ink);font-size:11px;font-weight:800;cursor:pointer}
+.atl-channel-reaction.is-reacted{background:var(--accent-soft,rgba(255,216,77,.22));border-color:var(--accent,#eabf24)}
+.atl-channel-reaction:disabled{opacity:.55;cursor:wait}
+.atl-channel-comments{margin-top:8px;padding:10px;border:1px solid var(--line,#e5e7eb);border-radius:12px;background:var(--surface,#f8fafc)}
+.atl-channel-comment-list{display:flex;flex-direction:column;gap:9px;max-height:230px;overflow:auto}
+.atl-channel-comment-list article{padding:8px 10px;border-radius:9px;background:var(--panel,#fff);border:1px solid var(--line,#e5e7eb)}
+.atl-channel-comment-list article b{display:block;font-size:11px}
+.atl-channel-comment-list article p{margin:3px 0;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.atl-channel-comment-list article small,.atl-channel-comments-empty{font-size:10px;color:var(--muted,#777)}
+.atl-channel-comments form{display:flex;gap:7px;margin-top:10px}
+.atl-channel-comments form input{flex:1;min-width:0;border:1px solid var(--line,#ddd);border-radius:999px;padding:9px 12px;background:var(--panel,#fff);color:var(--ink);font:inherit;font-size:12px}
+.atl-channel-comments form button{border:0;border-radius:999px;padding:0 14px;background:var(--accent,#ffd84d);color:#171717;font-size:11px;font-weight:900;cursor:pointer}
+.atl-channel-comments form button:disabled{opacity:.5;cursor:not-allowed}
