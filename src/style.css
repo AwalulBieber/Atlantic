@@ -2197,3 +2197,79 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
  .atl-call-actions{gap:22px;padding-bottom:calc(24px + env(safe-area-inset-bottom))}
  .atl-call-mini-overlay{left:10px;right:10px;bottom:calc(12px + env(safe-area-inset-bottom))}
 }
+
+
+/* Chat polls: clearer native poll cards, options and live results */
+.atl-polls{display:grid;gap:12px;min-width:0}
+.atl-polls-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;border:1px solid var(--line,#e5e7eb);border-radius:13px;background:var(--panel,#fff)}
+.atl-polls-heading>div{display:flex;align-items:center;gap:9px}
+.atl-polls-heading>div>div{display:grid;gap:2px}
+.atl-polls-heading b{font-size:13px;font-weight:850}
+.atl-polls-heading small{font-size:10px;color:var(--muted,#777)}
+.atl-polls-heading>button{display:flex;align-items:center;gap:6px;padding:8px 11px;border:0;border-radius:9px;background:var(--accent,#3478f6);color:#fff;font-size:10px;font-weight:850;box-shadow:none}
+.atl-poll-create{gap:12px;padding:14px;border:1px solid var(--line,#e5e7eb);border-radius:15px;background:var(--panel,#fff);box-shadow:0 5px 18px #00000008}
+.atl-poll-create label{gap:7px;font-size:11px;font-weight:800}
+.atl-poll-create input,.atl-poll-create select{min-height:42px;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:10px;background:var(--paper,#f8f9fb);font-size:12px}
+.atl-poll-choice-list{gap:8px}
+.atl-poll-choice-list>div button{width:38px;flex:0 0 38px;border:1px solid var(--line,#ddd);border-radius:9px}
+.atl-poll-add-choice{padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--paper,#f7f8fa);font-size:10px}
+.atl-poll-create-actions{gap:8px}
+.atl-poll-create-actions button{min-height:38px;padding:8px 13px;border-radius:9px;font-size:11px;font-weight:850;box-shadow:none}
+.atl-poll-create-actions button:last-child{border:0;background:var(--accent,#3478f6);color:#fff}
+.atl-poll-error{padding:9px 11px;border:1px solid #fca5a5;border-radius:9px;background:#fef2f2;color:#991b1b;font-size:11px}
+.atl-polls-empty{display:grid;justify-items:center;gap:8px;padding:28px 15px;border:1px dashed var(--line,#ccc);border-radius:14px;color:var(--muted,#777);font-size:11px}
+.atl-poll-card{display:grid;gap:11px;padding:13px;border:1px solid var(--line,#e5e7eb);border-radius:14px;background:var(--panel,#fff);color:var(--ink);box-shadow:0 4px 16px #00000008}
+.atl-poll-card>header{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.atl-poll-card>header b{font-size:13px;font-weight:850;line-height:1.4}
+.atl-poll-tag{padding:4px 7px;border:1px solid var(--line,#ddd);border-radius:99px;font-size:9px;font-weight:750}
+.atl-poll-options{display:grid;gap:8px}
+.atl-poll-option-label{display:grid;gap:5px}
+.atl-poll-option>button{width:100%;min-height:40px;display:flex;align-items:center;justify-content:space-between;gap:9px;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:10px;background:var(--paper,#f8f9fb);color:var(--ink);text-align:left;font-size:11px;box-shadow:none}
+.atl-poll-option.is-selected>button{border-color:var(--accent,#3478f6);background:color-mix(in srgb,var(--accent,#3478f6) 9%,var(--panel,#fff))}
+.atl-poll-progress{height:6px;overflow:hidden;border-radius:99px;background:var(--paper,#eceef1)}
+.atl-poll-progress span{display:block;height:100%;border-radius:99px;background:var(--accent,#3478f6);transition:width .25s ease}
+.atl-poll-voters{font-size:10px;color:var(--muted,#777)}
+.atl-poll-card-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.atl-poll-card-actions button,.atl-poll-close,.atl-poll-delete{padding:7px 9px;border:1px solid var(--line,#ddd);border-radius:8px;background:var(--paper,#f7f8fa);color:var(--ink);font-size:10px;font-weight:750;box-shadow:none}
+.atl-poll-close{background:var(--accent,#3478f6);border-color:transparent;color:#fff}
+.atl-poll-delete{color:#b91c1c}
+.atl-poll-reactions{display:flex;gap:6px;flex-wrap:wrap}
+.atl-poll-reactions button{padding:5px 8px;border:1px solid var(--line,#ddd);border-radius:99px;background:var(--paper,#f8f8f8);font-size:12px}
+.atl-poll-reaction-summary{font-size:10px;color:var(--muted,#777)}
+.atl-chat-polls-panel{padding:10px 0}
+.bubble .atl-poll-card{padding:8px 2px;box-shadow:none}
+
+/* Privacy controls: make saved account choices easy to scan */
+.atl-settings-body .atl-switch-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px;border:1px solid var(--line,#e5e7eb);border-radius:13px;background:var(--paper,#fafafa)}
+.atl-settings-body .atl-switch-row>span{display:grid;gap:4px;min-width:0}
+.atl-settings-body .atl-switch-row b{font-size:12px;font-weight:850}
+.atl-settings-body .atl-switch-row small{font-size:10px;line-height:1.45;color:var(--muted,#777)}
+.atl-settings-body .atl-switch-row input[type=checkbox]{width:19px;height:19px;flex:0 0 19px;accent-color:var(--accent,#3478f6)}
+.atl-settings-body>label:not(.atl-switch-row){display:grid;gap:7px;font-size:11px;font-weight:850}
+.atl-settings-body>label:not(.atl-switch-row) select{min-height:42px;padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:10px;background:var(--paper,#f8f8f8);color:var(--ink);font-size:12px}
+.atl-settings-body .atl-settings-hint{font-size:10px;line-height:1.5;color:var(--muted,#777);font-weight:500}
+
+/* Performance and motion preferences */
+.settings-modal{width:min(100%,620px);max-height:min(92dvh,850px);border:0;border-radius:20px;background:var(--panel,#fff);box-shadow:0 20px 70px #0004;overflow:auto}
+.settings-header{position:sticky;top:0;z-index:4;padding:15px 18px;background:var(--panel,#fff);border-bottom:1px solid var(--line,#e5e7eb)}
+.settings-header h2{font-size:19px;font-weight:850}
+.settings-tabs{position:sticky;top:64px;z-index:3;display:flex;gap:6px;padding:10px 14px;background:var(--panel,#fff);border-bottom:1px solid var(--line,#eee)}
+.settings-tabs button{padding:8px 12px;border:1px solid var(--line,#ddd);border-radius:99px;background:var(--paper,#f7f8fa);color:var(--ink);font-size:11px;font-weight:750}
+.settings-tabs button.active{border-color:var(--accent,#3478f6);background:var(--accent,#3478f6);color:#fff}
+.settings-content{padding:15px}
+.setting-group{margin:0 0 15px;padding:14px;border:1px solid var(--line,#e5e7eb);border-radius:14px;background:var(--panel,#fff)}
+.setting-group h3{font-size:13px;font-weight:850}
+.setting-group p{font-size:10px;line-height:1.5;color:var(--muted,#777)}
+.fps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:12px}
+.fps-choice{display:grid;gap:4px;min-height:62px;padding:10px;border:1px solid var(--line,#ddd);border-radius:11px;background:var(--paper,#f8f9fa);color:var(--ink);text-align:left;box-shadow:none}
+.fps-choice b{font-size:12px;font-weight:900}
+.fps-choice small{font-size:9px;color:var(--muted,#777)}
+.fps-choice.selected{border-color:var(--accent,#3478f6);background:color-mix(in srgb,var(--accent,#3478f6) 9%,var(--panel,#fff))}
+.setting-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.setting-toggle>div{min-width:0}
+.setting-toggle .toggle{width:46px;height:26px;flex:0 0 46px;border:0;border-radius:99px;background:#9ca3af;padding:3px;box-shadow:none}
+.setting-toggle .toggle span{display:block;width:20px;height:20px;border-radius:50%;background:white;transition:transform .2s ease}
+.setting-toggle .toggle.on{background:var(--accent,#3478f6)}
+.setting-toggle .toggle.on span{transform:translateX(20px)}
+.settings-footer{position:sticky;bottom:0;padding:11px 15px;background:var(--panel,#fff);border-top:1px solid var(--line,#e5e7eb)}
+@media(max-width:560px){.settings-backdrop{padding:0;align-items:end}.settings-modal{width:100%;height:94dvh;max-height:94dvh;border-radius:20px 20px 0 0}.settings-tabs{top:60px}}
