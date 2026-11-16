@@ -2283,3 +2283,15 @@ html[data-theme="dark"] .bubble-color-row small { color:#bbb; }
 .atl-group-invite-qr b{font-size:12px;font-weight:900}
 .atl-group-invite-qr small{font-size:10px;color:#64748b}
 .atl-group-invite-qr a{margin-top:4px;padding:8px 12px;border-radius:9px;background:#111827;color:#fff;text-decoration:none;font-size:10px;font-weight:850}
+
+
+/* Atlantic channel invite link, share actions and QR card */
+.atl-channel-invite-link{display:grid;gap:9px;padding:11px;border:1px solid var(--line,#e5e7eb);border-radius:13px;background:var(--panel,#fff)}
+.atl-channel-invite-link>input{width:100%;min-width:0;padding:9px 10px;border:1px solid var(--line,#ddd);border-radius:9px;background:var(--paper,#f8f9fb);font-size:10px;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.atl-channel-invite-actions{display:flex;flex-wrap:wrap;gap:7px}
+.atl-channel-invite-actions button{flex:1;min-width:82px;padding:8px 10px;border:1px solid var(--ink,#222);border-radius:9px;background:var(--accent,#ffd84d);color:var(--ink,#171717);font-size:10px;font-weight:900;box-shadow:2px 2px 0 var(--ink,#222)}
+.atl-channel-invite-qr{display:grid;justify-items:center;gap:6px;padding:14px;border:1px solid #e5e7eb;border-radius:13px;background:#fff;color:#111827;text-align:center}
+.atl-channel-invite-qr img{display:block;width:min(100%,220px);height:auto;aspect-ratio:1;object-fit:contain}
+.atl-channel-invite-qr b{font-size:12px;font-weight:900}
+.atl-channel-invite-qr small{font-size:10px;color:#64748b}
+.atl-channel-invite-qr a{margin-top:4px;padding:8px 12px;border-radius:9px;background:#111827;color:#fff;text-decoration:none;font-size:10px;font-weight:850}
