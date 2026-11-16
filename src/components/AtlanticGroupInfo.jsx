@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { supabase } from '../supabase';
 import { X, Users, BadgeCheck, Camera, ShieldCheck, Send } from 'lucide-react';
 
@@ -14,6 +15,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
   const [avatarPreview,setAvatarPreview]=useState('');
   const [avatarUrl,setAvatarUrl]=useState('');
   const [inviteLink,setInviteLink]=useState('');
+  const [inviteQr,setInviteQr]=useState('');
   const [inviteLinkId,setInviteLinkId]=useState('');
   const [inviteBusy,setInviteBusy]=useState(false);
   const [inviteExpiry,setInviteExpiry]=useState('never');
@@ -37,6 +39,14 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
   }
 
   useEffect(()=>{load();},[conversationId]);
+  useEffect(()=>{
+    let active=true;
+    if(!inviteLink){setInviteQr('');return ()=>{active=false;};}
+    QRCode.toDataURL(inviteLink,{width:260,margin:2,errorCorrectionLevel:'M',color:{dark:'#111827',light:'#ffffff'}})
+      .then(dataUrl=>{if(active)setInviteQr(dataUrl);})
+      .catch(()=>{if(active)setError('QR undangan gagal dibuat. Coba buat ulang link undangan.');});
+    return ()=>{active=false;};
+  },[inviteLink]);
   useEffect(()=>()=>{if(avatarPreview)URL.revokeObjectURL(avatarPreview);},[avatarPreview]);
   const isAdmin=members.some(m=>m.user_id===user.id&&m.role==='admin');
 
@@ -112,7 +122,7 @@ export default function AtlanticGroupInfo({ conversationId, user, onClose, onUpd
           <label>Masa berlaku<select value={inviteExpiry} onChange={e=>setInviteExpiry(e.target.value)}><option value="never">Tidak kedaluwarsa</option><option value="1">1 hari</option><option value="7">7 hari</option><option value="30">30 hari</option></select></label>
           <label>Batas penggunaan (opsional)<input type="number" min="1" max="10000" value={inviteMaxUses} onChange={e=>setInviteMaxUses(e.target.value)} placeholder="Kosong = tanpa batas"/></label>
           <button type="button" onClick={createInviteLink} disabled={inviteBusy}>{inviteBusy?'Memproses…':'Buat / perbarui link undangan'}</button>
-          {inviteLink&&<><input readOnly value={inviteLink} onFocus={e=>e.target.select()}/><div><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(inviteLink);onNotice?.('Link disalin.');}catch{setError('Gagal menyalin otomatis. Tekan dan tahan link untuk menyalin.');}}}>Salin link</button><button type="button" className="atl-group-invite-revoke" onClick={revokeInviteLink} disabled={inviteBusy}>Nonaktifkan link</button></div></>}
+          {inviteLink&&<><input readOnly value={inviteLink} onFocus={e=>e.target.select()}/><div className="atl-group-invite-link-actions"><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(inviteLink);onNotice?.('Link disalin.');}catch{setError('Gagal menyalin otomatis. Tekan dan tahan link untuk menyalin.');}}}>Salin link</button><button type="button" onClick={async()=>{try{if(navigator.share)await navigator.share({title:'Undangan grup '+group.title,text:'Gabung ke grup Atlantic '+group.title, url:inviteLink});else{await navigator.clipboard.writeText(inviteLink);onNotice?.('Link undangan disalin untuk dibagikan.');}}catch(error){if(error?.name!=='AbortError')setError('Link gagal dibagikan. Salin link secara manual.');}}}>Bagikan</button><button type="button" className="atl-group-invite-revoke" onClick={revokeInviteLink} disabled={inviteBusy}>Nonaktifkan link</button></div>{inviteQr&&<div className="atl-group-invite-qr"><img src={inviteQr} alt="QR code undangan grup Atlantic"/><b>Pindai untuk bergabung</b><small>QR ini berisi link undangan grup yang sama.</small><a href={inviteQr} download="atlantic-group-invite-qr.png">Simpan QR</a></div>}</>}
         </section>}
         {isAdmin&&<form className="atl-group-edit" onSubmit={saveGroup}>
           <label>Nama grup<input value={group.title||''} maxLength={60} onChange={e=>setGroup({...group,title:e.target.value})}/></label>
