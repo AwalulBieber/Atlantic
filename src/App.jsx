@@ -2134,14 +2134,27 @@ export default function App() {
               </>}
 
               {settingsTab === 'about' && (
-                <div className="about-card">
-                  <div className="about-logo"><Waves size={34} /></div>
-                  <h2>ATLANTIC</h2><p>Ruang obrolanmu, terhubung kapan saja.</p>
-                  <div className="about-meta">
-                    <span>Versi</span><b>1.2.0</b><span>Platform</span><b>Atlantic Web</b><span>UI</span><b>Neobrutalism + Liquid Glass</b>
-                  </div>
-                  <a href="https://github.com/AwalulBieber/Atlantic" target="_blank" rel="noreferrer">Lihat repository GitHub ↗</a>
-                  <small className="about-note">Dibuat untuk percakapan yang lebih nyaman. Pengaturan tampilan tersimpan di perangkat ini.</small>
+                <div className="about-page">
+                  <section className="about-app-card">
+                    <div className="about-app-mark"><Waves size={42} strokeWidth={1.8} /></div>
+                    <div className="about-app-copy">
+                      <h2>Atlantic</h2>
+                      <div className="about-app-tags"><span>1.2.0</span><span>WEB APP</span></div>
+                    </div>
+                  </section>
+                  <section className="about-developer-card">
+                    <div className="about-developer-cover" aria-hidden="true"><span>ATLANTIC / DEVELOPER</span></div>
+                    <div className="about-developer-info">
+                      <div><h2>AwalulBieber</h2><b>PENGEMBANG</b></div>
+                      <img src="/atlantic-developer.jpg" alt="Foto profil AwalulBieber" />
+                    </div>
+                  </section>
+                  <section className="about-socials">
+                    <h3>MEDIA SOSIAL</h3>
+                    <a href="https://www.instagram.com/4wlull_/" target="_blank" rel="noreferrer"><span className="about-social-icon">◎</span><span>Instagram <i>·</i> @4wlull_</span><b>↗</b></a>
+                    <a href="https://www.tiktok.com/@AwalulBieber" target="_blank" rel="noreferrer"><span className="about-social-icon">♪</span><span>TikTok <i>·</i> @AwalulBieber</span><b>↗</b></a>
+                  </section>
+                  <div className="about-footer-links"><a href="https://github.com/AwalulBieber/Atlantic" target="_blank" rel="noreferrer">Repository GitHub ↗</a><span>Atlantic · Dibuat dengan sepenuh hati</span></div>
                 </div>
               )}
             </div>
